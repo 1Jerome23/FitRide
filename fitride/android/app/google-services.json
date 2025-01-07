@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "266186848908",
+    "project_id": "fitride-274ac",
+    "storage_bucket": "fitride-274ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:266186848908:android:0771fcade57dc8ee2719a9",
+        "android_client_info": {
+          "package_name": "com.example.fitride"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzjRJRZAhcBIssNKP5OyCufZ2alP2pmUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
