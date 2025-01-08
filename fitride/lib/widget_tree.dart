@@ -25,3 +25,5 @@ class _WidgetTreeState extends State<WidgetTree> {
     );
   }
 }
+
+// for handling redirection to user authentication

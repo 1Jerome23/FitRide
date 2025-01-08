@@ -31,3 +31,4 @@ class Auth {
     await _firebaseAuth.signOut();
   }
 }
+// for firebase authentication, signing and registering users
