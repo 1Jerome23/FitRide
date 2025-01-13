@@ -60,43 +60,43 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-Widget _loginOrRegisterButton() {
-  return TextButton(
-    onPressed: () {
-      setState(() {
-        isLogin = !isLogin;
-      });
-    },
-    child: RichText(
-      text: TextSpan(
-        text: isLogin ? "Don't have an account? " : "Already have an account? ",
-        style: TextStyle(color: Colors.white),
-        children: [
-          TextSpan(
-            text: isLogin ? 'Register instead' : 'Login instead',
-            style: TextStyle(color: Colors.yellow[700], fontWeight: FontWeight.bold),
-          ),
-        ],
+  Widget _loginOrRegisterButton() {
+    return TextButton(
+      onPressed: () {
+        setState(() {
+          isLogin = !isLogin;
+        });
+      },
+      child: RichText(
+        text: TextSpan(
+          text: isLogin ? "Don't have an account? " : "Already have an account? ",
+          style: TextStyle(color: Colors.white),
+          children: [
+            TextSpan(
+              text: isLogin ? 'Register instead' : 'Login instead',
+              style: TextStyle(color: Colors.yellow[700], fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
-  return TextField(
-    controller: controller,
-    obscureText: isPassword,
-    decoration: InputDecoration(
-      labelText: title,
-      floatingLabelBehavior: FloatingLabelBehavior.never, 
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15), 
+  Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      decoration: InputDecoration(
+        labelText: title,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
-      filled: true, 
-      fillColor: Colors.white,
-    ),
-  );
-}
+    );
+  }
 
   Widget _errorMessage() {
     return errorMessage == null || errorMessage!.isEmpty
@@ -122,91 +122,99 @@ Widget _entryField(String title, TextEditingController controller, {bool isPassw
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color.fromARGB(255, 56, 56, 56), Color(0xFF383838)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Container(
+            height: MediaQuery.of(context).size.height, 
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color.fromARGB(255, 56, 56, 56), Color(0xFF383838)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Container(
-                margin: const EdgeInsets.only(top: 30.0),
-                child: Text(
-                  'Welcome to',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
-                  color: Colors.white),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  margin: const EdgeInsets.only(top: 30.0),
+                  child: Text(
+                    'Welcome to',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
                 ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(top: 5.0),
-                child: Image.asset(
-                  'assets/fitride_logo.png',
-                  width: 350.0,
-                  height: 150.0,
+                Container(
+                  margin: const EdgeInsets.only(top: 5.0),
+                  child: Image.asset(
+                    'assets/fitride_logo.png',
+                    width: 350.0,
+                    height: 150.0,
+                  ),
                 ),
-              ),
-              SizedBox(height: 15),
-              Container(
-                width: 350,
-                decoration: BoxDecoration(
-                  color: Colors.white, // Set background color to white
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: Offset(0, 3), // Shadow direction
-                    ),
-                  ],
+                SizedBox(height: 15),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white, 
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: _entryField('Email', _controllerEmail),
                 ),
-                child: _entryField('Email', _controllerEmail),
-              ),
-              SizedBox(height: 15),
-              Container(
-                width: 350,
-                decoration: BoxDecoration(
-                  color: Colors.white, // Set background color to white
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: Offset(0, 3), // Shadow direction
-                    ),
-                  ],
+                SizedBox(height: 15),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white, 
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: _entryField('Password', _controllerPassword, isPassword: true),
                 ),
-                child: _entryField('Password', _controllerPassword, isPassword: true),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: Text('Forgot Password?', style: TextStyle(color: Colors.blue)),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: Text('Forgot Password?', style: TextStyle(color: Colors.blue)),
+                  ),
                 ),
-              ),
-              _errorMessage(),
-              SizedBox(height: 10),
-              Container(
-                width: 300,
-                child: _submitButton(),
-              ),
-              SizedBox(height: 5),
-              Container(
-                width: 300,
-                child: _loginOrRegisterButton(),
-              ),
-              SizedBox(width: 350, child: _socialButton('Connect with Facebook', Colors.blueAccent, Icons.facebook, () {})),
-              SizedBox(height: 10),
-              SizedBox(width: 350, child: _socialButton('Connect with Google', Colors.red, FontAwesomeIcons.google, () {})),
-            ],
+                _errorMessage(),
+                SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  child: _submitButton(),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  width: double.infinity, 
+                  child: _loginOrRegisterButton(),
+                ),
+                SizedBox(height: 20), 
+                Container(
+                  width: double.infinity,
+                  child: _socialButton('Connect with Facebook', Colors.blueAccent, Icons.facebook, () {}),
+                ),
+                SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  child: _socialButton('Connect with Google', Colors.red, FontAwesomeIcons.google, () {}),
+                ),
+              ],
+            ),
           ),
         ),
       ),
