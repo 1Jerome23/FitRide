@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:geolocator/geolocator.dart';
-import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
-import 'DateDetailsPage.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 void main() {
   runApp(MyApp());
@@ -21,16 +16,70 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class FitRidePage extends StatelessWidget {
-  final List<Map<String, String>> dates = [
-    {"day": "Mon", "date": "06"},
-    {"day": "Tue", "date": "07"},
-    {"day": "Wed", "date": "08"},
-    {"day": "Thu", "date": "09"},
-    {"day": "Fri", "date": "10"},
-    {"day": "Sat", "date": "11"},
-    {"day": "Sun", "date": "12"},
-  ];
+class FitRidePage extends StatefulWidget {
+  @override
+  _FitRidePageState createState() => _FitRidePageState();
+}
+
+class _FitRidePageState extends State<FitRidePage> {
+  late List<Map<String, String>> dates;
+  late String selectedDate; // For tracking the selected date
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize the dates, including today as the latest date
+    dates = _generateDateList();
+    selectedDate =
+        "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
+  }
+
+  // Generate a list of the past 7 days, ending on today's date
+  List<Map<String, String>> _generateDateList() {
+    List<Map<String, String>> dateList = [];
+    DateTime today = DateTime.now();
+    for (int i = 6; i >= 0; i--) {
+      DateTime date = today.subtract(Duration(days: i));
+      dateList.add({
+        "day": DateFormat.E().format(date), // Mon, Tue, etc.
+        "date": DateFormat.d().format(date), // Numeric date
+      });
+    }
+    return dateList;
+  }
+
+  // Show a date picker for selecting an older date
+  Future<void> _showCalendar() async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020), // Limit to recent years
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: Colors.orange, // Header background color
+              onPrimary: Colors.black, // Header text color
+              surface: Colors.black, // Surface color
+              onSurface: Colors.white, // Text color
+            ),
+            dialogBackgroundColor: Colors.black,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        selectedDate =
+            "${DateFormat.E().format(pickedDate)} ${DateFormat.d().format(pickedDate)}";
+        print("Selected Date: $selectedDate"); // Debugging
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,22 +138,21 @@ class FitRidePage extends StatelessWidget {
                   itemCount: dates.length,
                   itemBuilder: (context, index) {
                     final date = dates[index];
+                    bool isSelected =
+                        selectedDate == "${date['day']} ${date['date']}";
+
                     return GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => DateDetailsPage(
-                              date: "${date['day']} ${date['date']}",
-                            ),
-                          ),
-                        );
+                        setState(() {
+                          selectedDate = "${date['day']} ${date['date']}";
+                          print("Selected Date: $selectedDate"); // Debugging
+                        });
                       },
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 8.0),
                         width: 60,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isSelected ? Colors.orange : Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
@@ -120,7 +168,7 @@ class FitRidePage extends StatelessWidget {
                             Text(
                               date['day']!,
                               style: GoogleFonts.roboto(
-                                color: Colors.black,
+                                color: isSelected ? Colors.white : Colors.black,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -129,7 +177,7 @@ class FitRidePage extends StatelessWidget {
                             Text(
                               date['date']!,
                               style: GoogleFonts.roboto(
-                                color: Colors.black,
+                                color: isSelected ? Colors.white : Colors.black,
                                 fontSize: 16,
                               ),
                             ),
@@ -140,10 +188,24 @@ class FitRidePage extends StatelessWidget {
                   },
                 ),
               ),
-
-              SizedBox(
-                height: 10,
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _showCalendar,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[900],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  "More",
+                  style: GoogleFonts.roboto(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
               ),
+              Spacer(),
               // Data Cards
               buildDataCard("Weight", "80kg"),
               buildDataCard("Height", "170cm"),
