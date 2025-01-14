@@ -5,6 +5,9 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';  
+
 
 void main() {
   runApp(MyApp());
@@ -232,82 +235,147 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _greeting() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Hello, $_name!',
-          style: GoogleFonts.poppins(
-            textStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Hello, $_name!',
+        style: GoogleFonts.poppins(
+          textStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
         ),
-        Text(
-          'Welcome to FitRide',
-          style: GoogleFonts.poppins(
-            textStyle: TextStyle(fontSize: 16, color: Colors.black),
-          ),
+      ),
+      Text(
+        'Welcome to FitRide',
+        style: GoogleFonts.poppins(
+          textStyle: TextStyle(fontSize: 16, color: Colors.black),
         ),
-        SizedBox(height: 20),
-        isLoading
-            ? CircularProgressIndicator()
-            : locationError
-                ? Column(
-                    children: [
-                      Text(
-                        _weatherMessage,
-                        style: TextStyle(fontSize: 16, color: Colors.black),
-                      ),
-                      SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: _fetchWeather,
-                        child: Text("Enable Location & Retry"),
-                      ),
-                    ],
-                  )
-                : weatherError
-                    ? Column(
+      ),
+      SizedBox(height: 20),
+      isLoading
+          ? CircularProgressIndicator()
+          : locationError
+              ? Column(
+                  children: [
+                    Text(
+                      _weatherMessage,
+                      style: TextStyle(fontSize: 16, color: Colors.black),
+                    ),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _fetchWeather,
+                      child: Text("Enable Location & Retry"),
+                    ),
+                  ],
+                )
+              : weatherError
+                  ? Column(
+                      children: [
+                        Text(
+                          _weatherMessage,
+                          style: TextStyle(fontSize: 16, color: Colors.black),
+                        ),
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: _fetchWeather,
+                          child: Text("Retry"),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             _weatherMessage,
                             style: TextStyle(fontSize: 16, color: Colors.black),
+                            textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: _fetchWeather,
-                            child: Text("Retry"),
-                          ),
+                          SizedBox(height: 20),
+                          Image.asset(_weatherImage, height: 200),
                         ],
-                      )
-                    : Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _weatherMessage,
-                              style: TextStyle(fontSize: 16, color: Colors.black),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 20),
-                            Image.asset(_weatherImage, height: 200),
-                          ],
-                        ),
                       ),
-        SizedBox(height: 30),
-        Text(
-          'Cycling Recommendation:',
-          style: GoogleFonts.poppins(
-            textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
+                    ),
+      SizedBox(height: 30),
+      
+      ElevatedButton(
+        onPressed: _recordWeather,  
+        child: Text("Record the weather today?"),
+      ),
+      
+      SizedBox(height: 20),
+
+      Text(
+        'Cycling Recommendation:',
+        style: GoogleFonts.poppins(
+          textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
         ),
-        SizedBox(height: 10),
-        Text(
-          cyclingRecommendations[_currentRecommendationIndex],
-          style: TextStyle(fontSize: 16, color: Colors.black),
-        ),
-        SizedBox(height: 20),
-      ],
+      ),
+      SizedBox(height: 10),
+      Text(
+        cyclingRecommendations[_currentRecommendationIndex],
+        style: TextStyle(fontSize: 16, color: Colors.black),
+      ),
+      SizedBox(height: 20),
+    ],
+  );
+}
+void _recordWeather() async {
+  User? user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("User is not authenticated! Please log in.")),
+    );
+    return;
+  }
+
+  String userUID = user.uid;  
+
+  Position? position = await _getCurrentLocation();
+  if (position == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Unable to fetch location. Please enable location services.")),
+    );
+    return;
+  }
+
+  final response = await http.get(Uri.parse(
+    'https://api.open-meteo.com/v1/forecast?latitude=${position.latitude}&longitude=${position.longitude}&current_weather=true',
+  ));
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+
+    final temperature = data['current_weather']['temperature'].toString();
+    final humidity = data['current_weather']['humidity'].toString();
+    final airQuality = data['current_weather']['weathercode'] == 1
+        ? "Good"
+        : "Moderate";  
+
+    final weatherData = {
+      'temperature': temperature,
+      'humidity': humidity,
+      'airQuality': airQuality,
+      'userUID': userUID,
+      'date': DateTime.now().toIso8601String(),
+    };
+
+    FirebaseFirestore.instance.collection('weatherData').add(weatherData).then((value) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Weather recorded successfully to Firebase!")),
+      );
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to record weather: $error")),
+      );
+    });
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Failed to fetch weather data.")),
     );
   }
+}
+
 
   void _onItemTapped(int index) {
     setState(() {
