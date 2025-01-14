@@ -235,7 +235,7 @@ class _HomePageState extends State<HomePage> {
     _saveRecommendationIndex(_currentRecommendationIndex);
   }
 
-  Widget _greeting() {
+ Widget _greeting() {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -299,7 +299,12 @@ class _HomePageState extends State<HomePage> {
       SizedBox(height: 30),
       
       ElevatedButton(
-        onPressed: _recordWeather,  
+        onPressed: () {
+          _showRecordWeatherDialog();
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Color(0xFFF89C23), // Orange color
+        ),
         child: Text("Record the weather today?"),
       ),
       
@@ -318,6 +323,44 @@ class _HomePageState extends State<HomePage> {
       ),
       SizedBox(height: 20),
     ],
+  );
+}
+void _showRecordWeatherDialog() {
+showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(
+          'Confirmation',
+          style: TextStyle(color: Colors.black), // Title color
+        ),
+        content: Text(
+          'Only record the weather when you\'re gonna have an activity for more accurate data analysis tailored for you!',
+          style: TextStyle(color: Colors.black), // Content color
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close the dialog
+            },
+            child: Text(
+              'No',
+              style: TextStyle(color: Colors.black), // Action button text color
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              _recordWeather(); // Proceed with the action
+              Navigator.of(context).pop(); // Close the dialog
+            },
+            child: Text(
+              'Yes',
+              style: TextStyle(color: Colors.black), // Action button text color
+            ),
+          ),
+        ],
+      );
+    },
   );
 }
 void _recordWeather() async {
@@ -377,7 +420,6 @@ void _recordWeather() async {
   }
 }
 
-
  void _onItemTapped(int index) {
   setState(() {
     _selectedIndex = index;
@@ -411,22 +453,31 @@ void _recordWeather() async {
   }
 }
 
-  @override
+@override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
       automaticallyImplyLeading: false, 
+      backgroundColor: Theme.of(context).primaryColor,
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('FitRide'),
-          Image.asset(
-            'assets/logobike.png', 
-            height: 40, 
+          // FitRide Title Section
+          Text(
+            "FitRide",
+            style: GoogleFonts.roboto(
+              color: Colors.orange,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Icon(
+            Icons.pedal_bike,
+            color: Colors.orange,
+            size: 28,
           ),
         ],
       ),
-      backgroundColor: Theme.of(context).primaryColor,
     ),
     bottomNavigationBar: BottomNavigationBar(
       currentIndex: _selectedIndex,
@@ -458,4 +509,5 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
 }

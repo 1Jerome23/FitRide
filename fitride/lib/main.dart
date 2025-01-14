@@ -4,8 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
 
-
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -20,29 +18,30 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.orange,
+        primaryColor: Colors.black, // Set primary color to black
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Color(0xFFF89C23),
-          secondary: Color(0xFFF89C23),
+          primary: Colors.black, // Set primary color to black
+          secondary: Colors.black, // Set secondary color to black
         ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         textTheme: Theme.of(context).textTheme.apply(
-              bodyColor: Colors.black,
-              displayColor: Colors.black,
+              bodyColor: Colors.white, // Set text color to white
+              displayColor: Colors.white, // Set text color to white
             ),
         appBarTheme: AppBarTheme(
-          backgroundColor: Color(0xFFF89C23),
+          backgroundColor: Colors.black, // Set AppBar background color to black
           elevation: 5,
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20), // Set title text color to white
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Color(0xFFF89C23), 
-          unselectedItemColor: Colors.grey,
+          selectedItemColor: Colors.white, // Set selected item color to white
+          unselectedItemColor: Colors.grey, // Set unselected item color to grey
+          backgroundColor: Colors.black, // Set background color of BottomNavigationBar to black
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(Color(0xFFF89C23)), 
-            foregroundColor: MaterialStateProperty.all(Colors.white), 
+            backgroundColor: MaterialStateProperty.all(Colors.black), // Set button background color to black
+            foregroundColor: MaterialStateProperty.all(Colors.white), // Set button text color to white
           ),
         ),
       ),
