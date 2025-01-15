@@ -1,3 +1,5 @@
+import 'package:fitride/pages/UserDataModule.dart';
+import 'package:fitride/pages/login_register.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +9,7 @@ import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
+import 'question.dart'; 
 
 
 void main() {
@@ -85,58 +88,89 @@ class _HomePageState extends State<HomePage> {
     "Check your tire pressure before heading out."
   ];
   int _currentRecommendationIndex = 0;
+  bool _isFirstLogin = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPreferences();
     _fetchWeather();
     _loadRecommendationIndex();
     _startRecommendationTimer();
+    _checkFirstLogin();
+    _initializePreferences();
   }
 
-  Future<void> _loadPreferences() async {
-    _prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _name = _prefs.getString('userName') ?? '';
-    });
 
-    if (_name.isEmpty) {
-      _askForName();
+  Future<void> _initializePreferences() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _name = prefs.getString('userName') ?? '';
+    });
+  }
+
+  Future<void> _checkFirstSignupOrLogin() async {
+  _prefs = await SharedPreferences.getInstance();
+  bool isFirstSignup = _prefs.getBool('isFirstSignup') ?? true; 
+  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true; 
+
+  if (isFirstSignup || isFirstLogin) {
+    if (isFirstSignup) {
+      _prefs.setBool('isFirstSignup', false);
+    }
+    if (isFirstLogin) {
+      _prefs.setBool('isFirstLogin', false); 
+    }
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
+  }
+}
+  void _checkFirstLogin() async {
+    _prefs = await SharedPreferences.getInstance();
+    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+
+    if (isFirstLogin) {
+      _prefs.setBool('isFirstLogin', false); 
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
     }
   }
+  void _onLoginSuccess() {
+  _prefs.setBool('isFirstLogin', false); 
+  _showFirstLoginDialog(); 
+  }
 
-  void _askForName() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        TextEditingController nameController = TextEditingController();
-        return AlertDialog(
-          title: Text('Enter your name'),
-          content: TextField(
-            controller: nameController,
-            decoration: InputDecoration(hintText: 'Your name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _saveName(nameController.text);
-                Navigator.of(context).pop();
-              },
-              child: Text('Save'),
+
+ void _showFirstLoginDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(
+          "Welcome!",
+          style: TextStyle(color: Colors.black), 
+        ),
+        content: Text(
+          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
+          style: TextStyle(color: Colors.black), 
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: Text(
+              "OK",
+              style: TextStyle(color: Colors.black), 
             ),
-          ],
-        );
-      },
-    );
-  }
+            onPressed: () {
+              Navigator.of(context).pop(); 
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => QuestionPage()),
+              );
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
-  Future<void> _saveName(String name) async {
-    _prefs.setString('userName', name);
-    setState(() {
-      _name = name;
-    });
-  }
 
   Future<void> _fetchWeather() async {
     Position? position = await _getCurrentLocation();
@@ -234,7 +268,7 @@ class _HomePageState extends State<HomePage> {
     _saveRecommendationIndex(_currentRecommendationIndex);
   }
 
-  Widget _greeting() {
+ Widget _greeting() {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -298,7 +332,12 @@ class _HomePageState extends State<HomePage> {
       SizedBox(height: 30),
       
       ElevatedButton(
-        onPressed: _recordWeather,  
+        onPressed: () {
+          _showRecordWeatherDialog();
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Color(0xFFF89C23),
+        ),
         child: Text("Record the weather today?"),
       ),
       
@@ -317,6 +356,44 @@ class _HomePageState extends State<HomePage> {
       ),
       SizedBox(height: 20),
     ],
+  );
+}
+void _showRecordWeatherDialog() {
+showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(
+          'Confirmation',
+          style: TextStyle(color: Colors.black), 
+        ),
+        content: Text(
+          'Only record the weather when you\'re gonna have an activity for more accurate data analysis tailored for you!',
+          style: TextStyle(color: Colors.black),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text(
+              'No',
+              style: TextStyle(color: Colors.black), 
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              _recordWeather();
+              Navigator.of(context).pop(); 
+            },
+            child: Text(
+              'Yes',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+        ],
+      );
+    },
   );
 }
 void _recordWeather() async {
@@ -376,57 +453,114 @@ void _recordWeather() async {
   }
 }
 
+ void _onItemTapped(int index) {
+  setState(() {
+    _selectedIndex = index;
+  });
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  switch (index) {
+    case 0:
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+      break;
+    case 1:
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()), // Recommendation page
+      );
+      break;
+    case 2:
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => FitRidePage()), // Data page
+      );
+      break;
+    case 3:
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()), // Profile page
+      );
+      break;
   }
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('FitRide'),
-            Image.asset(
-              'assets/logobike.png', 
-              height: 40, 
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      automaticallyImplyLeading: false, 
+      backgroundColor: Theme.of(context).primaryColor,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // FitRide Title Section
+          Text(
+            "FitRide",
+            style: GoogleFonts.roboto(
+              color: Colors.orange,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
-          ],
-        ),
-              backgroundColor: Theme.of(context).primaryColor,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights),
-            label: 'Insights',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.record_voice_over),
-            label: 'Record',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+          GestureDetector(
+            onTap: _logout, 
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(
+                Icons.pedal_bike,
+                color: Colors.orange,
+                size: 28,
+              ),
+            ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: _greeting(),
-      ),
-    );
-  }
+    ),
+    bottomNavigationBar: BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      selectedItemColor: Theme.of(context).colorScheme.primary,
+      unselectedItemColor: Colors.grey,
+      onTap: _onItemTapped,
+      items: const <BottomNavigationBarItem>[
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.insights),
+          label: 'Insights',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.data_usage),
+          label: 'Data',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: _greeting(), 
+    ),
+  );
+}
+
+void _logout() async {
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+
+  await FirebaseAuth.instance.signOut();
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => LoginPage()), 
+  );
+}
+
+
 }

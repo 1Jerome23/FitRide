@@ -1,7 +1,12 @@
+import 'package:fitride/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart'; 
+import 'question.dart'; 
+
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -13,6 +18,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   String? errorMessage = '';
   bool isLogin = true;
+  late SharedPreferences _prefs; 
 
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
@@ -25,30 +31,87 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> signInWithEmailAndPassword() async {
-    try {
-      await Auth().signInWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
-    }
-  }
+  try {
+    await Auth().signInWithEmailAndPassword(
+      email: _controllerEmail.text,
+      password: _controllerPassword.text,
+    );
 
-  Future<void> createUserWithEmailAndPassword() async {
-    try {
-      await Auth().createUserWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    setState(() {
+      errorMessage = e.message;
+    });
   }
+}
+
+Future<void> createUserWithEmailAndPassword() async {
+  try {
+    await Auth().createUserWithEmailAndPassword(
+      email: _controllerEmail.text,
+      password: _controllerPassword.text,
+    );
+
+    _onLoginSuccess();
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    setState(() {
+      errorMessage = e.message;
+    });
+  }
+}
+
+Future<void> _onLoginSuccess() async {
+  _prefs = await SharedPreferences.getInstance();
+  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+
+  if (isFirstLogin) {
+    _prefs.setBool('isFirstLogin', false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showFirstLoginDialog();
+    });
+  }
+}
+
+ void _showFirstLoginDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(
+          "Welcome!",
+          style: TextStyle(color: Colors.black), 
+        ),
+        content: Text(
+          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
+          style: TextStyle(color: Colors.black), 
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: Text(
+              "OK",
+              style: TextStyle(color: Colors.black), 
+            ),
+            onPressed: () {
+              Navigator.of(context).pop(); 
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => QuestionPage()),
+              );
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   Widget _submitButton() {
     return ElevatedButton(
@@ -83,20 +146,24 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        labelText: title,
-        floatingLabelBehavior: FloatingLabelBehavior.never,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+  return TextField(
+    controller: controller,
+    obscureText: isPassword,
+    style: TextStyle(color: Colors.black), 
+    decoration: InputDecoration(
+      labelText: title,
+      labelStyle: TextStyle(color: Colors.black),
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
       ),
-    );
-  }
+      filled: true,
+      fillColor: Colors.white,
+      hintStyle: TextStyle(color: Colors.black), 
+  ),
+  );
+}
+
 
   Widget _errorMessage() {
     return errorMessage == null || errorMessage!.isEmpty

@@ -1,10 +1,10 @@
+import 'package:fitride/pages/login_register.dart';
+import 'package:fitride/pages/question.dart';
 import 'package:flutter/material.dart';
-import 'package:fitride/widget_tree.dart';
+import 'package:fitride/widget_tree.dart'; // Assuming this imports your main app UI structure
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
-
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,33 +20,39 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.orange,
+        primaryColor: Colors.black, 
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Color(0xFFF89C23),
-          secondary: Color(0xFFF89C23),
+          primary: Colors.black, 
+          secondary: Colors.black, 
         ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         textTheme: Theme.of(context).textTheme.apply(
-              bodyColor: Colors.black,
-              displayColor: Colors.black,
+              bodyColor: Colors.white, 
+              displayColor: Colors.white, 
             ),
         appBarTheme: AppBarTheme(
-          backgroundColor: Color(0xFFF89C23),
+          backgroundColor: Colors.black, 
           elevation: 5,
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20), 
         ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Color(0xFFF89C23), 
-          unselectedItemColor: Colors.grey,
+          selectedItemColor: Colors.white, 
+          unselectedItemColor: Colors.grey, 
+          backgroundColor: Colors.black, 
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(Color(0xFFF89C23)), 
+            backgroundColor: MaterialStateProperty.all(Colors.black), 
             foregroundColor: MaterialStateProperty.all(Colors.white), 
           ),
         ),
       ),
-      home: const WidgetTree(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => LoginPage(), 
+        '/questionnaire': (context) => QuestionPage(), 
+        '/homepage': (context) => WidgetTree(), 
+      },
     );
   }
 }
