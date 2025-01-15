@@ -1,4 +1,5 @@
 import 'package:fitride/pages/UserDataModule.dart';
+import 'package:fitride/pages/login_register.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +9,7 @@ import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
+import 'question.dart'; // Import QuestionPage
 
 
 void main() {
@@ -86,57 +88,57 @@ class _HomePageState extends State<HomePage> {
     "Check your tire pressure before heading out."
   ];
   int _currentRecommendationIndex = 0;
+  bool _isFirstLogin = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPreferences();
     _fetchWeather();
     _loadRecommendationIndex();
     _startRecommendationTimer();
+    _checkFirstLogin();
+    _initializePreferences();
   }
 
-  Future<void> _loadPreferences() async {
+
+  Future<void> _initializePreferences() async {
     _prefs = await SharedPreferences.getInstance();
     setState(() {
       _name = _prefs.getString('userName') ?? '';
     });
+  }
 
-    if (_name.isEmpty) {
-      _askForName();
+  Future<void> _checkFirstLogin() async {
+    _prefs = await SharedPreferences.getInstance();
+    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+
+    if (isFirstLogin) {
+      _prefs.setBool('isFirstLogin', false); 
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
     }
   }
 
-  void _askForName() {
+  void _showFirstLoginDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        TextEditingController nameController = TextEditingController();
         return AlertDialog(
-          title: Text('Enter your name'),
-          content: TextField(
-            controller: nameController,
-            decoration: InputDecoration(hintText: 'Your name'),
-          ),
-          actions: [
+          title: Text("Welcome!"),
+          content: Text("We noticed this is your first time using the application."),
+          actions: <Widget>[
             TextButton(
+              child: Text("OK"),
               onPressed: () {
-                _saveName(nameController.text);
-                Navigator.of(context).pop();
+                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => QuestionPage()), // Redirect to QuestionPage
+                );
               },
-              child: Text('Save'),
             ),
           ],
         );
       },
     );
-  }
-
-  Future<void> _saveName(String name) async {
-    _prefs.setString('userName', name);
-    setState(() {
-      _name = name;
-    });
   }
 
   Future<void> _fetchWeather() async {
@@ -303,7 +305,7 @@ class _HomePageState extends State<HomePage> {
           _showRecordWeatherDialog();
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFFF89C23), // Orange color
+          backgroundColor: Color(0xFFF89C23),
         ),
         child: Text("Record the weather today?"),
       ),
@@ -332,30 +334,30 @@ showDialog(
       return AlertDialog(
         title: Text(
           'Confirmation',
-          style: TextStyle(color: Colors.black), // Title color
+          style: TextStyle(color: Colors.black), 
         ),
         content: Text(
           'Only record the weather when you\'re gonna have an activity for more accurate data analysis tailored for you!',
-          style: TextStyle(color: Colors.black), // Content color
+          style: TextStyle(color: Colors.black),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Close the dialog
+              Navigator.of(context).pop();
             },
             child: Text(
               'No',
-              style: TextStyle(color: Colors.black), // Action button text color
+              style: TextStyle(color: Colors.black), 
             ),
           ),
           TextButton(
             onPressed: () {
-              _recordWeather(); // Proceed with the action
-              Navigator.of(context).pop(); // Close the dialog
+              _recordWeather();
+              Navigator.of(context).pop(); 
             },
             child: Text(
               'Yes',
-              style: TextStyle(color: Colors.black), // Action button text color
+              style: TextStyle(color: Colors.black),
             ),
           ),
         ],
@@ -471,10 +473,16 @@ Widget build(BuildContext context) {
               fontWeight: FontWeight.bold,
             ),
           ),
-          Icon(
-            Icons.pedal_bike,
-            color: Colors.orange,
-            size: 28,
+          GestureDetector(
+            onTap: _logout, 
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(
+                Icons.pedal_bike,
+                color: Colors.orange,
+                size: 28,
+              ),
+            ),
           ),
         ],
       ),
@@ -505,9 +513,23 @@ Widget build(BuildContext context) {
     ),
     body: Padding(
       padding: const EdgeInsets.all(20.0),
-      child: _greeting(),
+      child: _greeting(), 
     ),
   );
 }
+
+void _logout() async {
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+
+  await FirebaseAuth.instance.signOut();
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => LoginPage()), 
+  );
+}
+
 
 }

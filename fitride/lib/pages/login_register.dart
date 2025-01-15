@@ -83,20 +83,24 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        labelText: title,
-        floatingLabelBehavior: FloatingLabelBehavior.never,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+  return TextField(
+    controller: controller,
+    obscureText: isPassword,
+    style: TextStyle(color: Colors.black), 
+    decoration: InputDecoration(
+      labelText: title,
+      labelStyle: TextStyle(color: Colors.black),
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
       ),
-    );
-  }
+      filled: true,
+      fillColor: Colors.white,
+      hintStyle: TextStyle(color: Colors.black), 
+  ),
+  );
+}
+
 
   Widget _errorMessage() {
     return errorMessage == null || errorMessage!.isEmpty
