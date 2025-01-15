@@ -9,7 +9,7 @@ import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
-import 'question.dart'; // Import QuestionPage
+import 'question.dart'; 
 
 
 void main() {
@@ -118,28 +118,38 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showFirstLoginDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Welcome!"),
-          content: Text("We noticed this is your first time using the application."),
-          actions: <Widget>[
-            TextButton(
-              child: Text("OK"),
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => QuestionPage()), // Redirect to QuestionPage
-                );
-              },
+ void _showFirstLoginDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text(
+          "Welcome!",
+          style: TextStyle(color: Colors.black), 
+        ),
+        content: Text(
+          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application",
+          style: TextStyle(color: Colors.black), 
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: Text(
+              "OK",
+              style: TextStyle(color: Colors.black), 
             ),
-          ],
-        );
-      },
-    );
-  }
+            onPressed: () {
+              Navigator.of(context).pop(); 
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => QuestionPage()),
+              );
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   Future<void> _fetchWeather() async {
     Position? position = await _getCurrentLocation();
