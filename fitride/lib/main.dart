@@ -1,3 +1,4 @@
+import 'package:fitride/pages/login_register.dart';
 import 'package:fitride/pages/question.dart';
 import 'package:flutter/material.dart';
 import 'package:fitride/widget_tree.dart'; // Assuming this imports your main app UI structure
@@ -48,7 +49,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => QuestionPage(), 
+        '/': (context) => LoginPage(), 
         '/questionnaire': (context) => QuestionPage(), 
         '/homepage': (context) => WidgetTree(), 
       },

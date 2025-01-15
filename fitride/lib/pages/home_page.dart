@@ -108,7 +108,24 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _checkFirstLogin() async {
+  Future<void> _checkFirstSignupOrLogin() async {
+  _prefs = await SharedPreferences.getInstance();
+  bool isFirstSignup = _prefs.getBool('isFirstSignup') ?? true; // Check if it's the first signup
+  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true; // Check if it's the first login
+
+  if (isFirstSignup || isFirstLogin) {
+    // If it's the first signup or login, show the dialog
+    if (isFirstSignup) {
+      _prefs.setBool('isFirstSignup', false); // Update the flag to false after first signup
+    }
+    if (isFirstLogin) {
+      _prefs.setBool('isFirstLogin', false); // Update the flag to false after first login
+    }
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
+  }
+}
+  void _checkFirstLogin() async {
     _prefs = await SharedPreferences.getInstance();
     bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
 
@@ -117,6 +134,11 @@ class _HomePageState extends State<HomePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
     }
   }
+  void _onLoginSuccess() {
+  _prefs.setBool('isFirstLogin', false); // Ensure it's not the first login anymore
+  _showFirstLoginDialog(); // Show the popup
+  }
+
 
  void _showFirstLoginDialog() {
   showDialog(
@@ -128,7 +150,7 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(color: Colors.black), 
         ),
         content: Text(
-          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application",
+          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
           style: TextStyle(color: Colors.black), 
         ),
         actions: <Widget>[
