@@ -102,24 +102,23 @@ class _HomePageState extends State<HomePage> {
 
 
   Future<void> _initializePreferences() async {
-    _prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _name = _prefs.getString('userName') ?? '';
+      _name = prefs.getString('userName') ?? '';
     });
   }
 
   Future<void> _checkFirstSignupOrLogin() async {
   _prefs = await SharedPreferences.getInstance();
-  bool isFirstSignup = _prefs.getBool('isFirstSignup') ?? true; // Check if it's the first signup
-  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true; // Check if it's the first login
+  bool isFirstSignup = _prefs.getBool('isFirstSignup') ?? true; 
+  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true; 
 
   if (isFirstSignup || isFirstLogin) {
-    // If it's the first signup or login, show the dialog
     if (isFirstSignup) {
-      _prefs.setBool('isFirstSignup', false); // Update the flag to false after first signup
+      _prefs.setBool('isFirstSignup', false);
     }
     if (isFirstLogin) {
-      _prefs.setBool('isFirstLogin', false); // Update the flag to false after first login
+      _prefs.setBool('isFirstLogin', false); 
     }
     
     WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
@@ -135,8 +134,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
   void _onLoginSuccess() {
-  _prefs.setBool('isFirstLogin', false); // Ensure it's not the first login anymore
-  _showFirstLoginDialog(); // Show the popup
+  _prefs.setBool('isFirstLogin', false); 
+  _showFirstLoginDialog(); 
   }
 
 

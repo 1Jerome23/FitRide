@@ -55,7 +55,6 @@ Future<void> createUserWithEmailAndPassword() async {
       password: _controllerPassword.text,
     );
 
-    // Check if it's the first login
     _onLoginSuccess();
 
     Navigator.pushReplacement(
@@ -70,14 +69,12 @@ Future<void> createUserWithEmailAndPassword() async {
 }
 
 Future<void> _onLoginSuccess() async {
-  // Assuming you have shared preferences or any other persistent storage solution
   _prefs = await SharedPreferences.getInstance();
   bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
 
   if (isFirstLogin) {
-    _prefs.setBool('isFirstLogin', false); // Set it to false after first login
+    _prefs.setBool('isFirstLogin', false);
 
-    // Show the first login popup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showFirstLoginDialog();
     });

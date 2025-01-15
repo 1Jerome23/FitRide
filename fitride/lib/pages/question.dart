@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class QuestionPage extends StatefulWidget {
   @override
@@ -88,7 +89,10 @@ class _QuestionPageState extends State<QuestionPage> {
           _difficultyBreathing = null;
           _interestedInCardioEndurance = null;
         });
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userName', name);
         Navigator.pushReplacementNamed(context, '/homepage');
+        
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to submit form: $e')),
