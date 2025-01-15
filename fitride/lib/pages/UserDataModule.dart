@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:intl/intl.dart';
+import 'package:firebase_core/firebase_core.dart'; // Firebase initialization
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // Initialize Firebase
   runApp(MyApp());
 }
 
@@ -23,114 +27,113 @@ class FitRidePage extends StatefulWidget {
 
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
-  late String selectedDate; // For tracking the selected date
+  late String selectedDate;
+  int _selectedIndex = 0;
+  final TextEditingController weightController = TextEditingController();
+  final TextEditingController heightController = TextEditingController();
+  String bmi = "0.00"; // Display BMI
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize the dates, including today as the latest date
     dates = _generateDateList();
     selectedDate =
         "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
   }
 
-  // Generate a list of the past 7 days, ending on today's date
   List<Map<String, String>> _generateDateList() {
     List<Map<String, String>> dateList = [];
     DateTime today = DateTime.now();
     for (int i = 6; i >= 0; i--) {
       DateTime date = today.subtract(Duration(days: i));
       dateList.add({
-        "day": DateFormat.E().format(date), // Mon, Tue, etc.
-        "date": DateFormat.d().format(date), // Numeric date
+        "day": DateFormat.E().format(date),
+        "date": DateFormat.d().format(date),
       });
     }
     return dateList;
   }
 
-  // Show a date picker for selecting an older date
-  Future<void> _showCalendar() async {
-    DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020), // Limit to recent years
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: Colors.orange, // Header background color
-              onPrimary: Colors.black, // Header text color
-              surface: Colors.black, // Surface color
-              onSurface: Colors.white, // Text color
-            ),
-            dialogBackgroundColor: Colors.black,
-          ),
-          child: child!,
-        );
-      },
-    );
+  void _calculateBMI() {
+    double? weight = double.tryParse(weightController.text);
+    double? height = double.tryParse(heightController.text);
 
-    if (pickedDate != null) {
+    if (weight != null && height != null && height > 0) {
+      double heightInMeters = height / 100;
       setState(() {
-        selectedDate =
-            "${DateFormat.E().format(pickedDate)} ${DateFormat.d().format(pickedDate)}";
-        print("Selected Date: $selectedDate"); // Debugging
+        bmi = (weight / (heightInMeters * heightInMeters)).toStringAsFixed(2);
       });
+    }
+  }
+
+  Future<void> _saveDataToFirebase() async {
+    double? weight = double.tryParse(weightController.text);
+    double? height = double.tryParse(heightController.text);
+
+    if (weight != null && height != null && bmi.isNotEmpty) {
+      FirebaseFirestore.instance.collection('user_data').add({
+        'date': selectedDate,
+        'weight': weight,
+        'height': height,
+        'bmi': bmi,
+        'timestamp': FieldValue.serverTimestamp(), // Save with timestamp
+      }).then((_) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Data saved successfully!"),
+        ));
+      }).catchError((error) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to save data: $error"),
+        ));
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Please enter valid weight and height!"),
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'FitRide',
+              style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
+            ),
+            Icon(Icons.pedal_bike, color: Colors.orange, size: 28),
+          ],
+        ),
+        backgroundColor: Colors.black,
+      ),
       backgroundColor: Colors.black,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.orange,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.black,
+        onTap: (index) => setState(() {
+          _selectedIndex = index;
+        }),
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.insights), label: 'Insights'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.record_voice_over), label: 'Record'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "FitRide",
-                    style: GoogleFonts.roboto(
-                      color: Colors.orange,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Icon(
-                    Icons.pedal_bike,
-                    color: Colors.orange,
-                    size: 28,
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-              // Greeting Section
-              Text(
-                "Hello, Name!",
-                style: GoogleFonts.roboto(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                "Here is the data we've gathered from you!",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.roboto(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                ),
-              ),
-              SizedBox(height: 20),
-              // Scrollable Date Selector
+              // Date Selection and Input
               SizedBox(
                 height: 80,
                 child: ListView.builder(
@@ -145,7 +148,6 @@ class _FitRidePageState extends State<FitRidePage> {
                       onTap: () {
                         setState(() {
                           selectedDate = "${date['day']} ${date['date']}";
-                          print("Selected Date: $selectedDate"); // Debugging
                         });
                       },
                       child: Container(
@@ -154,13 +156,6 @@ class _FitRidePageState extends State<FitRidePage> {
                         decoration: BoxDecoration(
                           color: isSelected ? Colors.orange : Colors.white,
                           borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.3),
-                              blurRadius: 5,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -188,107 +183,69 @@ class _FitRidePageState extends State<FitRidePage> {
                   },
                 ),
               ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _showCalendar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[900],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  "More",
-                  style: GoogleFonts.roboto(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              Spacer(),
-              // Data Cards
-              buildDataCard("Weight", "80kg"),
-              buildDataCard("Height", "170cm"),
-              buildDataCard("BMI", "27.68"),
-              SizedBox(height: 10),
-              // Status Button
-              Container(
-                width: double.infinity,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  "Overweight",
-                  style: GoogleFonts.roboto(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
               SizedBox(height: 20),
-              // Start Journey Button
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
+              // Input Fields
+              TextField(
+                controller: weightController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Enter Weight (kg)",
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: Colors.grey[900],
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: Text(
-                  "Start Journey!",
-                  style: GoogleFonts.roboto(
-                    color: Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                onChanged: (value) => _calculateBMI(),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: heightController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Enter Height (cm)",
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: Colors.grey[900],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
+                onChanged: (value) => _calculateBMI(),
+              ),
+              SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "BMI: $bmi",
+                    style: GoogleFonts.roboto(
+                      color: Colors.orange,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _saveDataToFirebase,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text("Update"),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // Function to build Data Cards
-  Widget buildDataCard(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.roboto(
-                color: Colors.grey[400],
-                fontSize: 16,
-              ),
-            ),
-            Text(
-              value,
-              style: GoogleFonts.roboto(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
         ),
       ),
     );
