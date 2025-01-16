@@ -1,5 +1,6 @@
 import 'package:fitride/pages/login_register.dart';
 import 'package:fitride/pages/question.dart';
+import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter/material.dart';
 import 'package:fitride/widget_tree.dart'; // Assuming this imports your main app UI structure
 import 'package:firebase_core/firebase_core.dart';
@@ -49,7 +50,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(), 
+        '/': (context) => LoginPage(),
         '/questionnaire': (context) => QuestionPage(), 
         '/homepage': (context) => WidgetTree(), 
       },
