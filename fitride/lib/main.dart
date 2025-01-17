@@ -1,3 +1,4 @@
+import 'package:fitride/pages/home_page.dart';
 import 'package:fitride/pages/login_register.dart';
 import 'package:fitride/pages/question.dart';
 import 'package:fitride/pages/question_after_exercise.dart';
@@ -50,7 +51,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(),
+        '/': (context) => HomePage(),
         '/questionnaire': (context) => QuestionPage(), 
         '/homepage': (context) => WidgetTree(), 
       },

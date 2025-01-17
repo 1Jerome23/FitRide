@@ -1,522 +1,328 @@
-import 'package:fitride/pages/UserDataModule.dart';
-import 'package:fitride/pages/login_register.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:geolocator/geolocator.dart';
-import 'dart:async';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:firebase_auth/firebase_auth.dart';  
-import 'question.dart'; 
-
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FitRide',
-      theme: ThemeData(
-        primaryColor: Color(0xFFF89C23),
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Color(0xFFF89C23),
-          secondary: Color(0xFFF89C23),
-        ),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        textTheme: GoogleFonts.openSansTextTheme(
-          Theme.of(context).textTheme.apply(
-                bodyColor: Colors.black,
-                displayColor: Colors.black,
-              ),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Color(0xFFF89C23),
-          elevation: 5,
-          titleTextStyle: GoogleFonts.poppins(
-            textStyle: TextStyle(color: Colors.white, fontSize: 20),
-          ),
-        ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Color(0xFFF89C23),
-          unselectedItemColor: Colors.grey,
-        ),
-        buttonTheme: ButtonThemeData(
-          buttonColor: Color(0xFFF89C23),
-          textTheme: ButtonTextTheme.primary, 
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFF89C23), 
-            foregroundColor: Colors.white,
-          ),
-        ),
-      ),
-      home: HomePage(),
-    );
-  }
-}
+import 'login_register.dart';
+import 'package:geolocator/geolocator.dart'; 
 
 
 class HomePage extends StatefulWidget {
-  HomePage({Key? key}) : super(key: key);
-
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  late SharedPreferences _prefs;
-  String _name = '';
-  String _weatherMessage = '';
-  String _weatherImage = '';
-  bool isLoading = true;
-  bool locationError = false;
-  bool weatherError = false;
   int _selectedIndex = 0;
-  List<String> cyclingRecommendations = [
-    "Make sure to stay hydrated during your ride!",
-    "Always wear a helmet for safety.",
-    "Start with a warm-up before any cycling session.",
-    "Track your progress to stay motivated!",
-    "Plan your cycling route ahead for a smooth ride.",
-    "Don’t forget to take breaks during long rides.",
-    "Check your tire pressure before heading out."
-  ];
-  int _currentRecommendationIndex = 0;
-  bool _isFirstLogin = false;
+  double? temperature;
+  double? humidity;
+  double? pm2_5;
+  String airQualityStatus = "Loading...";
+  String weatherImage = "assets/default_weather.png";
+  String userName = ''; 
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchWeather();
-    _loadRecommendationIndex();
-    _startRecommendationTimer();
-    _checkFirstLogin();
-    _initializePreferences();
+    fetchWeatherData();
+    _getUserName(); 
   }
 
-
-  Future<void> _initializePreferences() async {
+   Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _name = prefs.getString('userName') ?? '';
-    });
-  }
-
-  Future<void> _checkFirstSignupOrLogin() async {
-  _prefs = await SharedPreferences.getInstance();
-  bool isFirstSignup = _prefs.getBool('isFirstSignup') ?? true; 
-  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true; 
-
-  if (isFirstSignup || isFirstLogin) {
-    if (isFirstSignup) {
-      _prefs.setBool('isFirstSignup', false);
-    }
-    if (isFirstLogin) {
-      _prefs.setBool('isFirstLogin', false); 
-    }
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
-  }
-}
-  void _checkFirstLogin() async {
-    _prefs = await SharedPreferences.getInstance();
-    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
-
-    if (isFirstLogin) {
-      _prefs.setBool('isFirstLogin', false); 
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstLoginDialog());
+    String? fetchedUserName = prefs.getString('userName');
+    if (fetchedUserName != null) {
+      setState(() {
+        userName = fetchedUserName; 
+      });
     }
   }
-  void _onLoginSuccess() {
-  _prefs.setBool('isFirstLogin', false); 
-  _showFirstLoginDialog(); 
+
+  // Logout function
+  void _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await FirebaseAuth.instance.signOut();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginPage()),
+    );
   }
 
-
- void _showFirstLoginDialog() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(
-          "Welcome!",
-          style: TextStyle(color: Colors.black), 
-        ),
-        content: Text(
-          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
-          style: TextStyle(color: Colors.black), 
-        ),
-        actions: <Widget>[
-          TextButton(
-            child: Text(
-              "OK",
-              style: TextStyle(color: Colors.black), 
-            ),
-            onPressed: () {
-              Navigator.of(context).pop(); 
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => QuestionPage()),
-              );
-            },
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
-  Future<void> _fetchWeather() async {
-    Position? position = await _getCurrentLocation();
-    if (position != null) {
-      final response = await http.get(Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=${position.latitude}&longitude=${position.longitude}&current_weather=true',
-      ));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data.containsKey('current_weather') &&
-            data['current_weather'].containsKey('weathercode')) {
-          final weather = data['current_weather']['weathercode'];
-          setState(() {
-            if (weather == 1) {
-              _weatherMessage = "It's sunny today! It's a good day to take a ride.";
-              _weatherImage = 'assets/sunny.png';
-            } else if (weather == 2) {
-              _weatherMessage = "It's rainy today. Stay safe if you're heading out!";
-              _weatherImage = 'assets/images/rainy.png';
-            } else if (weather == 3) {
-              _weatherMessage = "It's cloudy today.";
-              _weatherImage = 'assets/cloudy.png';
-            } else {
-              _weatherMessage = "Stormy weather ahead. Stay safe!";
-              _weatherImage = 'assets/images/stormy.png';
-            }
-            isLoading = false;
-          });
-        } else {
-          setState(() {
-            _weatherMessage = "Weather data is incomplete.";
-            weatherError = true;
-            isLoading = false;
-          });
-        }
-      } else {
-        setState(() {
-          _weatherMessage = "Unable to fetch weather data.";
-          weatherError = true;
-          isLoading = false;
-        });
+  Future<void> fetchWeatherData() async {
+    Position position;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print("Location services are disabled.");
+        return;
       }
-    } else {
-      setState(() {
-        locationError = true;
-        isLoading = false;
-      });
-    }
-  }
 
-  Future<Position?> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() {
-        _weatherMessage = "Location services are disabled. Please enable them.";
-      });
-      return null;
-    }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.deniedForever) {
+        print("Location permission is denied permanently.");
+        return;
+      }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
-        setState(() {
-          _weatherMessage = "Location permissions are denied. Please grant permissions.";
-        });
-        return null;
+      if (permission == LocationPermission.denied) {
+        print("Location permission is denied.");
+        return;
       }
+      position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+    } catch (e) {
+      print('Error fetching location: $e');
+      return;
     }
 
-    return await Geolocator.getCurrentPosition();
+    final latitude = position.latitude;
+    final longitude = position.longitude;
+
+    try {
+      final weatherResponse = await http.get(Uri.parse(
+          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
+
+      if (weatherResponse.statusCode == 200) {
+        final data = json.decode(weatherResponse.body);
+        final currentWeather = data['current_weather'];
+        final hourly = data['hourly'];
+
+        setState(() {
+          temperature = (currentWeather['temperature'] as num).toDouble();
+          humidity = (hourly['relative_humidity_2m'] != null && hourly['relative_humidity_2m'].isNotEmpty)
+              ? (hourly['relative_humidity_2m'][0] as num).toDouble()
+              : 0.0;
+
+          weatherImage = _getWeatherImage(currentWeather['weathercode'].toString());
+        });
+      } else {
+        print('Failed to fetch temperature and humidity.');
+      }
+    } catch (e) {
+      print('Error fetching temperature and humidity: $e');
+    }
+
+    try {
+      final airQualityResponse = await http.get(Uri.parse(
+          'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
+
+      if (airQualityResponse.statusCode == 200) {
+        final data = json.decode(airQualityResponse.body);
+        final hourlyData = data['hourly'];
+
+        setState(() {
+          pm2_5 = (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
+              ? (hourlyData['pm2_5'][0] as num).toDouble()
+              : 0.0;
+
+          airQualityStatus = _evaluateAirQuality(pm2_5);
+        });
+      } else {
+        print('Failed to fetch air quality.');
+      }
+    } catch (e) {
+      print('Error fetching air quality: $e');
+    }
   }
 
-  Future<void> _loadRecommendationIndex() async {
-    _prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _currentRecommendationIndex = _prefs.getInt('recommendationIndex') ?? 0;
-    });
+  String _getWeatherImage(String? condition) {
+    switch (condition) {
+      case "1":
+        return "assets/sunny.png";
+      case "2":
+        return "assets/cloudy.png";
+      case "3":
+        return "assets/cloudy.png";
+      case "45":
+        return "assets/foggy.png";
+      case "61":
+        return "assets/rainy.png";
+      default:
+        return "assets/default_weather.png";
+    }
   }
 
-  Future<void> _saveRecommendationIndex(int index) async {
-    _prefs.setInt('recommendationIndex', index);
+  String _evaluateAirQuality(double? pm2_5) {
+    if (pm2_5 == null) return "Unknown";
+    if (pm2_5 <= 25) return "Good";
+    if (pm2_5 <= 50) return "Moderate";
+    return "Poor";
   }
 
-  void _startRecommendationTimer() {
-    Timer.periodic(Duration(seconds: 10), (timer) {
-      _showNextRecommendation();
-    });
-  }
-
-  void _showNextRecommendation() {
-    setState(() {
-      _currentRecommendationIndex = (_currentRecommendationIndex + 1) % cyclingRecommendations.length;
-    });
-    _saveRecommendationIndex(_currentRecommendationIndex);
-  }
-
- Widget _greeting() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'Hello, $_name!',
-        style: GoogleFonts.poppins(
-          textStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-      ),
-      Text(
-        'Welcome to FitRide',
-        style: GoogleFonts.poppins(
-          textStyle: TextStyle(fontSize: 16, color: Colors.black),
-        ),
-      ),
-      SizedBox(height: 20),
-      isLoading
-          ? CircularProgressIndicator()
-          : locationError
-              ? Column(
-                  children: [
-                    Text(
-                      _weatherMessage,
-                      style: TextStyle(fontSize: 16, color: Colors.black),
-                    ),
-                    SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _fetchWeather,
-                      child: Text("Enable Location & Retry"),
-                    ),
-                  ],
-                )
-              : weatherError
-                  ? Column(
-                      children: [
-                        Text(
-                          _weatherMessage,
-                          style: TextStyle(fontSize: 16, color: Colors.black),
-                        ),
-                        SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: _fetchWeather,
-                          child: Text("Retry"),
-                        ),
-                      ],
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _weatherMessage,
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 20),
-                          Image.asset(_weatherImage, height: 200),
-                        ],
-                      ),
-                    ),
-      SizedBox(height: 30),
-      
-      ElevatedButton(
-        onPressed: () {
-          _showRecordWeatherDialog();
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFFF89C23),
-        ),
-        child: Text("Record the weather today?"),
-      ),
-      
-      SizedBox(height: 20),
-
-      Text(
-        'Cycling Recommendation:',
-        style: GoogleFonts.poppins(
-          textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-      ),
-      SizedBox(height: 10),
-      Text(
-        cyclingRecommendations[_currentRecommendationIndex],
-        style: TextStyle(fontSize: 16, color: Colors.black),
-      ),
-      SizedBox(height: 20),
-    ],
-  );
-}
-void _showRecordWeatherDialog() {
-showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(
-          'Confirmation',
-          style: TextStyle(color: Colors.black), 
-        ),
-        content: Text(
-          'Only record the weather when you\'re gonna have an activity for more accurate data analysis tailored for you!',
-          style: TextStyle(color: Colors.black),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              'No',
-              style: TextStyle(color: Colors.black), 
-            ),
+  void _recordWeather() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Record the Weather"),
+          content: Text(
+            "Record the weather to get accurate information tailored for you!\nOnly record when you're going to cycle.",
+            style: TextStyle(color:Colors.black),
           ),
-          TextButton(
-            onPressed: () {
-              _recordWeather();
-              Navigator.of(context).pop(); 
-            },
-            child: Text(
-              'Yes',
-              style: TextStyle(color: Colors.black),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text(
+                "Cancel",
+                style: TextStyle(color: Colors.black),
+              ),
             ),
-          ),
-        ],
-      );
-    },
-  );
-}
-void _recordWeather() async {
-  User? user = FirebaseAuth.instance.currentUser;
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); 
+                if (temperature != null && humidity != null && pm2_5 != null) {
+                  String? userId = FirebaseAuth.instance.currentUser?.uid;
 
-  if (user == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("User is not authenticated! Please log in.")),
-    );
-    return;
-  }
+                  if (userId != null) {
+                    Map<String, dynamic> weatherData = {
+                      'temperature': temperature,
+                      'humidity': humidity,
+                      'pm2_5': pm2_5,
+                      'airQualityStatus': airQualityStatus,
+                      'timestamp': FieldValue.serverTimestamp(),
+                      'userId': userId, 
+                    };
 
-  String userUID = user.uid;  
-
-  Position? position = await _getCurrentLocation();
-  if (position == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Unable to fetch location. Please enable location services.")),
-    );
-    return;
-  }
-
-  final response = await http.get(Uri.parse(
-    'https://api.open-meteo.com/v1/forecast?latitude=${position.latitude}&longitude=${position.longitude}&current_weather=true',
-  ));
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-
-    final temperature = data['current_weather']['temperature'].toString();
-    final humidity = data['current_weather']['humidity'].toString();
-    final airQuality = data['current_weather']['weathercode'] == 1
-        ? "Good"
-        : "Moderate";  
-
-    final weatherData = {
-      'temperature': temperature,
-      'humidity': humidity,
-      'airQuality': airQuality,
-      'userUID': userUID,
-      'date': DateTime.now().toIso8601String(),
-    };
-
-    FirebaseFirestore.instance.collection('weatherData').add(weatherData).then((value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Weather recorded successfully to Firebase!")),
-      );
-    }).catchError((error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to record weather: $error")),
-      );
-    });
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Failed to fetch weather data.")),
+                    FirebaseFirestore.instance.collection('weatherData').add(weatherData).then((value) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Weather recorded successfully to Firebase!")),
+                      );
+                    }).catchError((error) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Failed to record weather: $error")),
+                      );
+                    });
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("User is not logged in.")),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to fetch weather data.")),
+                  );
+                }
+              },
+              child: Text(
+                "Okay",
+                style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)), 
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
-}
 
- void _onItemTapped(int index) {
-  setState(() {
-    _selectedIndex = index;
-  });
-
-  switch (index) {
-    case 0:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-      break;
-    case 1:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()), // Recommendation page
-      );
-      break;
-    case 2:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => FitRidePage()), // Data page
-      );
-      break;
-    case 3:
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()), // Profile page
-      );
-      break;
-  }
-}
-
-@override
+  @override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
-      automaticallyImplyLeading: false, 
+      automaticallyImplyLeading: false,
       backgroundColor: Theme.of(context).primaryColor,
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // FitRide Title Section
-          Text(
-            "FitRide",
-            style: GoogleFonts.roboto(
-              color: Colors.orange,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          GestureDetector(
-            onTap: _logout, 
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Icon(
-                Icons.pedal_bike,
-                color: Colors.orange,
-                size: 28,
-              ),
-            ),
-          ),
-        ],
+      title: Text(
+        "FitRide",
+        style: GoogleFonts.roboto(
+          color: Colors.orange,
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+        ),
       ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: GestureDetector(
+            onTap: _logout, 
+            child: Image.asset(
+              'assets/logobike.png', 
+              height: 40, 
+            ),
+          ),
+        ),
+      ],
+    ),
+    body: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (userName.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
+              "Hello, $userName!",
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+          ),
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.5),
+                spreadRadius: 3,
+                blurRadius: 5,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (temperature != null)
+                Center(
+                  child: Image.asset(weatherImage, height: 120),
+                ),
+              SizedBox(height: 12),
+              if (temperature != null)
+                Text(
+                  "Temperature: ${temperature!.toStringAsFixed(1)}°C",
+                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                ),
+              if (humidity != null)
+                Text(
+                  "Humidity: ${humidity!.toStringAsFixed(1)}%",
+                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                ),
+              Text(
+                "Air Quality: $airQualityStatus",
+                style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _recordWeather,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 248, 155, 14),
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  "Record the weather?",
+                  style: GoogleFonts.lato(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
     bottomNavigationBar: BottomNavigationBar(
       currentIndex: _selectedIndex,
@@ -533,32 +339,15 @@ Widget build(BuildContext context) {
           label: 'Insights',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.data_usage),
-          label: 'Data',
+          icon: Icon(Icons.record_voice_over),
+          label: 'Record',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
+          icon: Icon(Icons.settings),
+          label: 'Settings',
         ),
       ],
     ),
-    body: Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: _greeting(), 
-    ),
-  );
-}
-
-void _logout() async {
-
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  await prefs.clear();
-
-  await FirebaseAuth.instance.signOut();
-
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => LoginPage()), 
   );
 }
 

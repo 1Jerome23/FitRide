@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart'; 
-import 'question.dart'; 
-
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'question.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -18,7 +16,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   String? errorMessage = '';
   bool isLogin = true;
-  late SharedPreferences _prefs; 
+  late SharedPreferences _prefs;
 
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
@@ -31,46 +29,51 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> signInWithEmailAndPassword() async {
-  try {
-    await Auth().signInWithEmailAndPassword(
-      email: _controllerEmail.text,
-      password: _controllerPassword.text,
-    );
+    try {
+      await Auth().signInWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      errorMessage = e.message;
-    });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
   }
-}
 
-Future<void> createUserWithEmailAndPassword() async {
-  try {
-    await Auth().createUserWithEmailAndPassword(
-      email: _controllerEmail.text,
-      password: _controllerPassword.text,
-    );
+  Future<void> createUserWithEmailAndPassword() async {
+    try {
+      await Auth().createUserWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
 
-    _onLoginSuccess();
+      _onLoginSuccess();
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      errorMessage = e.message;
-    });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
   }
-}
 
 Future<void> _onLoginSuccess() async {
   _prefs = await SharedPreferences.getInstance();
+  
+  await _prefs.setBool('isFirstLogin', true);
+  
   bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+
+  print('isFirstLogin value: $isFirstLogin'); 
 
   if (isFirstLogin) {
     _prefs.setBool('isFirstLogin', false);
@@ -81,37 +84,38 @@ Future<void> _onLoginSuccess() async {
   }
 }
 
- void _showFirstLoginDialog() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(
-          "Welcome!",
-          style: TextStyle(color: Colors.black), 
-        ),
-        content: Text(
-          "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
-          style: TextStyle(color: Colors.black), 
-        ),
-        actions: <Widget>[
-          TextButton(
-            child: Text(
-              "OK",
-              style: TextStyle(color: Colors.black), 
-            ),
-            onPressed: () {
-              Navigator.of(context).pop(); 
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => QuestionPage()),
-              );
-            },
+
+  void _showFirstLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Welcome!",
+            style: TextStyle(color: Colors.black),
           ),
-        ],
-      );
-    },
-  );
-}
+          content: Text(
+            "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
+            style: TextStyle(color: Colors.black),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text(
+                "OK",
+                style: TextStyle(color: Colors.black),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => QuestionPage()),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _submitButton() {
     return ElevatedButton(
@@ -146,24 +150,23 @@ Future<void> _onLoginSuccess() async {
   }
 
   Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
-  return TextField(
-    controller: controller,
-    obscureText: isPassword,
-    style: TextStyle(color: Colors.black), 
-    decoration: InputDecoration(
-      labelText: title,
-      labelStyle: TextStyle(color: Colors.black),
-      floatingLabelBehavior: FloatingLabelBehavior.never,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      style: TextStyle(color: Colors.black),
+      decoration: InputDecoration(
+        labelText: title,
+        labelStyle: TextStyle(color: Colors.black),
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        hintStyle: TextStyle(color: Colors.black),
       ),
-      filled: true,
-      fillColor: Colors.white,
-      hintStyle: TextStyle(color: Colors.black), 
-  ),
-  );
-}
-
+    );
+  }
 
   Widget _errorMessage() {
     return errorMessage == null || errorMessage!.isEmpty
@@ -192,7 +195,7 @@ Future<void> _onLoginSuccess() async {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
-            height: MediaQuery.of(context).size.height, 
+            height: MediaQuery.of(context).size.height,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [const Color.fromARGB(255, 56, 56, 56), Color(0xFF383838)],
@@ -223,7 +226,7 @@ Future<void> _onLoginSuccess() async {
                 SizedBox(height: 15),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white, 
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
@@ -239,7 +242,7 @@ Future<void> _onLoginSuccess() async {
                 SizedBox(height: 15),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white, 
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
@@ -267,10 +270,10 @@ Future<void> _onLoginSuccess() async {
                 ),
                 SizedBox(height: 5),
                 Container(
-                  width: double.infinity, 
+                  width: double.infinity,
                   child: _loginOrRegisterButton(),
                 ),
-                SizedBox(height: 20), 
+                SizedBox(height: 20),
                 Container(
                   width: double.infinity,
                   child: _socialButton('Connect with Facebook', Colors.blueAccent, Icons.facebook, () {}),
