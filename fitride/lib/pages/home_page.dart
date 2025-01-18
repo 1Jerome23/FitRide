@@ -1,3 +1,4 @@
+import 'package:fitride/pages/UserDataModule.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +46,7 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
-
+  
   // Logout function
   void _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -134,22 +135,23 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  String _getWeatherImage(String? condition) {
-    switch (condition) {
-      case "1":
-        return "assets/sunny.png";
-      case "2":
-        return "assets/cloudy.png";
-      case "3":
-        return "assets/cloudy.png";
-      case "45":
-        return "assets/foggy.png";
-      case "61":
-        return "assets/rainy.png";
-      default:
-        return "assets/default_weather.png";
-    }
+String _getWeatherImage(String? condition) {
+  switch (condition) {
+    case "0": 
+      return "assets/sunny.png"; 
+    case "2": 
+      return "assets/cloudy.png"; 
+    case "3": 
+      return "assets/overcast.png"; 
+    case "61": 
+      return "assets/rainy.png"; 
+    case "77": 
+      return "assets/stormy.png"; 
+    default:
+      return "assets/sunny.png"; 
   }
+}
+
 
   String _evaluateAirQuality(double? pm2_5) {
     if (pm2_5 == null) return "Unknown";
@@ -171,7 +173,7 @@ class _HomePageState extends State<HomePage> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop(); 
               },
               child: Text(
                 "Cancel",
@@ -224,7 +226,6 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
-
 @override
 Widget build(BuildContext context) {
   return Scaffold(
@@ -243,232 +244,231 @@ Widget build(BuildContext context) {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: GestureDetector(
-            onTap: _logout, 
+            onTap: _logout,
             child: Image.asset(
-              'assets/logobike.png', 
-              height: 40, 
+              'assets/logobike.png',
+              height: 40,
             ),
           ),
         ),
       ],
     ),
-    body: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (userName.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              "Hello, $userName!",
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+    body: SingleChildScrollView(  
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (userName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Text(
+                "Hello, $userName!",
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ),
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.5),
+                  spreadRadius: 3,
+                  blurRadius: 5,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (temperature != null)
+                  Center(
+                    child: Image.asset(weatherImage, height: 120),
+                  ),
+                SizedBox(height: 12),
+                if (temperature != null)
+                  Text(
+                    "Temperature: ${temperature!.toStringAsFixed(1)}°C",
+                    style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                  ),
+                if (humidity != null)
+                  Text(
+                    "Humidity: ${humidity!.toStringAsFixed(1)}%",
+                    style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                  ),
+                Text(
+                  "Air Quality: $airQualityStatus",
+                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                ),
+                SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _recordWeather,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(255, 248, 155, 14),
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    "Record the weather?",
+                    style: GoogleFonts.lato(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.5),
-                spreadRadius: 3,
-                blurRadius: 5,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (temperature != null)
-                Center(
-                  child: Image.asset(weatherImage, height: 120),
-                ),
-              SizedBox(height: 12),
-              if (temperature != null)
+          SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 Text(
-                  "Temperature: ${temperature!.toStringAsFixed(1)}°C",
-                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
-                ),
-              if (humidity != null)
-                Text(
-                  "Humidity: ${humidity!.toStringAsFixed(1)}%",
-                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
-                ),
-              Text(
-                "Air Quality: $airQualityStatus",
-                style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _recordWeather,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 248, 155, 14),
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  "Body Goals",
+                  style: GoogleFonts.roboto(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
-                child: Text(
-                  "Record the weather?",
-                  style: GoogleFonts.lato(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 20),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Body Goals",
-                style: GoogleFonts.roboto(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => LoginPage()), // Replace with your settings page
-                  );
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.5),
-                        spreadRadius: 3,
-                        blurRadius: 5,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        "Edit Goals",
-                        style: GoogleFonts.lato(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black,
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoginPage()), // Replace with your settings page
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.5),
+                          spreadRadius: 3,
+                          blurRadius: 5,
+                          offset: Offset(0, 3),
                         ),
-                      ),
-                      SizedBox(width: 8), 
-                      Icon(
-                        Icons.settings,
-                        color: Colors.black,
-                        size: 20, 
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          "Edit Goals",
+                          style: GoogleFonts.lato(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(
+                          Icons.settings,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 3,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    "Goal 1",
-                    style: GoogleFonts.lato(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 3,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    "Goal 2",
-                    style: GoogleFonts.lato(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 3,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    "Goal 3",
-                    style: GoogleFonts.lato(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildGoalCard("Goal 1", Colors.orange),
+                _buildGoalCard("Goal 2", Colors.blue),
+                _buildGoalCard("Goal 3", Colors.green),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 16), 
-      ],
+          SizedBox(height: 16),
+
+          // Added section for User Data
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "User Data",
+                  style: GoogleFonts.roboto(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => FitRidePage()), // Replace with your User page
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.5),
+                          spreadRadius: 3,
+                          blurRadius: 5,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          "Edit Data",
+                          style: GoogleFonts.lato(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(
+                          Icons.settings,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildGoalCard("Data 1", Colors.orange),
+                _buildGoalCard("Data 2", Colors.blue),
+                _buildGoalCard("Data 3", Colors.green),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+        ],
+      ),
     ),
     bottomNavigationBar: BottomNavigationBar(
       currentIndex: _selectedIndex,
@@ -486,16 +486,46 @@ Widget build(BuildContext context) {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.record_voice_over),
-          label: 'Record',
+          label: 'Goal/Progress',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.settings),
-          label: 'Settings',
+          icon: Icon(Icons.person),
+          label: 'Profile',
         ),
       ],
     ),
   );
 }
+
+Widget _buildGoalCard(String title, Color color) {
+  return Container(
+    width: 100,
+    height: 100,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.5),
+          spreadRadius: 3,
+          blurRadius: 5,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Center(
+      child: Text(
+        title,
+        style: GoogleFonts.lato(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+    ),
+  );
+}
+
 
 
 }
