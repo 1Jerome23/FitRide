@@ -1,4 +1,5 @@
 import 'package:fitride/pages/UserDataModule.dart';
+import 'package:fitride/pages/goal_tracking.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_register.dart';
 import 'package:geolocator/geolocator.dart'; 
+import 'recommendation.dart';
 
 
 class HomePage extends StatefulWidget {
@@ -28,6 +30,32 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index;
     });
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()), 
+        );
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => RecommendationPage()),
+        );
+        break;
+      case 2:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => GoalTrackingPage()), 
+        );
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()), // Change to Profile Route
+        );
+        break;
+    }
   }
 
   @override
