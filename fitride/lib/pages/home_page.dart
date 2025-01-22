@@ -1,5 +1,6 @@
 import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
+import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +27,7 @@ class _HomePageState extends State<HomePage> {
   String weatherImage = "assets/default_weather.png";
   String userName = ''; 
 
+  //footer functionalities
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -52,7 +54,7 @@ class _HomePageState extends State<HomePage> {
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), // Change to Profile Route
+          MaterialPageRoute(builder: (context) => ProfilePage()), 
         );
         break;
     }
@@ -513,7 +515,7 @@ Widget build(BuildContext context) {
           label: 'Insights',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.record_voice_over),
+          icon: Icon(Icons.data_usage),
           label: 'Goal/Progress',
         ),
         BottomNavigationBarItem(

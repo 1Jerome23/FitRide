@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart' as gauges;
 import 'package:google_fonts/google_fonts.dart';
+import 'home_page.dart';
+import 'recommendation.dart';
+import 'profile.dart';
+import 'login_register.dart';
 
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});
@@ -11,17 +15,42 @@ class GoalTrackingPage extends StatefulWidget {
 }
 
 class _GoalTrackingPageState extends State<GoalTrackingPage> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 2; // Default to highlighting GoalTrackingPage
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+        break;
+      case 1:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => RecommendationPage()),
+        );
+        break;
+      case 2:
+        // Stay on the current page
+        break;
+      case 3:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ProfilePage()),
+        );
+        break;
+    }
   }
 
-  void _logout() {
-    // Add your logout logic here
-    print("User logged out");
+  void _logout() async {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginPage()),
+    );
   }
 
   @override

@@ -4,11 +4,12 @@ import 'package:fitride/pages/login_register.dart';
 import 'package:fitride/pages/question.dart';
 import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter/material.dart';
-import 'package:fitride/widget_tree.dart'; // Assuming this imports your main app UI structure
+import 'package:fitride/widget_tree.dart'; 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';  
 import 'package:fitride/pages/recommendation.dart';
+import 'package:fitride/pages/profile.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,11 +54,12 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => HomePage(),
+        '/': (context) => LoginPage(),
         '/questionnaire': (context) => QuestionPage(),
         '/homepage': (context) => WidgetTree(),
         '/recommendation': (context) => RecommendationPage(), 
         '/goal_tracking': (context) => GoalTrackingPage(),
+        '/profile': (context) => ProfilePage(),
       },
     );
   }

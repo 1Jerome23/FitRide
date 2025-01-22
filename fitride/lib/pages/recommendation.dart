@@ -1,8 +1,13 @@
-import 'package:fitride/pages/goal_tracking.dart';
-import 'package:fitride/pages/home_page.dart';
+import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'login_register.dart';  
+import 'package:flutter_web_auth/flutter_web_auth.dart';
+import 'home_page.dart';
+import 'goal_tracking.dart';
+import 'login_register.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert'; 
+import 'package:flutter_web_auth/flutter_web_auth.dart';
 
 class RecommendationPage extends StatefulWidget {
   @override
@@ -10,7 +15,25 @@ class RecommendationPage extends StatefulWidget {
 }
 
 class _RecommendationPageState extends State<RecommendationPage> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
+
+  Future<void> _authorizeStrava() async {
+    final authorizationUrl =
+        'https://www.strava.com/oauth/authorize?client_id=145840&redirect_uri=http://localhost&response_type=code&scope=activity:read_all';
+    
+    try {
+      final result = await FlutterWebAuth.authenticate(
+        url: authorizationUrl,
+        callbackUrlScheme: 'fitride',  
+      );
+
+      final authCode = Uri.parse(result).queryParameters['code'];
+
+      print('Authorization Code: $authCode');
+    } catch (e) {
+      print('Error during authentication: $e');
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -20,7 +43,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       case 0:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), 
+          MaterialPageRoute(builder: (context) => HomePage()),
         );
         break;
       case 1:
@@ -32,13 +55,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
       case 2:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => GoalTrackingPage()), 
+          MaterialPageRoute(builder: (context) => GoalTrackingPage()),
         );
         break;
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), // Change to Profile Route
+          MaterialPageRoute(builder: (context) => ProfilePage()),
         );
         break;
     }
@@ -79,9 +102,24 @@ class _RecommendationPageState extends State<RecommendationPage> {
         ],
       ),
       body: Center(
-        child: Text(
-          "Recommendation content goes here",
-          style: GoogleFonts.lato(fontSize: 18, color: Colors.black),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "Recommendation content goes here",
+              style: GoogleFonts.lato(fontSize: 18, color: Colors.black),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _authorizeStrava,
+              child: Text('Authorize Strava'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                textStyle: GoogleFonts.lato(fontSize: 18, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -99,7 +137,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
             label: 'Insights',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.record_voice_over),
+            icon: Icon(Icons.data_usage),
             label: 'Goal/Progress',
           ),
           BottomNavigationBarItem(
@@ -111,3 +149,4 @@ class _RecommendationPageState extends State<RecommendationPage> {
     );
   }
 }
+

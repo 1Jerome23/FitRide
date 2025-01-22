@@ -273,11 +273,6 @@ Future<void> _onLoginSuccess() async {
                   width: double.infinity,
                   child: _loginOrRegisterButton(),
                 ),
-                SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  child: _socialButton('Connect with Facebook', Colors.blueAccent, Icons.facebook, () {}),
-                ),
                 SizedBox(height: 10),
                 Container(
                   width: double.infinity,
