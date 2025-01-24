@@ -1,13 +1,14 @@
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'home_page.dart';
 import 'goal_tracking.dart';
 import 'login_register.dart';
+import 'strava_webview.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert'; 
-import 'package:flutter_web_auth/flutter_web_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RecommendationPage extends StatefulWidget {
   @override
@@ -17,21 +18,80 @@ class RecommendationPage extends StatefulWidget {
 class _RecommendationPageState extends State<RecommendationPage> {
   int _selectedIndex = 1;
 
-  Future<void> _authorizeStrava() async {
-    final authorizationUrl =
-        'https://www.strava.com/oauth/authorize?client_id=145840&redirect_uri=http://localhost&response_type=code&scope=activity:read_all';
-    
+  void _authorizeStrava() {
+    final String clientId = "145840"; 
+    final String redirectUri = "com.example.fitride"; 
+    final String responseType = "code";
+    final String approvalPrompt = "auto";
+    final String scope = "activity:write,read";
+
+    final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/mobile/authorize")
+        .replace(queryParameters: {
+          "client_id": clientId,
+          "redirect_uri": redirectUri,
+          "response_type": responseType,
+          "approval_prompt": approvalPrompt,
+          "scope": scope,
+        }).toString();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StravaWebView(
+          initialUrl: authorizationUrl,
+          onRedirect: (url) {
+            final Uri parsedUrl = Uri.parse(url);
+            final authCode = parsedUrl.queryParameters['code'];
+
+            if (authCode != null) {
+              print('Authorization Code: $authCode');
+              _exchangeAuthorizationCodeForTokens(authCode); 
+            } else {
+              print('Authorization failed: No code found in redirect URL.');
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
+    final String clientId = "145840"; 
+    final String clientSecret = "63ef4f6d5aa9f156ba84279c51569261cb37e905"; 
+
     try {
-      final result = await FlutterWebAuth.authenticate(
-        url: authorizationUrl,
-        callbackUrlScheme: 'fitride',  
+      final response = await http.post(
+        Uri.parse('https://www.strava.com/oauth/token'),
+        body: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'code': code,
+          'grant_type': 'authorization_code',
+        },
       );
 
-      final authCode = Uri.parse(result).queryParameters['code'];
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final String accessToken = data['access_token'];
+        final String refreshToken = data['refresh_token'];
 
-      print('Authorization Code: $authCode');
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+
+        if (userId != null) {
+          await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
+            'access_token': accessToken,
+            'refresh_token': refreshToken,
+          });
+
+          print('Tokens saved in Firestore');
+        } else {
+          print('User is not authenticated.');
+        }
+      } else {
+        print('Error exchanging authorization code: ${response.body}');
+      }
     } catch (e) {
-      print('Error during authentication: $e');
+      print('Error during token exchange: $e');
     }
   }
 
@@ -44,12 +104,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => HomePage()),
-        );
-        break;
-      case 1:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => RecommendationPage()),
         );
         break;
       case 2:
@@ -67,7 +121,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
+  // Handle logout
   void _logout() async {
+    await FirebaseAuth.instance.signOut();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => LoginPage()),
@@ -149,4 +205,3 @@ class _RecommendationPageState extends State<RecommendationPage> {
     );
   }
 }
-
