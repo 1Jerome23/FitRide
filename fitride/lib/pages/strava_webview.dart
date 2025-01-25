@@ -33,7 +33,7 @@ class _StravaWebViewState extends State<StravaWebView> {
       ..setUserAgent(userAgent)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (String url) {
-          if (url.startsWith('com.example.fitride')) { 
+          if (url.startsWith('https://amend-adjustable-generators-marcus.trycloudflare.com/callback')) { 
             widget.onRedirect(url);
             Navigator.pop(context); 
             _handleRedirect(url);
@@ -77,28 +77,36 @@ class _StravaWebViewState extends State<StravaWebView> {
     }
   }
 
-  Future<void> _saveTokensToFirestore(String accessToken, String refreshToken) async {
-    final String userId = FirebaseAuth.instance.currentUser?.uid ?? "default_user_id"; 
+Future<void> _saveTokensToFirestore(String accessToken, String refreshToken) async {
+  final User? user = FirebaseAuth.instance.currentUser;
+  
+  if (user == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('User is not logged in. Please log in first.')),
+    );
+    return;
+  }
 
-    try {
-      await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
-        'access_token': accessToken,
-        'refresh_token': refreshToken,
-      });
+  try {
+    await FirebaseFirestore.instance.collection('user_tokens').doc(user.uid).set({
+      'access_token': accessToken,
+      'refresh_token': refreshToken,
+    });
 
-      print('Tokens saved in Firestore');
-    } catch (e) {
-      print('Error saving tokens to Firestore: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save tokens. Please try again.')),
-      );
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => RecommendationPage()), 
+    print('Tokens saved in Firestore');
+  } catch (e) {
+    print('Error saving tokens to Firestore: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to save tokens. Please try again.')),
     );
   }
+
+  // Navigate to the next page (RecommendationPage)
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => RecommendationPage()),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +115,28 @@ class _StravaWebViewState extends State<StravaWebView> {
         title: Text('Strava Authentication'),
       ),
       body: WebViewWidget(controller: _controller),
+    );
+  }
+}
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'FitRide',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: StravaWebView(
+      initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://amend-adjustable-generators-marcus.trycloudflare.com/callback&response_type=code&scope=read',
+        onRedirect: (url) {
+          print('Redirect URL: $url');
+        },
+      ),
     );
   }
 }
