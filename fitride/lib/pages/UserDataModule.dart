@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase initialization
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,10 +29,12 @@ class FitRidePage extends StatefulWidget {
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
   late String selectedDate;
-  int _selectedIndex = 0;
   final TextEditingController weightController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   String bmi = "0.00"; // Display BMI
+  String currentWeight = "-";
+  String currentHeight = "-";
+  String? userGoal = "-"; // Display user goal
 
   @override
   void initState() {
@@ -39,6 +42,7 @@ class _FitRidePageState extends State<FitRidePage> {
     dates = _generateDateList();
     selectedDate =
         "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
+    _fetchUserGoal(); // Fetch goal when the page is initialized
   }
 
   List<Map<String, String>> _generateDateList() {
@@ -52,6 +56,36 @@ class _FitRidePageState extends State<FitRidePage> {
       });
     }
     return dateList;
+  }
+
+  Future<void> _fetchUserGoal() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      String uid = user.uid;
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('User Questionnaires')
+          .doc(uid)
+          .get();
+
+      if (userDoc.exists) {
+        setState(() {
+          userGoal = userDoc['goals'] ?? "-"; // Update goal from Firestore
+        });
+      } else {
+        setState(() {
+          userGoal = "No goal found";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        userGoal = "Error fetching goal";
+      });
+      print("Error fetching user goal: $e");
+    }
   }
 
   void _calculateBMI() {
@@ -81,6 +115,10 @@ class _FitRidePageState extends State<FitRidePage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text("Data saved successfully!"),
         ));
+        setState(() {
+          currentWeight = weight.toStringAsFixed(1) + " kg";
+          currentHeight = height.toStringAsFixed(1) + " cm";
+        });
       }).catchError((error) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text("Failed to save data: $error"),
@@ -110,30 +148,23 @@ class _FitRidePageState extends State<FitRidePage> {
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.black,
-        onTap: (index) => setState(() {
-          _selectedIndex = index;
-        }),
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.insights), label: 'Insights'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.record_voice_over), label: 'Record'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date Selection and Input
+              SizedBox(height: 20),
+              Text(
+                "Goal: $userGoal",
+                style: GoogleFonts.roboto(
+                  color: Colors.orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              // Scrollable Date Selector
               SizedBox(
                 height: 80,
                 child: ListView.builder(
@@ -184,7 +215,43 @@ class _FitRidePageState extends State<FitRidePage> {
                 ),
               ),
               SizedBox(height: 20),
-              // Input Fields
+              // Display selected date's data
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Weight: $currentWeight",
+                      style: GoogleFonts.roboto(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      "Height: $currentHeight",
+                      style: GoogleFonts.roboto(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      "BMI: $bmi",
+                      style: GoogleFonts.roboto(
+                        color: Colors.orange,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Spacer(),
+              // Weight, Height Input, and Update Button
               TextField(
                 controller: weightController,
                 keyboardType: TextInputType.number,
@@ -217,32 +284,49 @@ class _FitRidePageState extends State<FitRidePage> {
                 onChanged: (value) => _calculateBMI(),
               ),
               SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "BMI: $bmi",
-                    style: GoogleFonts.roboto(
-                      color: Colors.orange,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+              ElevatedButton(
+                onPressed: _saveDataToFirebase,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
                   ),
-                  ElevatedButton(
-                    onPressed: _saveDataToFirebase,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text("Update"),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
+                ),
+                child: Text(
+                  "Update",
+                  style: GoogleFonts.roboto(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              // Start Journey Button
+              ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  "Start Journey!",
+                  style: GoogleFonts.roboto(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
