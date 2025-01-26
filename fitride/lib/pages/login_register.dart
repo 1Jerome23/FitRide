@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart'; 
 import 'question.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,6 +21,9 @@ class _LoginPageState extends State<LoginPage> {
 
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); 
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void dispose() {
@@ -66,24 +70,23 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-Future<void> _onLoginSuccess() async {
-  _prefs = await SharedPreferences.getInstance();
-  
-  await _prefs.setBool('isFirstLogin', true);
-  
-  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+  Future<void> _onLoginSuccess() async {
+    _prefs = await SharedPreferences.getInstance();
+    
+    await _prefs.setBool('isFirstLogin', true);
+    
+    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
 
-  print('isFirstLogin value: $isFirstLogin'); 
+    print('isFirstLogin value: $isFirstLogin'); 
 
-  if (isFirstLogin) {
-    _prefs.setBool('isFirstLogin', false);
+    if (isFirstLogin) {
+      _prefs.setBool('isFirstLogin', false);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showFirstLoginDialog();
-    });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFirstLoginDialog();
+      });
+    }
   }
-}
-
 
   void _showFirstLoginDialog() {
     showDialog(
@@ -115,6 +118,34 @@ Future<void> _onLoginSuccess() async {
         );
       },
     );
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await _auth.signInWithCredential(credential);
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
   }
 
   Widget _submitButton() {
@@ -176,7 +207,7 @@ Future<void> _onLoginSuccess() async {
 
   Widget _socialButton(String text, Color color, IconData icon, VoidCallback onPressed) {
     return ElevatedButton.icon(
-      onPressed: onPressed,
+      onPressed: signInWithGoogle,  
       icon: Icon(icon, color: Colors.white),
       label: Text(
         text,

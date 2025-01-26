@@ -48,7 +48,7 @@ dependencies:
   flutter_web_auth: ^0.6.0
   webview_flutter: ^4.10.0
   image_picker: ^0.8.5+3
-
+  google_sign_in: ^6.1.0
 
 dev_dependencies:
   flutter_test:

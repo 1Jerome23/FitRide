@@ -12,7 +12,12 @@
           "package_name": "com.example.fitride"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "266186848908-m8kg6bgt4sp4e11g9mb4cqd00ho5pvrv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCzjRJRZAhcBIssNKP5OyCufZ2alP2pmUA"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "266186848908-m8kg6bgt4sp4e11g9mb4cqd00ho5pvrv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
