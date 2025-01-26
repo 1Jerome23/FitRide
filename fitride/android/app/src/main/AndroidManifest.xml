@@ -29,7 +29,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="amend-adjustable-generators-marcus.trycloudflare.com" android:pathPrefix="/strava/callback" />
+                <data android:scheme="https" android:host="geo-diesel-south-metropolitan.trycloudflare.com" android:pathPrefix="/strava/callback" />
             </intent-filter>
         </activity>
 

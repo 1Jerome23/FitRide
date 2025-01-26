@@ -11,7 +11,7 @@ const STRAVA_CLIENT_ID = '145840';
 const STRAVA_CLIENT_SECRET = '63ef4f6d5aa9f156ba84279c51569261cb37e905';
 
 // The redirect URI is now set to Cloudflare Tunnel URL
-const REDIRECT_URI = 'https://amend-adjustable-generators-marcus.trycloudflare.com/callback';
+const REDIRECT_URI = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
 
 console.log('STRAVA_CLIENT_ID:', STRAVA_CLIENT_ID);
 console.log('STRAVA_CLIENT_SECRET:', STRAVA_CLIENT_SECRET);
@@ -21,7 +21,7 @@ app.listen(port, async () => {
   console.log(`Server is running on http://localhost:${port}`);
   
   // Generate the authorization URL using the hardcoded values
-  const authorizationUrl = `https://www.strava.com/oauth/mobile/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=read`;
+  const authorizationUrl = `https://www.strava.com/oauth/mobile/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=activity:read_all`;
   console.log('Authorization URL:', authorizationUrl);
   
   // Serve the authorization URL on your route
@@ -31,30 +31,30 @@ app.listen(port, async () => {
   let accessToken = '';  // Variable to hold the access token
 
   // OAuth callback route to exchange the code for an access token
-  app.get('/callback', async (req, res) => {
-    const code = req.query.code;  // The authorization code from Strava
+  app.get('/oauth/callback', async (req, res) => {
+    const authorizationCode = req.query.code;
   
     try {
-      // Exchange code for access token
-      const response = await axios.post('https://www.strava.com/oauth/token', null, {
-        params: {
-          client_id: STRAVA_CLIENT_ID,
-          client_secret: STRAVA_CLIENT_SECRET,
-          code: code,
-          grant_type: 'authorization_code',
-        },
+      // Exchange authorization code for access token
+      const response = await axios.post('https://www.strava.com/oauth/token', {
+        client_id: '145840',
+        client_secret: '63ef4f6d5aa9f156ba84279c51569261cb37e905',
+        code: authorizationCode,
+        grant_type: 'authorization_code',
       });
   
-      // Save the access token dynamically
-      accessToken = response.data.access_token;
+      // Access token is in response.data.access_token
+      const accessToken = response.data.access_token;
       console.log('Strava Access Token:', accessToken);
   
+      // Send a response to confirm OAuth process was completed
       res.send('OAuth callback received. Access token saved!');
     } catch (error) {
-      console.error('Error exchanging authorization code:', error);
+      console.error('Error during token exchange:', error);
       res.status(500).send('Error exchanging authorization code');
     }
   });
+  
   
  
 app.get('/profile', async (req, res) => {

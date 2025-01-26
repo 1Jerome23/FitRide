@@ -17,66 +17,52 @@ class RecommendationPage extends StatefulWidget {
 
 class _RecommendationPageState extends State<RecommendationPage> {
   int _selectedIndex = 1;
-  String _athleteName = '';
-  List<dynamic> _activities = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchStravaData();
+    // _fetchStravaData() is no longer called here
   }
 
-  Future<void> _fetchStravaData() async {
+  Future<void> _fetchStravaData(String accessToken) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId != null) {
       try {
-        DocumentSnapshot userTokenDoc = await FirebaseFirestore.instance
-            .collection('user_tokens')
-            .doc(userId)
-            .get();
+        // Fetch athlete data
+        final athleteResponse = await http.get(
+          Uri.parse('https://www.strava.com/api/v3/athlete'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        );
 
-        if (userTokenDoc.exists) {
-          final String accessToken = userTokenDoc['access_token'];
-          print("Access Token: $accessToken");
+        if (athleteResponse.statusCode == 200) {
+          final Map<String, dynamic> athleteData = json.decode(athleteResponse.body);
+          print("Athlete Data: $athleteData");
 
-          final athleteResponse = await http.get(
-            Uri.parse('https://www.strava.com/api/v3/athlete'),
-            headers: {
-              'Authorization': 'Bearer $accessToken',
-            },
-          );
-
-          if (athleteResponse.statusCode == 200) {
-            final Map<String, dynamic> athleteData = json.decode(athleteResponse.body);
-            print("Athlete Data: $athleteData"); // Debugging: Check if athlete data is fetched successfully
-            setState(() {
-              _athleteName = athleteData['firstname'] ?? 'No name available';
-            });
-          } else {
-            print('Error fetching athlete data: ${athleteResponse.body}');
-          }
-
-          // Fetch activities data
-          final activitiesResponse = await http.get(
-            Uri.parse('https://www.strava.com/api/v3/athlete/activities'),
-            headers: {
-              'Authorization': 'Bearer $accessToken',
-            },
-          );
-
-          if (activitiesResponse.statusCode == 200) {
-            final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
-            print("Activities Data: $activitiesData"); // Debugging: Check if activities data is fetched successfully
-            setState(() {
-              _activities = activitiesData;
-              _isLoading = false;
-            });
-          } else {
-            print('Error fetching activities: ${activitiesResponse.body}');
-          }
+          // Save data to Firebase Firestore
+          await _saveAthleteDataToFirestore(userId, athleteData);
         } else {
-          print('No user token found in Firestore.');
+          print('Error fetching athlete data: ${athleteResponse.body}');
+        }
+
+        // Fetch activities data
+        final activitiesResponse = await http.get(
+          Uri.parse('https://www.strava.com/api/v3/athlete/activities'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        );
+
+        if (activitiesResponse.statusCode == 200) {
+          final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
+          print("Activities Data: $activitiesData");
+
+          // Save activities data to Firestore
+          await _saveActivitiesDataToFirestore(userId, activitiesData);
+        } else {
+          print('Error fetching activities: ${activitiesResponse.body}');
         }
       } catch (e) {
         print('Error fetching Strava data: $e');
@@ -84,142 +70,132 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
-  Widget _buildDataDisplay() {
-  if (_isLoading) {
-    return Center(child: CircularProgressIndicator());
-  }
-
-  if (_athleteName.isEmpty && _activities.isEmpty) {
-    return Center(child: Text('No data available.'));
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Display Athlete's Name
-      Text(
-        'Hello, $_athleteName!',
-        style: GoogleFonts.lato(fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-      SizedBox(height: 20),
-
-      // Display Recent Activities
-      Text(
-        'Recent Activities:',
-        style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-      SizedBox(height: 10),
-      
-      // If no activities, show a message
-      _activities.isEmpty
-          ? Text("No activities found.")
-          : Column(
-              children: _activities.map((activity) {
-                final activityName = activity['name'] ?? 'Unnamed Activity';
-                final distance = activity['distance'] / 1000; // Convert from meters to kilometers
-                final date = DateTime.parse(activity['start_date']).toLocal(); // Format the start date
-
-                return Card(
-                  margin: EdgeInsets.symmetric(vertical: 5),
-                  child: ListTile(
-                    title: Text(activityName),
-                    subtitle: Text(
-                      'Distance: ${distance.toStringAsFixed(2)} km\nDate: ${date.toLocal()}',
-                    ),
-                    trailing: Icon(Icons.directions_bike),
-                  ),
-                );
-              }).toList(),
-            ),
-    ],
-  );
-}
-
-void _authorizeStrava() {
-  final String clientId = "145840"; 
-  final String redirectUri = 'https://amend-adjustable-generators-marcus.trycloudflare.com/callback'; 
-  final String responseType = "code";
-  final String approvalPrompt = "force";
-  final String scope = "read";
-
-  final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/mobile/authorize")
-      .replace(queryParameters: {
-        "client_id": clientId,
-        "redirect_uri": redirectUri,
-        "response_type": responseType,
-        "approval_prompt": approvalPrompt,
-        "scope": scope,
-      }).toString();
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => StravaWebView(
-        initialUrl: authorizationUrl,
-        onRedirect: (url) {
-          final Uri parsedUrl = Uri.parse(url);
-          final authCode = parsedUrl.queryParameters['code'];
-
-          // Log to check if code exists in the URL
-          print('Authorization Code: $authCode');
-
-          if (authCode != null && authCode.isNotEmpty) {
-            print('Authorization Code: $authCode');
-            _exchangeAuthorizationCodeForTokens(authCode); 
-          } else {
-            print('Authorization failed: No code found in redirect URL.');
-          }
-        },
-      ),
-    ),
-  );
-}
-
-Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
-  final String clientId = "145840"; 
-  final String clientSecret = "63ef4f6d5aa9f156ba84279c51569261cb37e905"; 
-
-  try {
-    final response = await http.post(
-      Uri.parse('https://www.strava.com/oauth/token'),
-      body: {
-        'client_id': clientId,
-        'client_secret': clientSecret,
-        'code': code,
-        'grant_type': 'authorization_code',
-      },
-    );
-
-    // Log the response to check for errors or success
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data = json.decode(response.body);
-      final String accessToken = data['access_token'];
-      final String refreshToken = data['refresh_token'];
-
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-
-      if (userId != null) {
-        await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
-          'access_token': accessToken,
-          'refresh_token': refreshToken,
-        });
-
-        print('Tokens saved in Firestore');
-      } else {
-        print('User is not authenticated.');
-      }
-    } else {
-      print('Error exchanging authorization code: ${response.body}');
+  Future<void> _saveAthleteDataToFirestore(String userId, Map<String, dynamic> athleteData) async {
+    try {
+      await FirebaseFirestore.instance.collection('athletes').doc(userId).set({
+        'athlete_name': '${athleteData['firstname']} ${athleteData['lastname']}',
+        'profile_picture': athleteData['profile_medium'] ?? '',
+        'sex': athleteData['sex'] ?? '',
+        'country': athleteData['country'] ?? '',
+        'city': athleteData['city'] ?? '',
+        'weight': athleteData['weight'] ?? '',
+        'bio': athleteData['bio'] ?? '',
+        'created_at': athleteData['created_at'] ?? '',
+        'updated_at': athleteData['updated_at'] ?? '',
+      });
+      print('Athlete data saved to Firestore.');
+    } catch (e) {
+      print('Error saving athlete data to Firestore: $e');
     }
-  } catch (e) {
-    print('Error during token exchange: $e');
   }
-}
 
-  // Handle logout
+  Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var activity in activitiesData) {
+        final activityRef = FirebaseFirestore.instance.collection('activities').doc();
+        batch.set(activityRef, {
+          'user_id': userId,
+          'name': activity['name'] ?? 'Unnamed Activity',
+          'distance': activity['distance'] ?? 0,
+          'start_date': activity['start_date'] ?? '',
+          'type': activity['type'] ?? '',
+        });
+      }
+
+      await batch.commit();
+      print('Activities data saved to Firestore.');
+    } catch (e) {
+      print('Error saving activities data to Firestore: $e');
+    }
+  }
+
+  Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
+    final String clientId = "145840";
+    final String clientSecret = "63ef4f6d5aa9f156ba84279c51569261cb37e905";
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://www.strava.com/oauth/token'),
+        body: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'code': code,
+          'grant_type': 'authorization_code',
+        },
+      );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final String accessToken = data['access_token'];
+        final String refreshToken = data['refresh_token'];
+
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+
+        if (userId != null) {
+          await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
+            'access_token': accessToken,
+            'refresh_token': refreshToken,
+          });
+
+          print('Tokens saved in Firestore');
+
+          // Fetch and save athlete data after tokens are successfully stored
+          await _fetchStravaData(accessToken);
+        } else {
+          print('User is not authenticated.');
+        }
+      } else {
+        print('Error exchanging authorization code: ${response.body}');
+      }
+    } catch (e) {
+      print('Error during token exchange: $e');
+    }
+  }
+
+  void _authorizeStrava() {
+    final String clientId = "145840";
+    final String redirectUri = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
+    final String responseType = "code";
+    final String approvalPrompt = "force";
+    final String scope = "activity:read_all";
+
+    final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/mobile/authorize")
+        .replace(queryParameters: {
+      "client_id": clientId,
+      "redirect_uri": redirectUri,
+      "response_type": responseType,
+      "approval_prompt": approvalPrompt,
+      "scope": scope,
+    }).toString();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StravaWebView(
+          initialUrl: authorizationUrl,
+          onRedirect: (url) {
+            final Uri parsedUrl = Uri.parse(url);
+            final authCode = parsedUrl.queryParameters['code'];
+
+            print('Authorization Code: $authCode');
+
+            if (authCode != null && authCode.isNotEmpty) {
+              print('Authorization Code: $authCode');
+              _exchangeAuthorizationCodeForTokens(authCode);
+            } else {
+              print('Authorization failed: No code found in redirect URL.');
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   void _logout() async {
     await FirebaseAuth.instance.signOut();
     Navigator.pushReplacement(
@@ -288,7 +264,7 @@ Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
           children: [
             _isLoading
                 ? CircularProgressIndicator()
-                : _buildDataDisplay(), // Show data or loading indicator
+                : SizedBox.shrink(),
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: _authorizeStrava,

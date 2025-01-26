@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'recommendation.dart'; 
+import 'recommendation.dart';
 
 class StravaWebView extends StatefulWidget {
   final String initialUrl;
@@ -33,9 +33,9 @@ class _StravaWebViewState extends State<StravaWebView> {
       ..setUserAgent(userAgent)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (String url) {
-          if (url.startsWith('https://amend-adjustable-generators-marcus.trycloudflare.com/callback')) { 
+          if (url.startsWith('https://geo-diesel-south-metropolitan.trycloudflare.com/callback')) {
             widget.onRedirect(url);
-            Navigator.pop(context); 
+            Navigator.pop(context);
             _handleRedirect(url);
           }
         },
@@ -60,6 +60,7 @@ class _StravaWebViewState extends State<StravaWebView> {
         'client_secret': '63ef4f6d5aa9f156ba84279c51569261cb37e905',
         'code': code,
         'grant_type': 'authorization_code',
+        'redirect_uri': 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback', // ensure this is the correct redirect URI
       },
     );
 
@@ -77,36 +78,36 @@ class _StravaWebViewState extends State<StravaWebView> {
     }
   }
 
-Future<void> _saveTokensToFirestore(String accessToken, String refreshToken) async {
-  final User? user = FirebaseAuth.instance.currentUser;
-  
-  if (user == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('User is not logged in. Please log in first.')),
+  Future<void> _saveTokensToFirestore(String accessToken, String refreshToken) async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User is not logged in. Please log in first.')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('user_tokens').doc(user.uid).set({
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+      });
+
+      print('Tokens saved in Firestore');
+    } catch (e) {
+      print('Error saving tokens to Firestore: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save tokens. Please try again.')),
+      );
+    }
+
+    // Navigate to the next page (RecommendationPage)
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => RecommendationPage()),
     );
-    return;
   }
-
-  try {
-    await FirebaseFirestore.instance.collection('user_tokens').doc(user.uid).set({
-      'access_token': accessToken,
-      'refresh_token': refreshToken,
-    });
-
-    print('Tokens saved in Firestore');
-  } catch (e) {
-    print('Error saving tokens to Firestore: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to save tokens. Please try again.')),
-    );
-  }
-
-  // Navigate to the next page (RecommendationPage)
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => RecommendationPage()),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +133,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: StravaWebView(
-      initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://amend-adjustable-generators-marcus.trycloudflare.com/callback&response_type=code&scope=read',
+        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://geo-diesel-south-metropolitan.trycloudflare.com/callback&response_type=code&scope=activity:read_all',
         onRedirect: (url) {
           print('Redirect URL: $url');
         },
