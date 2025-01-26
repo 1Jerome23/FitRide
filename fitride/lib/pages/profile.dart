@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:fitride/pages/change_password.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -194,8 +195,11 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildProfileButton("Edit Your Goal", Icons.arrow_forward, () {
                 // Navigate to Edit Your Goal page
               }),
-              _buildProfileButton("Change Password", Icons.arrow_forward, () {
-                // Navigate to Change Password page
+             _buildProfileButton("Change Password", Icons.arrow_forward, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChangePasswordPage()),
+                );
               }),
               _buildProfileButton("Health Summary", Icons.arrow_forward, () {
                 // Navigate to Health Summary page
