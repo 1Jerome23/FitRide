@@ -28,7 +28,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId != null) {
       try {
-        // Fetch athlete data
         final athleteResponse = await http.get(
           Uri.parse('https://www.strava.com/api/v3/athlete'),
           headers: {
@@ -40,13 +39,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
           final Map<String, dynamic> athleteData = json.decode(athleteResponse.body);
           print("Athlete Data: $athleteData");
 
-          // Save data to Firebase Firestore
           await _saveAthleteDataToFirestore(userId, athleteData);
         } else {
           print('Error fetching athlete data: ${athleteResponse.body}');
         }
 
-        // Fetch activities data
         final activitiesResponse = await http.get(
           Uri.parse('https://www.strava.com/api/v3/athlete/activities'),
           headers: {
@@ -58,7 +55,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
           final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
           print("Activities Data: $activitiesData");
 
-          // Save activities data to Firestore
           await _saveActivitiesDataToFirestore(userId, activitiesData);
         } else {
           print('Error fetching activities: ${activitiesResponse.body}');
@@ -67,7 +63,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
         print('Error fetching Strava data: $e');
       } finally {
         setState(() {
-          _isLoading = false;  // Turn off loading spinner
+          _isLoading = false;  
         });
       }
     }
@@ -77,7 +73,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
     try {
       await FirebaseFirestore.instance.collection('athletes').doc(userId).set({
         'athlete_name': '${athleteData['firstname']} ${athleteData['lastname']}',
-        'profile_picture': athleteData['profile_medium'] ?? '',
         'sex': athleteData['sex'] ?? '',
         'country': athleteData['country'] ?? '',
         'city': athleteData['city'] ?? '',
@@ -91,20 +86,24 @@ class _RecommendationPageState extends State<RecommendationPage> {
       print('Error saving athlete data to Firestore: $e');
     }
   }
-
- Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
+Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
   try {
     final batch = FirebaseFirestore.instance.batch();
 
     for (var activity in activitiesData) {
+
+      double distanceInKm = (activity['distance'] ?? 0) / 1000; 
+
+      double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
+
       final activityRef = FirebaseFirestore.instance.collection('activities').doc();
       batch.set(activityRef, {
         'user_id': userId,
         'name': activity['name'] ?? 'Unnamed Activity',
-        'distance': activity['distance'] ?? 0,
+        'distance': distanceInKm, 
         'start_date': activity['start_date'] ?? '',
         'type': activity['type'] ?? '',
-        'average_speed': activity['average_speed'] ?? 0.0, // Add average_speed
+        'average_speed': averageSpeedInKmh, 
       });
     }
 
@@ -114,6 +113,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     print('Error saving activities data to Firestore: $e');
   }
 }
+
 
   Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
     final String clientId = "145840";
@@ -160,21 +160,23 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
-  void _authorizeStrava() {
-    final String clientId = "145840";
-    final String redirectUri = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
-    final String responseType = "code";
-    final String approvalPrompt = "force";
-    final String scope = "activity:read_all";
+void _authorizeStrava() {
+  final String clientId = "145840";
+  final String redirectUri = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
+  final String responseType = "code";
+  final String approvalPrompt = "force";
+  final String scope = "activity:read_all";
+  final String login = "true";  
 
-    final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/mobile/authorize")
-        .replace(queryParameters: {
-      "client_id": clientId,
-      "redirect_uri": redirectUri,
-      "response_type": responseType,
-      "approval_prompt": approvalPrompt,
-      "scope": scope,
-    }).toString();
+  final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/authorize")
+      .replace(queryParameters: {
+    "client_id": clientId,
+    "redirect_uri": redirectUri,
+    "response_type": responseType,
+    "approval_prompt": approvalPrompt,
+    "scope": scope,
+    "login": login,  
+  }).toString();
 
     Navigator.push(
       context,

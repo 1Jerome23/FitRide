@@ -60,7 +60,7 @@ class _StravaWebViewState extends State<StravaWebView> {
         'client_secret': '63ef4f6d5aa9f156ba84279c51569261cb37e905',
         'code': code,
         'grant_type': 'authorization_code',
-        'redirect_uri': 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback', // ensure this is the correct redirect URI
+        'redirect_uri': 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback', 
       },
     );
 
@@ -102,7 +102,6 @@ class _StravaWebViewState extends State<StravaWebView> {
       );
     }
 
-    // Navigate to the next page (RecommendationPage)
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => RecommendationPage()),
@@ -133,7 +132,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: StravaWebView(
-        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://geo-diesel-south-metropolitan.trycloudflare.com/callback&response_type=code&scope=activity:read_all',
+        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://geo-diesel-south-metropolitan.trycloudflare.com/callback&response_type=code&scope=activity:read_allapproval_prompt=force&login=true',
         onRedirect: (url) {
           print('Redirect URL: $url');
         },
