@@ -9,7 +9,7 @@ const STRAVA_CLIENT_ID = '145840';
 const STRAVA_CLIENT_SECRET = '63ef4f6d5aa9f156ba84279c51569261cb37e905';
 
 // The redirect URI is now set to Cloudflare Tunnel URL
-const REDIRECT_URI = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
+const REDIRECT_URI = 'https://fitride.trycloudflare.com/callback';
 
 console.log('STRAVA_CLIENT_ID:', STRAVA_CLIENT_ID);
 console.log('STRAVA_CLIENT_SECRET:', STRAVA_CLIENT_SECRET);

@@ -162,7 +162,7 @@ Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activit
 
 void _authorizeStrava() {
   final String clientId = "145840";
-  final String redirectUri = 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback';
+  final String redirectUri = 'https://fitride.trycloudflare.com/callback';
   final String responseType = "code";
   final String approvalPrompt = "force";
   final String scope = "activity:read_all";

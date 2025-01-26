@@ -33,7 +33,7 @@ class _StravaWebViewState extends State<StravaWebView> {
       ..setUserAgent(userAgent)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (String url) {
-          if (url.startsWith('https://geo-diesel-south-metropolitan.trycloudflare.com/callback')) {
+          if (url.startsWith('https://fitride.trycloudflare.com/callback')) {
             widget.onRedirect(url);
             Navigator.pop(context);
             _handleRedirect(url);
@@ -132,7 +132,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: StravaWebView(
-        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://geo-diesel-south-metropolitan.trycloudflare.com/callback&response_type=code&scope=activity:read_allapproval_prompt=force&login=true',
+        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://fitride.trycloudflare.com/callback&response_type=code&scope=activity:read_allapproval_prompt=force&login=true',
         onRedirect: (url) {
           print('Redirect URL: $url');
         },
