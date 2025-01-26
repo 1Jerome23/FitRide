@@ -5,6 +5,10 @@ import 'home_page.dart';
 import 'goal_tracking.dart';
 import 'login_register.dart';
 import 'recommendation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -15,19 +19,79 @@ class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 3;
   String name = "Loading...";
   String email = "Loading...";
+  String? _imagePath;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadImagePath(); 
   }
 
   Future<void> _loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    User? currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot athleteDoc = await FirebaseFirestore.instance
+            .collection('athletes')
+            .doc(currentUser.uid)
+            .get();
+
+        if (athleteDoc.exists) {
+          setState(() {
+            name = athleteDoc['athlete_name'] ?? 'Your Name';
+          });
+        } else {
+          setState(() {
+            name = 'Your Name';
+          });
+        }
+      } catch (e) {
+        print('Error fetching athlete data: $e');
+        setState(() {
+          name = 'Your Name';
+        });
+      }
+
+      setState(() {
+        email = currentUser.email ?? 'your.email@example.com';
+      });
+
+      prefs.setString('email', email);
+    } else {
+      setState(() {
+        name = 'Your Name';
+        email = 'your.email@example.com';
+      });
+    }
+  }
+
+  Future<void> _loadImagePath() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      name = prefs.getString('name') ?? 'Your Name';
-      email = prefs.getString('email') ?? 'your.email@example.com';
+      _imagePath = prefs.getString('profileImagePath'); 
     });
+  }
+
+  Future<void> _saveImagePath(String path) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profileImagePath', path);
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _imagePath = pickedFile.path;
+      });
+      await _saveImagePath(pickedFile.path);
+    }
   }
 
   void _onItemTapped(int index) {
@@ -38,7 +102,7 @@ class _ProfilePageState extends State<ProfilePage> {
       case 0:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), 
+          MaterialPageRoute(builder: (context) => HomePage()),
         );
         break;
       case 1:
@@ -50,22 +114,23 @@ class _ProfilePageState extends State<ProfilePage> {
       case 2:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => GoalTrackingPage()), 
+          MaterialPageRoute(builder: (context) => GoalTrackingPage()),
         );
         break;
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => ProfilePage()), 
+          MaterialPageRoute(builder: (context) => ProfilePage()),
         );
         break;
     }
   }
 
   void _logout() async {
+    await FirebaseAuth.instance.signOut();
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => LoginPage()), 
+      MaterialPageRoute(builder: (context) => LoginPage()),
     );
   }
 
@@ -87,7 +152,7 @@ class _ProfilePageState extends State<ProfilePage> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Image.asset(
-              'assets/logobike.png', 
+              'assets/logobike.png',
               height: 40,
             ),
           ),
@@ -100,10 +165,18 @@ class _ProfilePageState extends State<ProfilePage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(height: 20),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[300],
-                child: Icon(Icons.person, size: 50, color: Colors.grey[700]),
+              GestureDetector(
+                onTap: _pickImage,
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.grey[300],
+                  backgroundImage: _imagePath == null
+                      ? null
+                      : FileImage(File(_imagePath!)), 
+                  child: _imagePath == null
+                      ? Icon(Icons.person, size: 50, color: Colors.grey[700])
+                      : null,
+                ),
               ),
               SizedBox(height: 10),
               Text(
@@ -115,10 +188,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: GoogleFonts.lato(fontSize: 16, color: Colors.black),
               ),
               SizedBox(height: 30),
-              _buildProfileButton("Set Your Goal", Icons.arrow_forward, () {}),
-              _buildProfileButton("Edit Your Goal", Icons.arrow_forward, () {}),
-              _buildProfileButton("Change Password", Icons.arrow_forward, () {}),
-              _buildProfileButton("Health Summary", Icons.arrow_forward, () {}),
+              _buildProfileButton("Set Your Goal", Icons.arrow_forward, () {
+                // Navigate to Set Your Goal page
+              }),
+              _buildProfileButton("Edit Your Goal", Icons.arrow_forward, () {
+                // Navigate to Edit Your Goal page
+              }),
+              _buildProfileButton("Change Password", Icons.arrow_forward, () {
+                // Navigate to Change Password page
+              }),
+              _buildProfileButton("Health Summary", Icons.arrow_forward, () {
+                // Navigate to Health Summary page
+              }),
               SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _logout,
@@ -170,8 +251,10 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: EdgeInsets.symmetric(vertical: 15),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center, 
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Icon(icon, color: Colors.black),
+            SizedBox(width: 10),
             Text(
               text,
               style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.normal),

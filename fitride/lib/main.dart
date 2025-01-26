@@ -54,7 +54,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(),
+        '/': (context) => HomePage(),
         '/questionnaire': (context) => QuestionPage(),
         '/homepage': (context) => WidgetTree(),
         '/recommendation': (context) => RecommendationPage(), 

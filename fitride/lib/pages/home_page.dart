@@ -287,14 +287,6 @@ Widget build(BuildContext context) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (userName.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text(
-                "Hello, $userName!",
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-            ),
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: EdgeInsets.all(16),
