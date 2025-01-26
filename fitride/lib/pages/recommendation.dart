@@ -22,7 +22,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   @override
   void initState() {
     super.initState();
-    // _fetchStravaData() is no longer called here
   }
 
   Future<void> _fetchStravaData(String accessToken) async {
@@ -66,6 +65,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
         }
       } catch (e) {
         print('Error fetching Strava data: $e');
+      } finally {
+        setState(() {
+          _isLoading = false;  // Turn off loading spinner
+        });
       }
     }
   }
@@ -89,27 +92,28 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
-  Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
+ Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
+  try {
+    final batch = FirebaseFirestore.instance.batch();
 
-      for (var activity in activitiesData) {
-        final activityRef = FirebaseFirestore.instance.collection('activities').doc();
-        batch.set(activityRef, {
-          'user_id': userId,
-          'name': activity['name'] ?? 'Unnamed Activity',
-          'distance': activity['distance'] ?? 0,
-          'start_date': activity['start_date'] ?? '',
-          'type': activity['type'] ?? '',
-        });
-      }
-
-      await batch.commit();
-      print('Activities data saved to Firestore.');
-    } catch (e) {
-      print('Error saving activities data to Firestore: $e');
+    for (var activity in activitiesData) {
+      final activityRef = FirebaseFirestore.instance.collection('activities').doc();
+      batch.set(activityRef, {
+        'user_id': userId,
+        'name': activity['name'] ?? 'Unnamed Activity',
+        'distance': activity['distance'] ?? 0,
+        'start_date': activity['start_date'] ?? '',
+        'type': activity['type'] ?? '',
+        'average_speed': activity['average_speed'] ?? 0.0, // Add average_speed
+      });
     }
+
+    await batch.commit();
+    print('Activities data saved to Firestore.');
+  } catch (e) {
+    print('Error saving activities data to Firestore: $e');
   }
+}
 
   Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
     final String clientId = "145840";
@@ -144,7 +148,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
           print('Tokens saved in Firestore');
 
-          // Fetch and save athlete data after tokens are successfully stored
           await _fetchStravaData(accessToken);
         } else {
           print('User is not authenticated.');

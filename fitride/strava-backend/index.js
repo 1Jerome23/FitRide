@@ -77,5 +77,29 @@ app.get('/profile', async (req, res) => {
     res.status(500).send('Error fetching user profile data');
   }
 });
+app.get('/activities', async (req, res) => {
+  if (!accessToken) {
+    return res.status(400).send('No access token found. Please authenticate first.');
+  }
+
+  try {
+    // Fetch the activities of the authenticated user
+    const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      params: {
+        per_page: 5,  // Fetch a maximum of 5 activities (you can adjust this)
+        page: 1,      // Pagination (you can adjust the page number)
+      },
+    });
+
+    console.log('User activities:', response.data);
+    res.json(response.data);  // Send the activities data as JSON in the response
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    res.status(500).send('Error fetching activities');
+  }
+});
 
 });
