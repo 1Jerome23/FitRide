@@ -56,11 +56,11 @@ class _StravaWebViewState extends State<StravaWebView> {
     final response = await http.post(
       Uri.parse('https://www.strava.com/oauth/token'),
       body: {
-        'client_id': '145840',
-        'client_secret': '63ef4f6d5aa9f156ba84279c51569261cb37e905',
+        'client_id': '146485',
+        'client_secret': '6e8f87ec4856b0793c009aaf3dc17ff9a941f50f',
         'code': code,
         'grant_type': 'authorization_code',
-        'redirect_uri': 'https://geo-diesel-south-metropolitan.trycloudflare.com/callback', 
+        'redirect_uri': 'https://fitride.trycloudflare.com/callback', 
       },
     );
 
@@ -132,7 +132,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: StravaWebView(
-        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=145840&redirect_uri=https://fitride.trycloudflare.com/callback&response_type=code&scope=activity:read_allapproval_prompt=force&login=true',
+        initialUrl: 'https://www.strava.com/oauth/mobile/authorize?client_id=146485&redirect_uri=https://fitride.trycloudflare.com/callback&response_type=code&scope=activity:read_allapproval_prompt=force&login=true',
         onRedirect: (url) {
           print('Redirect URL: $url');
         },
