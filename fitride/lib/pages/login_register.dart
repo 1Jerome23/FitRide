@@ -33,22 +33,23 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> signInWithEmailAndPassword() async {
-    try {
-      await Auth().signInWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
-      );
+  try {
+    await Auth().signInWithEmailAndPassword(
+      email: _controllerEmail.text,
+      password: _controllerPassword.text,
+    );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    setState(() {
+      errorMessage = 'Invalid email or password.';
+    });
   }
+}
+
 
 Future<void> createUserWithEmailAndPassword() async {
   try {
