@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "266186848908-uq3oemr5t04oaq86neoo14icisfldoeb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.fitride",
+            "certificate_hash": "48684288615323b7e906ec44d91602b02e4029f2"
+          }
+        },
+        {
           "client_id": "266186848908-m8kg6bgt4sp4e11g9mb4cqd00ho5pvrv.apps.googleusercontent.com",
           "client_type": 3
         }

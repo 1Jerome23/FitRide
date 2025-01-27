@@ -217,7 +217,7 @@ Widget build(BuildContext context) {
                 child: DropdownButtonFormField<String>(
                   value: _experiencedHeartRateIssues,
                   decoration: InputDecoration(
-                    labelText: 'Have you experienced any issues with your\nheart rate during or after exercise?',
+                    labelText: 'Have you experienced any issues with your\nheart during or after exercise?',
                     labelStyle: TextStyle(fontSize: 12),
                     border: OutlineInputBorder(),
                     filled: true,
