@@ -50,43 +50,42 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> createUserWithEmailAndPassword() async {
-    try {
-      await Auth().createUserWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
-      );
+Future<void> createUserWithEmailAndPassword() async {
+  try {
+    await Auth().createUserWithEmailAndPassword(
+      email: _controllerEmail.text,
+      password: _controllerPassword.text,
+    );
 
-      _onLoginSuccess();
+    await _onLoginSuccess();
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    setState(() {
+      errorMessage = e.message;
+    });
   }
+}
 
-  Future<void> _onLoginSuccess() async {
-    _prefs = await SharedPreferences.getInstance();
-    
-    await _prefs.setBool('isFirstLogin', true);
-    
-    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+Future<void> _onLoginSuccess() async {
+  _prefs = await SharedPreferences.getInstance();
+  
+  await _prefs.setBool('isFirstLogin', true);
+  
+  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
 
-    print('isFirstLogin value: $isFirstLogin'); 
+  if (isFirstLogin) {
+    await _prefs.setBool('isFirstLogin', false);
 
-    if (isFirstLogin) {
-      _prefs.setBool('isFirstLogin', false);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showFirstLoginDialog();
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showFirstLoginDialog();
+    });
   }
+}
+
 
   void _showFirstLoginDialog() {
     showDialog(
