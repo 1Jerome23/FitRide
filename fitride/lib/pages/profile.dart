@@ -12,8 +12,8 @@ import 'dart:io';
 import 'package:fitride/pages/change_password.dart';
 import 'strava_webview.dart';
 import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import 'package:fitride/pages/edit_goal.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -203,34 +203,35 @@ Future<void> _fetchStravaData(String accessToken) async {
     }
   }
 
-  Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
+ Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
+  try {
+    final batch = FirebaseFirestore.instance.batch();
 
-      for (var activity in activitiesData) {
+    for (var activity in activitiesData) {
 
-        double distanceInKm = (activity['distance'] ?? 0) / 1000; 
-        double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
+      double distanceInKm = (activity['distance'] ?? 0) / 1000; 
+      double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
+      double averageHeartRate = (activity['average_heartrate'] ?? 0); 
+      double caloriesBurned = (activity['calories'] ?? 0);  
 
-        double averageHeartRate = (activity['average_heartrate'] ?? 0); 
-
-        final activityRef = FirebaseFirestore.instance.collection('activities').doc();
-        batch.set(activityRef, {
-          'user_id': userId,
-          'name': activity['name'] ?? 'Unnamed Activity',
-          'distance': distanceInKm, 
-          'start_date': activity['start_date'] ?? '',
-          'type': activity['type'] ?? '',
-          'average_speed': averageSpeedInKmh,
-          'average_heartrate': averageHeartRate,
-        });
-      }
-
-      await batch.commit();
-      print('Activities data saved to Firestore.');
-    } catch (e) {
-      print('Error saving activities data to Firestore: $e');
+      final activityRef = FirebaseFirestore.instance.collection('activities').doc();
+      batch.set(activityRef, {
+        'user_id': userId,
+        'name': activity['name'] ?? 'Unnamed Activity',
+        'distance': distanceInKm, 
+        'start_date': activity['start_date'] ?? '',
+        'type': activity['type'] ?? '',
+        'average_speed': averageSpeedInKmh,
+        'average_heartrate': averageHeartRate,
+        'calories_burned': caloriesBurned,  
+      });
     }
+
+    await batch.commit();
+    print('Activities data saved to Firestore.');
+  } catch (e) {
+    print('Error saving activities data to Firestore: $e');
+  }
 }
 
 
@@ -378,7 +379,10 @@ Future<void> _fetchStravaData(String accessToken) async {
                 _authorizeStrava();
               }),
               _buildProfileButton("Edit Your Goal", Icons.arrow_forward, () {
-                // Navigate to Edit Your Goal page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChangeGoalPage()),
+                );
               }),
               _buildProfileButton("Change Password", Icons.arrow_forward, () {
                 Navigator.push(
