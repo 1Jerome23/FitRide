@@ -21,6 +21,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
   Map<String, dynamic> userData = {};
   List<Map<String, dynamic>> activities = [];
   Map<String, dynamic> weatherData = {};
+  double? temperature;
+  double? humidity;
+  double? pm2_5;
 
   @override
   void initState() {
