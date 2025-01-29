@@ -1,3 +1,4 @@
+import 'package:fitride/pages/health_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,7 @@ import 'strava_webview.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fitride/pages/edit_goal.dart';
+import 'package:fitride/pages/health_summary.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -391,7 +393,10 @@ Future<void> _fetchStravaData(String accessToken) async {
                 );
               }),
               _buildProfileButton("Health Summary", Icons.arrow_forward, () {
-                // Navigate to Health Summary page
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => HealthSummary()),
+                );             
               }),
               SizedBox(height: 20),
               ElevatedButton(
