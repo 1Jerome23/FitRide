@@ -21,9 +21,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   Map<String, dynamic> userData = {};
   List<Map<String, dynamic>> activities = [];
   Map<String, dynamic> weatherData = {};
-  double? temperature;
-  double? humidity;
-  double? pm2_5;
 
   @override
   void initState() {
@@ -111,107 +108,6 @@ Future<void> _fetchWeatherData() async {
     print("Error fetching weather data: $e");
   }
 }
-
-  String generateOverallRecommendation() {
-    if (activities.length < 2) {
-      return "You need at least two recorded cycling activities to receive personalized recommendations.";
-    }
-    return "${getHeartRateRecommendation()}\n${getHydrationRecommendation()}\n${getSleepRecommendation()}\n${getEnergyRecommendation()}\n${getWeatherRecommendation(weatherData)}\n${getAQIRecommendation(weatherData)}";
-  }
-
-  String getHeartRateRecommendation() {
-    int age = userData['age'] ?? 20;
-    int heartRate = userData['heartRate'] ?? 140;
-    int maxHeartRate = 220 - age;
-    double targetHeartRateMin = maxHeartRate * 0.5;
-    double targetHeartRateMax = maxHeartRate * 0.7;
-
-    String fitnessLevel = userData['currentFitnessLevel'] ?? 'Intermediate'; 
-
-    if (fitnessLevel == 'Beginner') {
-      targetHeartRateMin = maxHeartRate * 0.5;
-      targetHeartRateMax = maxHeartRate * 0.6;
-    } else if (fitnessLevel == 'Advanced') {
-      targetHeartRateMin = maxHeartRate * 0.7;
-      targetHeartRateMax = maxHeartRate * 0.85;
-    }
-
-    if (heartRate >= targetHeartRateMin && heartRate <= targetHeartRateMax) {
-      return "You're in the right heart rate zone. Keep cycling at this intensity.";
-    } else if (heartRate < targetHeartRateMin) {
-      return "Increase intensity to reach your optimal heart rate zone.";
-    } else {
-      return "Reduce intensity to avoid overexertion.";
-    }
-  }
-
-  String getHydrationRecommendation() {
-    int hydrationLevel = userData['hydrationLevel'] ?? 5;
-    int temperature = userData['weatherTemperature'] ?? 25;
-    int humidity = userData['humidity'] ?? 50;
-
-    if (hydrationLevel < 5) {
-      return "Increase water intake. Drink at least 500 ml per hour of cycling.";
-    }
-
-    if (temperature > 30 || humidity > 60) {
-      return "Hot and humid conditions! Make sure to hydrate frequently.";
-    }
-
-    return "You're hydrated! Keep it up.";
-  }
-
-  String getSleepRecommendation() {
-    int sleepHours = userData['sleepHours'] ?? 7;
-    String goal = userData['goals'] ?? 'Endurance'; 
-
-    if (sleepHours < 7) {
-      return goal == 'Muscle Building' ? "Increase your sleep for muscle recovery." : "You need more rest to perform well in your next ride.";
-    }
-
-    return "Great sleep! You're ready for your workout.";
-  }
-
-  String getEnergyRecommendation() {
-    int energyLevel = userData['energyLevel'] ?? 8;
-    String fitnessLevel = userData['currentFitnessLevel'] ?? 'Intermediate';
-
-    if (energyLevel < 5) {
-      return "You're low on energy. Consider reducing intensity or cycling duration.";
-    }
-
-    return fitnessLevel == 'Advanced'
-        ? "You're energized! Push yourself harder for a more intense session."
-        : "You're energized! A good ride is ahead.";
-  }
-
-  String getWeatherRecommendation(Map<String, dynamic> weatherData) {
-    int temperature = weatherData['temperature'] ?? 25;
-    int humidity = weatherData['humidity'] ?? 50;
-    int precipitation = weatherData['precipitation'] ?? 0;
-
-    if (precipitation > 50) {
-      return "It's raining heavily. Consider indoor cycling.";
-    } else if (temperature > 30) {
-      return "It's quite hot today. Stay hydrated and consider a shorter session.";
-    } else if (temperature < 15) {
-      return "Chilly weather. Dress warmly!";
-    }
-
-    return "Ideal cycling weather. Enjoy your ride!";
-  }
-
-  String getAQIRecommendation(Map<String, dynamic> weatherData) {
-    int airQualityIndex = weatherData['airQualityIndex'] ?? 50;
-    String respiratoryHealth = weatherData['respiratoryHealth'] ?? 'Good';
-
-    if (airQualityIndex > 100 || respiratoryHealth != 'Good') {
-      return "The air quality is poor. Consider indoor cycling.";
-    }
-
-    return "Air quality is good. Enjoy outdoor cycling!";
-  }
-
   @override
   Widget build(BuildContext context) {
     if (userData.isEmpty) {
@@ -231,9 +127,6 @@ Future<void> _fetchWeatherData() async {
         body: Center(child: CircularProgressIndicator()),  
       );
     }
-
-    String recommendations = generateOverallRecommendation();
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -282,30 +175,6 @@ Future<void> _fetchWeatherData() async {
             label: 'Profile',
           ),
         ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Recommendations for Today:",
-                style: GoogleFonts.roboto(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                recommendations,
-                style: GoogleFonts.roboto(
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
