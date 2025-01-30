@@ -26,7 +26,10 @@ class _HomePageState extends State<HomePage> {
   String airQualityStatus = "Loading...";
   String weatherImage = "assets/default_weather.png";
   String userName = ''; 
-
+  String? bmi;
+  double? weight;
+  double? height;
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
   //footer functionalities
   void _onItemTapped(int index) {
     setState(() {
@@ -65,6 +68,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     fetchWeatherData();
     _getUserName(); 
+
   }
 
    Future<void> _getUserName() async {
@@ -479,13 +483,37 @@ Widget build(BuildContext context) {
           SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildGoalCard("Data 1", Colors.orange),
-                _buildGoalCard("Data 2", Colors.blue),
-                _buildGoalCard("Data 3", Colors.green),
-              ],
+            child: FutureBuilder<DocumentSnapshot>( 
+              future: FirebaseFirestore.instance.collection('User Questionnaires').doc(userId).get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return CircularProgressIndicator();
+                }
+
+                if (snapshot.hasError) {
+                  return Text("Error fetching data");
+                }
+
+                if (!snapshot.hasData || !snapshot.data!.exists) {
+                  return Text("No data available");
+                }
+
+                var data = snapshot.data!.data() as Map<String, dynamic>;
+                double weight = double.tryParse(data['weight'].toString()) ?? 0.0;
+                double height = double.tryParse(data['height'].toString()) ?? 0.0;
+
+                // Calculate BMI
+                double bmi = (weight / ((height / 100) * (height / 100))); // Convert height to meters
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildDataCard("BMI", bmi.toStringAsFixed(1), Colors.orange),
+                    _buildDataCard("Weight", weight.toStringAsFixed(1), Colors.blue),
+                    _buildDataCard("Height", height.toStringAsFixed(1), Colors.green),
+                  ],
+                );
+              },
             ),
           ),
           SizedBox(height: 16),
@@ -548,6 +576,39 @@ Widget _buildGoalCard(String title, Color color) {
   );
 }
 
+Widget _buildDataCard(String title, String value, Color color) {
+  return Container(
+    width: 100,
+    height: 100,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.5),
+          spreadRadius: 3,
+          blurRadius: 5,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.lato(fontSize: 14, color: Colors.white),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 
 }
