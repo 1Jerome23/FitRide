@@ -15,20 +15,10 @@ class _QuestionPageState extends State<QuestionPage> {
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _bodyWaterController = TextEditingController();
-  
-  String? _selectedGoal;
-  String? _selectedHealthIssue;
+
   String? _selectedActivityLevel;
   String? _experiencedHeartRateIssues;
   String? _difficultyBreathing;
-  String? _interestedInCardioEndurance;
-
-  final List<String> _goals = [
-    'Weight loss',
-    'Muscle building',
-    'Improving endurance',
-    'Stress reduction',
-  ];
 
   final List<String> _activityLevels = [
     'Beginner',
@@ -40,6 +30,8 @@ class _QuestionPageState extends State<QuestionPage> {
     'Yes',
     'No',
   ];
+
+  int _currentStep = 0;
 
   @override
   void dispose() {
@@ -56,7 +48,6 @@ class _QuestionPageState extends State<QuestionPage> {
       final weight = _weightController.text.isNotEmpty ? _weightController.text : null;
       final height = _heightController.text.isNotEmpty ? _heightController.text : null;
       final bodyWater = _bodyWaterController.text.isNotEmpty ? _bodyWaterController.text : null;
-      final healthIssues = _selectedHealthIssue;
       final activityLevel = _selectedActivityLevel;
 
       User? user = FirebaseAuth.instance.currentUser;
@@ -69,17 +60,15 @@ class _QuestionPageState extends State<QuestionPage> {
 
       String uid = user.uid;
 
-      // Save to Firestore
       try {
         await FirebaseFirestore.instance
-            .collection('User Questionnaires') // Collection name
-            .doc(uid) // Use UID as the document ID
+            .collection('User Questionnaires')
+            .doc(uid)
             .set({
           'name': name,
           'weight': weight,
           'height': height,
           'bodyWater': bodyWater,
-          'healthIssues': healthIssues,
           'activityLevel': activityLevel,
           'experiencedHeartRateIssues': _experiencedHeartRateIssues,
           'difficultyBreathing': _difficultyBreathing,
@@ -93,11 +82,8 @@ class _QuestionPageState extends State<QuestionPage> {
         _formKey.currentState!.reset();
         setState(() {
           _selectedActivityLevel = null;
-          _selectedGoal = null;
-          _selectedHealthIssue = null;
           _experiencedHeartRateIssues = null;
           _difficultyBreathing = null;
-          _interestedInCardioEndurance = null;
         });
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('userName', name);
@@ -111,154 +97,64 @@ class _QuestionPageState extends State<QuestionPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,  
-          children: [
-            Text('User Questionnaire'),  
-            Image.asset(
-              'assets/logobike.png',  
-              height: 40,  
-            ),
-          ],
-        ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('User Questionnaire'),
+          Image.asset(
+            'assets/logobike.png',
+            height: 40,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+    ),
+    body: Center(
+      child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Name input field
-                TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Name',
-                    labelStyle: TextStyle(fontSize: 12),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  style: TextStyle(color: Colors.black, fontSize: 14),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your name';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 8),
-                TextFormField(
-                  controller: _weightController,
-                  decoration: InputDecoration(
-                    labelText: 'Weight (kg)',
-                    labelStyle: TextStyle(fontSize: 12),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  style: TextStyle(color: Colors.black, fontSize: 14),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your weight';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 8),
-                // Height input field (required)
-                TextFormField(
-                  controller: _heightController,
-                  decoration: InputDecoration(
-                    labelText: 'Height (cm)',
-                    labelStyle: TextStyle(fontSize: 12),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  style: TextStyle(color: Colors.black, fontSize: 14),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your height';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 8),
-
-                // Body Water input field (optional)
-                TextFormField(
-                  controller: _bodyWaterController,
-                  decoration: InputDecoration(
-                    labelText: 'Body Water (%) (Optional)',
-                    labelStyle: TextStyle(fontSize: 12),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  style: TextStyle(color: Colors.black, fontSize: 14),
-                  keyboardType: TextInputType.number,
-                ),
-                SizedBox(height: 8),
-
-                // Goal dropdown field
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedGoal,
-                    decoration: InputDecoration(
-                      labelText: 'Goals',
-                      labelStyle: TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
+                if (_currentStep == 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      ),
+                      style: TextStyle(color: Colors.black),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
                     ),
-                    style: TextStyle(color: Colors.black, fontSize: 14),
-                    items: _goals
-                        .map((goal) => DropdownMenuItem(
-                              value: goal,
-                              child: Text(goal),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGoal = value;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please select a goal';
-                      }
-                      return null;
-                    },
                   ),
-                ),
-                SizedBox(height: 8),
-
-                // Activity Level dropdown field
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: DropdownButtonFormField<String>(
+                  SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
                     value: _selectedActivityLevel,
                     decoration: InputDecoration(
                       labelText: 'Current Fitness Level',
-                      labelStyle: TextStyle(fontSize: 12),
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
-                    style: TextStyle(color: Colors.black, fontSize: 14),
+                    style: TextStyle(color: Colors.black),
                     items: _activityLevels
-                        .map((level) => DropdownMenuItem(
-                              value: level,
-                              child: Text(level),
-                            ))
+                        .map((level) => DropdownMenuItem(value: level, child: Text(level, style: TextStyle(color: Colors.black))))
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -267,31 +163,145 @@ class _QuestionPageState extends State<QuestionPage> {
                     },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please select an activity level';
+                        return 'Please select your fitness level';
                       }
                       return null;
                     },
                   ),
-                ),
-                SizedBox(height: 8),
-
-                // Heart Rate Issues dropdown field
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: DropdownButtonFormField<String>(
-                    value: _experiencedHeartRateIssues,
+                  SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState?.validate() ?? false) {
+                            setState(() {
+                              _currentStep++;
+                            });
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, 
+                        ),
+                        child: Text('Next'),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_currentStep == 1) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextFormField(
+                      controller: _weightController,
+                      decoration: InputDecoration(
+                        labelText: 'Weight (kg)',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      ),
+                      style: TextStyle(color: Colors.black),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your weight';
+                        }
+                        final double? weight = double.tryParse(value);
+                        if (weight == null || weight <= 0) {
+                          return 'Enter a valid weight';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _heightController,
                     decoration: InputDecoration(
-                      labelText: 'Have you experienced any issues with your\nheart during or after exercise?',
-                      labelStyle: TextStyle(fontSize: 12),
+                      labelText: 'Height (cm)',
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
-                    style: TextStyle(color: Colors.black, fontSize: 14),
+                    style: TextStyle(color: Colors.black),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your height';
+                      }
+                      final double? height = double.tryParse(value);
+                      if (height == null || height <= 0) {
+                        return 'Enter a valid height';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bodyWaterController,
+                    decoration: InputDecoration(
+                      labelText: 'Body Water (%) (Optional)',
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    ),
+                    style: TextStyle(color: Colors.black),
+                    keyboardType: TextInputType.number,
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _currentStep--;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, 
+                        ),
+                        child: Text('Back'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState?.validate() ?? false) {
+                            setState(() {
+                              _currentStep++;
+                            });
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, 
+                        ),
+                        child: Text('Next'),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_currentStep == 2) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'Have you experienced any heart rate issues?',
+                      style: TextStyle(fontSize: 12, color: Colors.black),
+                    ),
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: _experiencedHeartRateIssues,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    ),
+                    style: TextStyle(color: Colors.black),
                     items: _yesNoOptions
-                        .map((option) => DropdownMenuItem(
+                        .map((option) => DropdownMenuItem<String>(
                               value: option,
-                              child: Text(option),
+                              child: Text(option, style: TextStyle(color: Colors.black)),
                             ))
                         .toList(),
                     onChanged: (value) {
@@ -301,31 +311,32 @@ class _QuestionPageState extends State<QuestionPage> {
                     },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please answer if you have heart rate issues';
+                        return 'Please select an option';
                       }
                       return null;
                     },
                   ),
-                ),
-                SizedBox(height: 8),
-
-                // Breathing Difficulty dropdown field
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: DropdownButtonFormField<String>(
+                  SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'Difficulty breathing during or after cycling?',
+                      style: TextStyle(fontSize: 12, color: Colors.black),
+                    ),
+                  ),
+                  DropdownButtonFormField<String>(
                     value: _difficultyBreathing,
                     decoration: InputDecoration(
-                      labelText: 'Do you experience shortness of breath\nor any difficulty breathing during or after cycling?',
-                      labelStyle: TextStyle(fontSize: 12),
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
-                    style: TextStyle(color: Colors.black, fontSize: 14),
+                    style: TextStyle(color: Colors.black),
                     items: _yesNoOptions
-                        .map((option) => DropdownMenuItem(
+                        .map((option) => DropdownMenuItem<String>(
                               value: option,
-                              child: Text(option),
+                              child: Text(option, style: TextStyle(color: Colors.black)),
                             ))
                         .toList(),
                     onChanged: (value) {
@@ -335,22 +346,43 @@ class _QuestionPageState extends State<QuestionPage> {
                     },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please answer if you have difficulty breathing';
+                        return 'Please select an option';
                       }
                       return null;
                     },
                   ),
-                ),
-                SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _submitForm,
-                  child: Text('Submit'),
-                ),
+                  SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _currentStep--;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, 
+                        ),
+                        child: Text('Back'),
+                      ),
+                      ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, 
+                        ),
+                        child: Text('Submit'),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 }
