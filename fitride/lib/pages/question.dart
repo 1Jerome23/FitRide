@@ -56,7 +56,6 @@ class _QuestionPageState extends State<QuestionPage> {
       final weight = _weightController.text.isNotEmpty ? _weightController.text : null;
       final height = _heightController.text.isNotEmpty ? _heightController.text : null;
       final bodyWater = _bodyWaterController.text.isNotEmpty ? _bodyWaterController.text : null;
-      final goals = _selectedGoal;
       final healthIssues = _selectedHealthIssue;
       final activityLevel = _selectedActivityLevel;
 
@@ -80,12 +79,10 @@ class _QuestionPageState extends State<QuestionPage> {
           'weight': weight,
           'height': height,
           'bodyWater': bodyWater,
-          'goals': goals,
           'healthIssues': healthIssues,
           'activityLevel': activityLevel,
           'experiencedHeartRateIssues': _experiencedHeartRateIssues,
           'difficultyBreathing': _difficultyBreathing,
-          'interestedInCardioEndurance': _interestedInCardioEndurance,
           'timestamp': FieldValue.serverTimestamp(),
         });
 
@@ -345,41 +342,6 @@ class _QuestionPageState extends State<QuestionPage> {
                   ),
                 ),
                 SizedBox(height: 8),
-
-                // Cardio Endurance dropdown field
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: DropdownButtonFormField<String>(
-                    value: _interestedInCardioEndurance,
-                    decoration: InputDecoration(
-                      labelText: 'Are you interested in improving your\ncardiovascular endurance through cycling?',
-                      labelStyle: TextStyle(fontSize: 12),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    style: TextStyle(color: Colors.black, fontSize: 14),
-                    items: _yesNoOptions
-                        .map((option) => DropdownMenuItem(
-                              value: option,
-                              child: Text(option),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _interestedInCardioEndurance = value;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please answer if you are interested in cardio endurance';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                SizedBox(height: 16),
-
                 ElevatedButton(
                   onPressed: _submitForm,
                   child: Text('Submit'),
