@@ -15,6 +15,7 @@ class _QuestionPageState extends State<QuestionPage> {
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _bodyWaterController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
 
   String? _selectedActivityLevel;
   String? _experiencedHeartRateIssues;
@@ -39,63 +40,73 @@ class _QuestionPageState extends State<QuestionPage> {
     _weightController.dispose();
     _heightController.dispose();
     _bodyWaterController.dispose();
+    _ageController.dispose(); 
     super.dispose();
   }
 
-  Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      final name = _nameController.text;
-      final weight = _weightController.text.isNotEmpty ? _weightController.text : null;
-      final height = _heightController.text.isNotEmpty ? _heightController.text : null;
-      final bodyWater = _bodyWaterController.text.isNotEmpty ? _bodyWaterController.text : null;
-      final activityLevel = _selectedActivityLevel;
+ Future<void> _submitForm() async {
+  if (_formKey.currentState!.validate()) {
+    final name = _nameController.text;
+    final weight = _weightController.text.isNotEmpty
+        ? double.tryParse(_weightController.text) 
+        : null;
+    final height = _heightController.text.isNotEmpty ? _heightController.text : null;
+    final bodyWater = _bodyWaterController.text.isNotEmpty ? _bodyWaterController.text : null;
+    final activityLevel = _selectedActivityLevel;
 
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User is not authenticated! Please log in.')),
-        );
-        return;
-      }
+    // Convert age to int
+    final age = _ageController.text.isNotEmpty
+        ? int.tryParse(_ageController.text) 
+        : null; 
 
-      String uid = user.uid;
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User is not authenticated! Please log in.')),
+      );
+      return;
+    }
 
-      try {
-        await FirebaseFirestore.instance
-            .collection('User Questionnaires')
-            .doc(uid)
-            .set({
-          'name': name,
-          'weight': weight,
-          'height': height,
-          'bodyWater': bodyWater,
-          'activityLevel': activityLevel,
-          'experiencedHeartRateIssues': _experiencedHeartRateIssues,
-          'difficultyBreathing': _difficultyBreathing,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+    String uid = user.uid;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Form submitted successfully!')),
-        );
+    try {
+      await FirebaseFirestore.instance
+          .collection('User Questionnaires')
+          .doc(uid)
+          .set({
+        'name': name,
+        'weight': weight,  // Save as double (or null if empty)
+        'height': height,
+        'age': age, // Save as int (or null if empty)
+        'bodyWater': bodyWater,
+        'activityLevel': activityLevel,
+        'experiencedHeartRateIssues': _experiencedHeartRateIssues,
+        'difficultyBreathing': _difficultyBreathing,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-        _formKey.currentState!.reset();
-        setState(() {
-          _selectedActivityLevel = null;
-          _experiencedHeartRateIssues = null;
-          _difficultyBreathing = null;
-        });
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userName', name);
-        Navigator.pushReplacementNamed(context, '/homepage');
-        
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit form: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Form submitted successfully!')),
+      );
+
+      _formKey.currentState!.reset();
+      setState(() {
+        _selectedActivityLevel = null;
+        _experiencedHeartRateIssues = null;
+        _difficultyBreathing = null;
+      });
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userName', name);
+      Navigator.pushReplacementNamed(context, '/homepage');
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit form: $e')),
+      );
     }
   }
+}
+
 
 @override
 Widget build(BuildContext context) {
@@ -131,12 +142,40 @@ Widget build(BuildContext context) {
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                       ),
                       style: TextStyle(color: Colors.black),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextFormField(
+                      controller: _ageController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Age',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      ),
+                      style: TextStyle(color: Colors.black),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your age';
+                        }
+                        final age = int.tryParse(value);
+                        if (age == null || age <= 0) {
+                          return 'Please enter a valid age';
                         }
                         return null;
                       },
@@ -150,11 +189,16 @@ Widget build(BuildContext context) {
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
                     style: TextStyle(color: Colors.black),
                     items: _activityLevels
-                        .map((level) => DropdownMenuItem(value: level, child: Text(level, style: TextStyle(color: Colors.black))))
+                        .map((level) => DropdownMenuItem(
+                              value: level,
+                              child: Text(level,
+                                  style: TextStyle(color: Colors.black)),
+                            ))
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -181,7 +225,7 @@ Widget build(BuildContext context) {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, 
+                          backgroundColor: Colors.orange,
                         ),
                         child: Text('Next'),
                       ),
@@ -198,7 +242,8 @@ Widget build(BuildContext context) {
                         border: OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                       ),
                       style: TextStyle(color: Colors.black),
                       keyboardType: TextInputType.number,
@@ -222,7 +267,8 @@ Widget build(BuildContext context) {
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
                     style: TextStyle(color: Colors.black),
                     keyboardType: TextInputType.number,
@@ -238,19 +284,6 @@ Widget build(BuildContext context) {
                     },
                   ),
                   SizedBox(height: 16),
-                  TextFormField(
-                    controller: _bodyWaterController,
-                    decoration: InputDecoration(
-                      labelText: 'Body Water (%) (Optional)',
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                    ),
-                    style: TextStyle(color: Colors.black),
-                    keyboardType: TextInputType.number,
-                  ),
-                  SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -261,7 +294,7 @@ Widget build(BuildContext context) {
                           });
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, 
+                          backgroundColor: Colors.orange,
                         ),
                         child: Text('Back'),
                       ),
@@ -274,7 +307,7 @@ Widget build(BuildContext context) {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, 
+                          backgroundColor: Colors.orange,
                         ),
                         child: Text('Next'),
                       ),
@@ -295,53 +328,20 @@ Widget build(BuildContext context) {
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     ),
                     style: TextStyle(color: Colors.black),
                     items: _yesNoOptions
                         .map((option) => DropdownMenuItem<String>(
                               value: option,
-                              child: Text(option, style: TextStyle(color: Colors.black)),
+                              child: Text(option,
+                                  style: TextStyle(color: Colors.black)),
                             ))
                         .toList(),
                     onChanged: (value) {
                       setState(() {
                         _experiencedHeartRateIssues = value;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please select an option';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      'Difficulty breathing during or after cycling?',
-                      style: TextStyle(fontSize: 12, color: Colors.black),
-                    ),
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: _difficultyBreathing,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                    ),
-                    style: TextStyle(color: Colors.black),
-                    items: _yesNoOptions
-                        .map((option) => DropdownMenuItem<String>(
-                              value: option,
-                              child: Text(option, style: TextStyle(color: Colors.black)),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _difficultyBreathing = value;
                       });
                     },
                     validator: (value) {
@@ -362,14 +362,14 @@ Widget build(BuildContext context) {
                           });
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, 
+                          backgroundColor: Colors.orange,
                         ),
                         child: Text('Back'),
                       ),
                       ElevatedButton(
                         onPressed: _submitForm,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, 
+                          backgroundColor: Colors.orange,
                         ),
                         child: Text('Submit'),
                       ),
@@ -384,5 +384,4 @@ Widget build(BuildContext context) {
     ),
   );
 }
-
 }

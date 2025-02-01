@@ -15,7 +15,6 @@ import 'strava_webview.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fitride/pages/edit_goal.dart';
-import 'package:fitride/pages/health_summary.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
