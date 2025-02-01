@@ -120,18 +120,12 @@ class _HealthSummaryState extends State<HealthSummary> {
                   _buildInfoRow("Weight", data['User Questionnaires']?['weight']?.toString() ?? 'N/A'),
                   _buildInfoRow("Height", data['User Questionnaires']?['height']?.toString() ?? 'N/A'),
                   _buildInfoRow("BMI", bmi > 0 ? bmi.toStringAsFixed(2) : 'Invalid data'),
+                  _buildInfoRow("Age", data['User Questionnaires']?['age']?.toString() ?? 'N/A'),
+                  _buildInfoRow("Body Water", data['User Questionnaires']?['bodyWater']?.toString() ?? 'N/A'),
 
                   _buildSectionTitle("Heart Health"),
                   _buildInfoRow("Consistent Heart Rate", averageHeartRate > 0 ? averageHeartRate.toStringAsFixed(2) : '0'),
                   _buildInfoRow("Have you experienced heart issues?", data['User Questionnaires']?['experiencedHeartRateIssues'] ?? 'N/A'),
-
-                  _buildSectionTitle("Respiratory Health"),
-                  _buildInfoRow("Respiratory Health Issues", data['User Questionnaires']?['difficultyBreathing'] ?? 'N/A'),
-
-                  _buildSectionTitle("Fitness Goals"),
-                  _buildInfoRow("Goals", data['User Questionnaires']?['goals'] ?? 'N/A'),
-                  _buildInfoRow("Current Fitness Level", data['User Questionnaires']?['activityLevel'] ?? 'N/A'),
-                  _buildInfoRow("Interested in improving cardiovascular endurance?", data['User Questionnaires']?['interestedInCardioEndurance'] ?? 'N/A'),
                 ],
               ),
             ),
