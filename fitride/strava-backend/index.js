@@ -5,8 +5,8 @@ const dotenv = require('dotenv');
 const app = express();
 const port = 3000;
 
-const STRAVA_CLIENT_ID = '146485';
-const STRAVA_CLIENT_SECRET = '6e8f87ec4856b0793c009aaf3dc17ff9a941f50f';
+const STRAVA_CLIENT_ID = '146579';
+const STRAVA_CLIENT_SECRET = '3b0d8a915656534ea34c07b2cf870cf1bb9f31ee';
 
 // The redirect URI is now set to Cloudflare Tunnel URL
 const REDIRECT_URI = 'https://fitride.trycloudflare.com/callback';
@@ -30,8 +30,8 @@ app.listen(port, async () => {
   
     try {
       const response = await axios.post('https://www.strava.com/oauth/token', {
-        client_id: '146485',
-        client_secret: '6e8f87ec4856b0793c009aaf3dc17ff9a941f50f',
+        client_id: '146579',
+        client_secret: '3b0d8a915656534ea34c07b2cf870cf1bb9f31ee',
         code: authorizationCode,
         grant_type: 'authorization_code',
       });

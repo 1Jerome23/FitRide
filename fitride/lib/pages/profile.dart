@@ -235,8 +235,8 @@ Future<void> _fetchStravaData(String accessToken) async {
 
 
   Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
-    final String clientId = "146485";
-    final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
+    final String clientId = "146579";
+    final String clientSecret = "3b0d8a915656534ea34c07b2cf870cf1bb9f31ee";
 
     try {
       final response = await http.post(
@@ -280,7 +280,7 @@ Future<void> _fetchStravaData(String accessToken) async {
   }
 
   void _authorizeStrava() {
-    final String clientId = "146485";
+    final String clientId = "146579";
     final String redirectUri = 'https://fitride.trycloudflare.com/callback';
     final String responseType = "code";
     final String approvalPrompt = "force";
