@@ -15,8 +15,11 @@ class _QuestionPageState extends State<QuestionPage> {
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _bodyFatController = TextEditingController();
   final TextEditingController _bodyWaterController = TextEditingController();
-  final TextEditingController _exertionController =
-      TextEditingController(); // New controller for exertion level
+  final TextEditingController _exertionController = TextEditingController();
+  final TextEditingController _restingHeartRateController =
+      TextEditingController(); // New controller for resting heart rate
+  final TextEditingController _preExistingConditionsController =
+      TextEditingController(); // New controller for pre-existing conditions
 
   @override
   void dispose() {
@@ -24,7 +27,9 @@ class _QuestionPageState extends State<QuestionPage> {
     _weightController.dispose();
     _bodyFatController.dispose();
     _bodyWaterController.dispose();
-    _exertionController.dispose(); // Dispose the new controller
+    _exertionController.dispose();
+    _restingHeartRateController.dispose(); // Dispose the new controller
+    _preExistingConditionsController.dispose(); // Dispose the new controller
     super.dispose();
   }
 
@@ -44,7 +49,12 @@ class _QuestionPageState extends State<QuestionPage> {
           : null;
       final exertionLevel = _exertionController.text.isNotEmpty
           ? int.tryParse(_exertionController.text)
-          : null; // Parse exertion level
+          : null;
+      final restingHeartRate = _restingHeartRateController.text.isNotEmpty
+          ? int.tryParse(_restingHeartRateController.text)
+          : null; // Parse resting heart rate
+      final preExistingConditions =
+          _preExistingConditionsController.text; // Get pre-existing conditions
 
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -65,7 +75,10 @@ class _QuestionPageState extends State<QuestionPage> {
           'weight': weight,
           'bodyFat': bodyFat,
           'bodyWater': bodyWater,
-          'exertionLevel': exertionLevel, // Add exertion level to Firestore
+          'exertionLevel': exertionLevel,
+          'restingHeartRate': restingHeartRate, // Add resting heart rate
+          'preExistingConditions':
+              preExistingConditions, // Add pre-existing conditions
           'timestamp': FieldValue.serverTimestamp(),
         });
 
@@ -252,6 +265,53 @@ class _QuestionPageState extends State<QuestionPage> {
                         }
                         return null;
                       },
+                    ),
+                  ),
+                  SizedBox(height: 16),
+
+                  // Resting Heart Rate Input
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextFormField(
+                      controller: _restingHeartRateController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Resting Heart Rate (bpm)',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      ),
+                      style: TextStyle(color: Colors.black),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your resting heart rate';
+                        }
+                        final int? restingHeartRate = int.tryParse(value);
+                        if (restingHeartRate == null || restingHeartRate <= 0) {
+                          return 'Enter a valid resting heart rate';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 16),
+
+                  // Pre-existing Conditions Input (Optional)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextFormField(
+                      controller: _preExistingConditionsController,
+                      decoration: InputDecoration(
+                        labelText: 'Pre-existing Conditions (Optional)',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                      ),
+                      style: TextStyle(color: Colors.black),
                     ),
                   ),
                   SizedBox(height: 16),

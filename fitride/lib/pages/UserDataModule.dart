@@ -36,7 +36,8 @@ class _FitRidePageState extends State<FitRidePage> {
   String bodyWater = "-";
   String exertionLevel = "-";
   String age = "-";
-
+  String restingHeartRate = "-";
+  String preExistingConditions = "-";
   @override
   void initState() {
     super.initState();
@@ -79,6 +80,10 @@ class _FitRidePageState extends State<FitRidePage> {
           bodyFat = userDoc['bodyFat']?.toString() ?? "-";
           bodyWater = userDoc['bodyWater']?.toString() ?? "-";
           exertionLevel = userDoc['exertionLevel']?.toString() ?? "-";
+          restingHeartRate = userDoc['restingHeartRate']?.toString() ??
+              "-"; // Fetch resting heart rate
+          preExistingConditions = userDoc['preExistingConditions'] ??
+              "-"; // Fetch pre-existing conditions
         });
       } else {
         setState(() {
@@ -87,6 +92,8 @@ class _FitRidePageState extends State<FitRidePage> {
           bodyFat = "No data found";
           bodyWater = "No data found";
           exertionLevel = "No data found";
+          restingHeartRate = "No data found"; // Default value
+          preExistingConditions = "No data found"; // Default value
         });
       }
     } catch (e) {
@@ -96,6 +103,8 @@ class _FitRidePageState extends State<FitRidePage> {
         bodyFat = "Error fetching data";
         bodyWater = "Error fetching data";
         exertionLevel = "Error fetching data";
+        restingHeartRate = "Error fetching data"; // Error handling
+        preExistingConditions = "Error fetching data"; // Error handling
       });
       print("Error fetching user data: $e");
     }
@@ -111,6 +120,10 @@ class _FitRidePageState extends State<FitRidePage> {
         TextEditingController(text: bodyWater);
     TextEditingController exertionController =
         TextEditingController(text: exertionLevel);
+    TextEditingController restingHeartRateController =
+        TextEditingController(text: restingHeartRate); // New controller
+    TextEditingController preExistingConditionsController =
+        TextEditingController(text: preExistingConditions); // New controller
 
     showDialog(
       context: context,
@@ -129,6 +142,10 @@ class _FitRidePageState extends State<FitRidePage> {
                 _buildEditField("Body Fat (%)", bodyFatController),
                 _buildEditField("Body Water (%)", bodyWaterController),
                 _buildEditField("Exertion Level (1-10)", exertionController),
+                _buildEditField("Resting Heart Rate",
+                    restingHeartRateController), // New field
+                _buildEditField("Pre-existing Conditions",
+                    preExistingConditionsController), // New field
               ],
             ),
           ),
@@ -170,8 +187,12 @@ class _FitRidePageState extends State<FitRidePage> {
                       'weight': double.tryParse(weightController.text),
                       'bodyFat': double.tryParse(bodyFatController.text),
                       'bodyWater': double.tryParse(bodyWaterController.text),
-                      'exertionLevel':
-                          exertionLevelValue, // Use validated value
+                      'exertionLevel': exertionLevelValue,
+                      'restingHeartRate': int.tryParse(
+                          restingHeartRateController
+                              .text), // Save resting heart rate
+                      'preExistingConditions': preExistingConditionsController
+                          .text, // Save pre-existing conditions
                     });
 
                     // Update local state
@@ -181,6 +202,10 @@ class _FitRidePageState extends State<FitRidePage> {
                       bodyFat = bodyFatController.text;
                       bodyWater = bodyWaterController.text;
                       exertionLevel = exertionController.text;
+                      restingHeartRate = restingHeartRateController
+                          .text; // Update resting heart rate
+                      preExistingConditions = preExistingConditionsController
+                          .text; // Update pre-existing conditions
                     });
 
                     Navigator.pop(context);
@@ -236,10 +261,10 @@ class _FitRidePageState extends State<FitRidePage> {
             );
           },
         ),
-        title: Text(
-          'FitRide',
-          style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
-        ),
+        // title: Text(
+        //   'FitRide',
+        //   style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
+        // ),
         backgroundColor: Colors.black,
         actions: [
           Icon(Icons.pedal_bike, color: Colors.orange, size: 28),
@@ -337,6 +362,10 @@ class _FitRidePageState extends State<FitRidePage> {
                       _buildDataRow("Body Fat", "$bodyFat %"),
                       _buildDataRow("Body Water", "$bodyWater %"),
                       _buildDataRow("Exertion Level", exertionLevel),
+                      _buildDataRow("Resting Heart Rate",
+                          "$restingHeartRate bpm"), // New field
+                      _buildDataRow("Pre-existing Conditions",
+                          preExistingConditions), // New field
                     ],
                   ),
                 ),
