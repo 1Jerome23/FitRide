@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase initialization
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:firebase_auth/firebase_auth.dart';
+import 'home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,12 +30,13 @@ class FitRidePage extends StatefulWidget {
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
   late String selectedDate;
-  final TextEditingController weightController = TextEditingController();
-  final TextEditingController heightController = TextEditingController();
   String bmi = "0.00"; // Display BMI
   String currentWeight = "-";
   String currentHeight = "-";
-  String? userGoal = "-"; // Display user goal
+  String activityLevel = "-";
+  String bodyWater = "-";
+  String difficultyBreathing = "-";
+  String experiencedHeartRateIssues = "-";
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _FitRidePageState extends State<FitRidePage> {
     dates = _generateDateList();
     selectedDate =
         "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
-    _fetchUserGoal(); // Fetch goal when the page is initialized
+    _fetchUserData(); // Fetch user data when the page is initialized
   }
 
   List<Map<String, String>> _generateDateList() {
@@ -58,7 +60,7 @@ class _FitRidePageState extends State<FitRidePage> {
     return dateList;
   }
 
-  Future<void> _fetchUserGoal() async {
+  Future<void> _fetchUserData() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -73,79 +75,128 @@ class _FitRidePageState extends State<FitRidePage> {
 
       if (userDoc.exists) {
         setState(() {
-          userGoal = userDoc['goals'] ?? "-"; // Update goal from Firestore
+          activityLevel = userDoc['activityLevel'] ?? "-";
+          bodyWater = userDoc['bodyWater'] ?? "-";
+          difficultyBreathing = userDoc['difficultyBreathing'] ?? "-";
+          experiencedHeartRateIssues =
+              userDoc['experiencedHeartRateIssues'] ?? "-";
+          currentHeight = userDoc['height']?.toString() ?? "-";
+          currentWeight = userDoc['weight']?.toString() ?? "-";
         });
       } else {
         setState(() {
-          userGoal = "No goal found";
+          activityLevel = "No data found";
+          bodyWater = "No data found";
+          difficultyBreathing = "No data found";
+          experiencedHeartRateIssues = "No data found";
+          currentHeight = "No data found";
+          currentWeight = "No data found";
         });
       }
     } catch (e) {
       setState(() {
-        userGoal = "Error fetching goal";
+        activityLevel = "Error fetching data";
+        bodyWater = "Error fetching data";
+        difficultyBreathing = "Error fetching data";
+        experiencedHeartRateIssues = "Error fetching data";
+        currentHeight = "Error fetching data";
+        currentWeight = "Error fetching data";
       });
-      print("Error fetching user goal: $e");
+      print("Error fetching user data: $e");
     }
   }
 
-  void _calculateBMI() {
-    double? weight = double.tryParse(weightController.text);
-    double? height = double.tryParse(heightController.text);
-
-    if (weight != null && height != null && height > 0) {
-      double heightInMeters = height / 100;
-      setState(() {
-        bmi = (weight / (heightInMeters * heightInMeters)).toStringAsFixed(2);
-      });
-    }
+  void _showEditDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            "Edit User Data",
+            style: GoogleFonts.roboto(color: Colors.orange),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildEditField("Activity Level", activityLevel),
+                _buildEditField("Body Water", bodyWater),
+                _buildEditField("Difficulty Breathing", difficultyBreathing),
+                _buildEditField("Experienced Heart Rate Issues",
+                    experiencedHeartRateIssues),
+                _buildEditField("Height (cm)", currentHeight),
+                _buildEditField("Weight (kg)", currentWeight),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.roboto(color: Colors.orange),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // Save changes to Firebase
+                Navigator.pop(context);
+              },
+              child: Text(
+                "Save",
+                style: GoogleFonts.roboto(color: Colors.orange),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  Future<void> _saveDataToFirebase() async {
-    double? weight = double.tryParse(weightController.text);
-    double? height = double.tryParse(heightController.text);
-
-    if (weight != null && height != null && bmi.isNotEmpty) {
-      FirebaseFirestore.instance.collection('user_data').add({
-        'date': selectedDate,
-        'weight': weight,
-        'height': height,
-        'bmi': bmi,
-        'timestamp': FieldValue.serverTimestamp(), // Save with timestamp
-      }).then((_) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Data saved successfully!"),
-        ));
-        setState(() {
-          currentWeight = weight.toStringAsFixed(1) + " kg";
-          currentHeight = height.toStringAsFixed(1) + " cm";
-        });
-      }).catchError((error) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Failed to save data: $error"),
-        ));
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text("Please enter valid weight and height!"),
-      ));
-    }
+  Widget _buildEditField(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextField(
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: GoogleFonts.roboto(color: Colors.orange),
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.orange),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.orange),
+          ),
+        ),
+        style: GoogleFonts.roboto(color: Colors.white),
+        controller: TextEditingController(text: value),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'FitRide',
-              style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
-            ),
-            Icon(Icons.pedal_bike, color: Colors.orange, size: 28),
-          ],
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.orange),
+          onPressed: () {
+            // Navigate back to HomePage
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) =>
+                    HomePage(), // Replace with your HomePage widget
+              ),
+            );
+          },
+        ),
+        title: Text(
+          'FitRide',
+          style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
         ),
         backgroundColor: Colors.black,
+        actions: [
+          Icon(Icons.pedal_bike, color: Colors.orange, size: 28),
+        ],
       ),
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -154,17 +205,7 @@ class _FitRidePageState extends State<FitRidePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: 20),
-              Text(
-                "Goal: $userGoal",
-                style: GoogleFonts.roboto(
-                  color: Colors.orange,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 20),
-              // Scrollable Date Selector
+              // Calendar
               SizedBox(
                 height: 80,
                 child: ListView.builder(
@@ -215,122 +256,76 @@ class _FitRidePageState extends State<FitRidePage> {
                 ),
               ),
               SizedBox(height: 20),
-              // Display selected date's data
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Weight: $currentWeight",
-                      style: GoogleFonts.roboto(
-                        color: Colors.grey[400],
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      "Height: $currentHeight",
-                      style: GoogleFonts.roboto(
-                        color: Colors.grey[400],
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      "BMI: $bmi",
-                      style: GoogleFonts.roboto(
-                        color: Colors.orange,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Spacer(),
-              // Weight, Height Input, and Update Button
-              TextField(
-                controller: weightController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: "Enter Weight (kg)",
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[900],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onChanged: (value) => _calculateBMI(),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: heightController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: "Enter Height (cm)",
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[900],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onChanged: (value) => _calculateBMI(),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _saveDataToFirebase,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  "Update",
-                  style: GoogleFonts.roboto(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+              // Edit Button
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  icon: Icon(Icons.edit, color: Colors.orange),
+                  onPressed: _showEditDialog,
                 ),
               ),
               SizedBox(height: 20),
-              // Start Journey Button
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
+              // Expanded User Data Section
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
                     borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-                child: Text(
-                  "Start Journey!",
-                  style: GoogleFonts.roboto(
-                    color: Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "User Data",
+                        style: GoogleFonts.roboto(
+                          color: Colors.orange,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      _buildDataRow("Activity Level", activityLevel),
+                      _buildDataRow("Body Water", bodyWater),
+                      _buildDataRow(
+                          "Difficulty Breathing", difficultyBreathing),
+                      _buildDataRow(
+                          "Heart Rate Issues", experiencedHeartRateIssues),
+                      _buildDataRow("Height", "$currentHeight cm"),
+                      _buildDataRow("Weight", "$currentWeight kg"),
+                      _buildDataRow("BMI", bmi),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDataRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Text(
+            "$label: ",
+            style: GoogleFonts.roboto(
+              color: Colors.grey[400],
+              fontSize: 18,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.roboto(
+              color: Colors.orange,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
