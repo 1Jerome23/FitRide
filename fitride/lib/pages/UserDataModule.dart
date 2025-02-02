@@ -30,13 +30,12 @@ class FitRidePage extends StatefulWidget {
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
   late String selectedDate;
-  String bmi = "0.00"; // Display BMI
   String currentWeight = "-";
   String currentHeight = "-";
-  String activityLevel = "-";
+  String bodyFat = "-";
   String bodyWater = "-";
-  String difficultyBreathing = "-";
-  String experiencedHeartRateIssues = "-";
+  String exertionLevel = "-";
+  String age = "-";
 
   @override
   void initState() {
@@ -75,38 +74,44 @@ class _FitRidePageState extends State<FitRidePage> {
 
       if (userDoc.exists) {
         setState(() {
-          activityLevel = userDoc['activityLevel'] ?? "-";
-          bodyWater = userDoc['bodyWater'] ?? "-";
-          difficultyBreathing = userDoc['difficultyBreathing'] ?? "-";
-          experiencedHeartRateIssues =
-              userDoc['experiencedHeartRateIssues'] ?? "-";
-          currentHeight = userDoc['height']?.toString() ?? "-";
+          age = userDoc['age']?.toString() ?? "-";
           currentWeight = userDoc['weight']?.toString() ?? "-";
+          bodyFat = userDoc['bodyFat']?.toString() ?? "-";
+          bodyWater = userDoc['bodyWater']?.toString() ?? "-";
+          exertionLevel = userDoc['exertionLevel']?.toString() ?? "-";
         });
       } else {
         setState(() {
-          activityLevel = "No data found";
-          bodyWater = "No data found";
-          difficultyBreathing = "No data found";
-          experiencedHeartRateIssues = "No data found";
-          currentHeight = "No data found";
+          age = "No data found";
           currentWeight = "No data found";
+          bodyFat = "No data found";
+          bodyWater = "No data found";
+          exertionLevel = "No data found";
         });
       }
     } catch (e) {
       setState(() {
-        activityLevel = "Error fetching data";
-        bodyWater = "Error fetching data";
-        difficultyBreathing = "Error fetching data";
-        experiencedHeartRateIssues = "Error fetching data";
-        currentHeight = "Error fetching data";
+        age = "Error fetching data";
         currentWeight = "Error fetching data";
+        bodyFat = "Error fetching data";
+        bodyWater = "Error fetching data";
+        exertionLevel = "Error fetching data";
       });
       print("Error fetching user data: $e");
     }
   }
 
   void _showEditDialog() {
+    TextEditingController ageController = TextEditingController(text: age);
+    TextEditingController weightController =
+        TextEditingController(text: currentWeight);
+    TextEditingController bodyFatController =
+        TextEditingController(text: bodyFat);
+    TextEditingController bodyWaterController =
+        TextEditingController(text: bodyWater);
+    TextEditingController exertionController =
+        TextEditingController(text: exertionLevel);
+
     showDialog(
       context: context,
       builder: (context) {
@@ -119,13 +124,11 @@ class _FitRidePageState extends State<FitRidePage> {
           content: SingleChildScrollView(
             child: Column(
               children: [
-                _buildEditField("Activity Level", activityLevel),
-                _buildEditField("Body Water", bodyWater),
-                _buildEditField("Difficulty Breathing", difficultyBreathing),
-                _buildEditField("Experienced Heart Rate Issues",
-                    experiencedHeartRateIssues),
-                _buildEditField("Height (cm)", currentHeight),
-                _buildEditField("Weight (kg)", currentWeight),
+                _buildEditField("Age", ageController),
+                _buildEditField("Weight (kg)", weightController),
+                _buildEditField("Body Fat (%)", bodyFatController),
+                _buildEditField("Body Water (%)", bodyWaterController),
+                _buildEditField("Exertion Level (1-10)", exertionController),
               ],
             ),
           ),
@@ -138,9 +141,53 @@ class _FitRidePageState extends State<FitRidePage> {
               ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                // Validate exertion level
+                final exertionLevelValue =
+                    int.tryParse(exertionController.text);
+                if (exertionLevelValue == null ||
+                    exertionLevelValue < 1 ||
+                    exertionLevelValue > 10) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Exertion level must be between 1 and 10.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return; // Stop further execution if validation fails
+                }
+
                 // Save changes to Firebase
-                Navigator.pop(context);
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  String uid = user.uid;
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('User Questionnaires')
+                        .doc(uid)
+                        .update({
+                      'age': int.tryParse(ageController.text),
+                      'weight': double.tryParse(weightController.text),
+                      'bodyFat': double.tryParse(bodyFatController.text),
+                      'bodyWater': double.tryParse(bodyWaterController.text),
+                      'exertionLevel':
+                          exertionLevelValue, // Use validated value
+                    });
+
+                    // Update local state
+                    setState(() {
+                      age = ageController.text;
+                      currentWeight = weightController.text;
+                      bodyFat = bodyFatController.text;
+                      bodyWater = bodyWaterController.text;
+                      exertionLevel = exertionController.text;
+                    });
+
+                    Navigator.pop(context);
+                  } catch (e) {
+                    print("Error updating user data: $e");
+                  }
+                }
               },
               child: Text(
                 "Save",
@@ -153,7 +200,7 @@ class _FitRidePageState extends State<FitRidePage> {
     );
   }
 
-  Widget _buildEditField(String label, String value) {
+  Widget _buildEditField(String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
@@ -168,7 +215,7 @@ class _FitRidePageState extends State<FitRidePage> {
           ),
         ),
         style: GoogleFonts.roboto(color: Colors.white),
-        controller: TextEditingController(text: value),
+        controller: controller,
       ),
     );
   }
@@ -285,15 +332,11 @@ class _FitRidePageState extends State<FitRidePage> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      _buildDataRow("Activity Level", activityLevel),
-                      _buildDataRow("Body Water", bodyWater),
-                      _buildDataRow(
-                          "Difficulty Breathing", difficultyBreathing),
-                      _buildDataRow(
-                          "Heart Rate Issues", experiencedHeartRateIssues),
-                      _buildDataRow("Height", "$currentHeight cm"),
+                      _buildDataRow("Age", age),
                       _buildDataRow("Weight", "$currentWeight kg"),
-                      _buildDataRow("BMI", bmi),
+                      _buildDataRow("Body Fat", "$bodyFat %"),
+                      _buildDataRow("Body Water", "$bodyWater %"),
+                      _buildDataRow("Exertion Level", exertionLevel),
                     ],
                   ),
                 ),
