@@ -235,51 +235,88 @@ Future<void> _fetchStravaData(String accessToken) async {
   }
 }
 
+Future<void> _subscribeToStravaWebhook() async {
+  final String clientId = "146485";
+  final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
+  final String callbackUrl = 'https://fitride.trycloudflare.com/webhook'; 
+  final String verifyToken = '510a9fdca8569583355fc3c158c3cb0a2583f6c1';
 
-  Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
-    final String clientId = "146485";
-    final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
+  try {
+    print('Creating webhook subscription...');
+    print('Request Body: ${{
+      'client_id': clientId,
+      'client_secret': clientSecret,
+      'callback_url': callbackUrl,
+      'verify_token': verifyToken,
+    }}');
 
-    try {
-      final response = await http.post(
-        Uri.parse('https://www.strava.com/oauth/token'),
-        body: {
-          'client_id': clientId,
-          'client_secret': clientSecret,
-          'code': code,
-          'grant_type': 'authorization_code',
-        },
-      );
+    final response = await http.post(
+      Uri.parse('https://www.strava.com/api/v3/push_subscriptions'),
+      body: {
+        'client_id': clientId,
+        'client_secret': clientSecret,
+        'callback_url': callbackUrl,
+        'verify_token': verifyToken,
+      },
+    );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+    print('Response Status Code: ${response.statusCode}');
+    print('Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final String accessToken = data['access_token'];
-        final String refreshToken = data['refresh_token'];
-
-        final userId = FirebaseAuth.instance.currentUser?.uid;
-
-        if (userId != null) {
-          await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
-            'access_token': accessToken,
-            'refresh_token': refreshToken,
-          });
-
-          print('Tokens saved in Firestore');
-
-          await _fetchStravaData(accessToken);
-        } else {
-          print('User is not authenticated.');
-        }
-      } else {
-        print('Error exchanging authorization code: ${response.body}');
-      }
-    } catch (e) {
-      print('Error during token exchange: $e');
+    if (response.statusCode == 201) {
+      print('Webhook subscription created successfully: ${response.body}');
+    } else {
+      print('Error creating webhook subscription: ${response.body}');
     }
+  } catch (e) {
+    print('Error during webhook subscription: $e');
   }
+}
+
+Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
+  final String clientId = "146485";
+  final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f"; 
+
+  try {
+    final response = await http.post(
+      Uri.parse('https://www.strava.com/oauth/token'),
+      body: {
+        'client_id': clientId,
+        'client_secret': clientSecret,
+        'code': code,
+        'grant_type': 'authorization_code',
+      },
+    );
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final Map data = json.decode(response.body);
+      final String accessToken = data['access_token'];
+      final String refreshToken = data['refresh_token'];
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+
+      if (userId != null) {
+        await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
+          'access_token': accessToken,
+          'refresh_token': refreshToken,
+        });
+
+        print('Tokens saved in Firestore');
+
+        await _fetchStravaData(accessToken);
+        await _subscribeToStravaWebhook();
+      } else {
+        print('User is not authenticated.');
+      }
+    } else {
+      print('Error exchanging authorization code: ${response.body}');
+    }
+  } catch (e) {
+    print('Error during token exchange: $e');
+  }
+}
 
   void _authorizeStrava() {
     final String clientId = "146485";
