@@ -10,7 +10,7 @@ const STRAVA_CLIENT_ID = '146485';
 const STRAVA_CLIENT_SECRET = '6e8f87ec4856b0793c009aaf3dc17ff9a941f50f';
 const REDIRECT_URI = 'https://fitride.uk/callback';
 const WEBHOOK_CALLBACK_URL = 'https://fitride.uk/webhook';
-const VERIFY_TOKEN = '510a9fdca8569583355fc3c158c3cb0a2583f6c1';
+const VERIFY_TOKEN = 'STRAVA';
 
 let userTokens = {}; 
 
@@ -89,13 +89,14 @@ app.get('/webhook', (req, res) => {
   const verifyToken = req.query['hub.verify_token'];
 
   if (verifyToken === VERIFY_TOKEN) { 
-    console.log('Webhook verified');
+    console.log('✅ Webhook verified');
     res.status(200).json({ 'hub.challenge': hubChallenge }); 
   } else {
-    console.error('Invalid verify token');
+    console.error('❌ Invalid verify token');
     res.status(403).send('Invalid verify token');
   }
 });
+
 
 // Webhook event handler
 app.post('/webhook', (req, res) => {

@@ -214,7 +214,7 @@ Future<void> _subscribeToStravaWebhook() async {
   final String clientId = "146485";
   final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
   final String callbackUrl = 'https://fitride.uk/webhook'; 
-  final String verifyToken = '510a9fdca8569583355fc3c158c3cb0a2583f6c1';
+  final String verifyToken = 'STRAVA';
 
   try {
     print('Creating webhook subscription...');
