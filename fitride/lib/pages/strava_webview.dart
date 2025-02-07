@@ -98,6 +98,8 @@ void initState() {
           });
 
           print('Tokens saved in Firestore');
+          await _fetchStravaData(accessToken);
+          await _subscribeToStravaWebhook();
           return true; 
         } else {
           print('User is not authenticated.');
@@ -114,6 +116,137 @@ void initState() {
       _isExchangingCode = false; 
     }
   }
+
+Future<void> _fetchStravaData(String accessToken) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      try {
+        final athleteResponse = await http.get(
+          Uri.parse('https://www.strava.com/api/v3/athlete'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        );
+
+        if (athleteResponse.statusCode == 200) {
+          final Map<String, dynamic> athleteData = json.decode(athleteResponse.body);
+          print("Athlete Data: $athleteData");
+
+          await _saveAthleteDataToFirestore(userId, athleteData);
+        } else {
+          print('Error fetching athlete data: ${athleteResponse.body}');
+        }
+
+        final activitiesResponse = await http.get(
+          Uri.parse('https://www.strava.com/api/v3/athlete/activities'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        );
+
+        if (activitiesResponse.statusCode == 200) {
+          final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
+          print("Activities Data: $activitiesData");
+
+          await _saveActivitiesDataToFirestore(userId, activitiesData);
+        } else {
+          print('Error fetching activities: ${activitiesResponse.body}');
+        }
+      } catch (e) {
+        print('Error fetching Strava data: $e');
+      } finally {
+        setState(() {
+        });
+      }
+    }
+  }
+
+  Future<void> _saveAthleteDataToFirestore(String userId, Map<String, dynamic> athleteData) async {
+    try {
+      await FirebaseFirestore.instance.collection('athletes').doc(userId).set({
+        'athlete_name': '${athleteData['firstname']} ${athleteData['lastname']}',
+        'sex': athleteData['sex'] ?? '',
+        'country': athleteData['country'] ?? '',
+        'city': athleteData['city'] ?? '',
+        'weight': athleteData['weight'] ?? '',
+        'bio': athleteData['bio'] ?? '',
+        'created_at': athleteData['created_at'] ?? '',
+        'updated_at': athleteData['updated_at'] ?? '',
+      });
+      print('Athlete data saved to Firestore.');
+    } catch (e) {
+      print('Error saving athlete data to Firestore: $e');
+    }
+  }
+
+ Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
+  try {
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (var activity in activitiesData) {
+
+      double distanceInKm = (activity['distance'] ?? 0) / 1000; 
+      double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
+      double averageHeartRate = (activity['average_heartrate'] ?? 0); 
+      double caloriesBurned = (activity['calories'] ?? 0);  
+
+      final activityRef = FirebaseFirestore.instance.collection('activities').doc();
+      batch.set(activityRef, {
+        'user_id': userId,
+        'name': activity['name'] ?? 'Unnamed Activity',
+        'distance': distanceInKm, 
+        'start_date': activity['start_date'] ?? '',
+        'type': activity['type'] ?? '',
+        'average_speed': averageSpeedInKmh,
+        'average_heartrate': averageHeartRate,
+        'calories_burned': caloriesBurned,  
+      });
+    }
+
+    await batch.commit();
+    print('Activities data saved to Firestore.');
+  } catch (e) {
+    print('Error saving activities data to Firestore: $e');
+  }
+}
+
+Future<void> _subscribeToStravaWebhook() async {
+  final String clientId = "146485";
+  final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
+  final String callbackUrl = 'https://fitride.uk/webhook'; 
+  final String verifyToken = '510a9fdca8569583355fc3c158c3cb0a2583f6c1';
+
+  try {
+    print('Creating webhook subscription...');
+    print('Request Body: ${{
+      'client_id': clientId,
+      'client_secret': clientSecret,
+      'callback_url': callbackUrl,
+      'verify_token': verifyToken,
+    }}');
+
+    final response = await http.post(
+      Uri.parse('https://www.strava.com/api/v3/push_subscriptions'),
+      body: {
+        'client_id': clientId,
+        'client_secret': clientSecret,
+        'callback_url': callbackUrl,
+        'verify_token': verifyToken,
+      },
+    );
+
+    print('Response Status Code: ${response.statusCode}');
+    print('Response Body: ${response.body}');
+
+    if (response.statusCode == 201) {
+      print('Webhook subscription created successfully: ${response.body}');
+    } else {
+      print('Error creating webhook subscription: ${response.body}');
+    }
+  } catch (e) {
+    print('Error during webhook subscription: $e');
+  }
+}
 
   @override
   Widget build(BuildContext context) {
