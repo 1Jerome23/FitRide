@@ -238,7 +238,7 @@ Future<void> _fetchStravaData(String accessToken) async {
 Future<void> _subscribeToStravaWebhook() async {
   final String clientId = "146485";
   final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
-  final String callbackUrl = 'https://fitride.trycloudflare.com/webhook'; 
+  final String callbackUrl = 'https://fitride.uk/webhook'; 
   final String verifyToken = '510a9fdca8569583355fc3c158c3cb0a2583f6c1';
 
   try {
@@ -320,7 +320,7 @@ Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
 
   void _authorizeStrava() {
     final String clientId = "146485";
-    final String redirectUri = 'https://fitride.trycloudflare.com/callback';
+    final String redirectUri = 'https://fitride.uk/callback';
     final String responseType = "code";
     final String approvalPrompt = "force";
     final String scope = "activity:read_all";
