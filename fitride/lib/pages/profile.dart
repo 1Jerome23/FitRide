@@ -215,7 +215,7 @@ Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
 
               if (authCode != null && authCode.isNotEmpty) {
                 print('Authorization Code: $authCode');
-                _exchangeAuthorizationCodeForTokens(authCode);
+                //_exchangeAuthorizationCodeForTokens(authCode);
               } else {
                 print('Authorization failed: No code found in redirect URL.');
               }
