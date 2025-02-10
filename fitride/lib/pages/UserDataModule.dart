@@ -30,14 +30,12 @@ class FitRidePage extends StatefulWidget {
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
   late String selectedDate;
-  String currentWeight = "-";
-  String currentHeight = "-";
+  String weight = "-";
   String bodyFat = "-";
-  String bodyWater = "-";
   String exertionLevel = "-";
-  String age = "-";
-  String restingHeartRate = "-";
-  String preExistingConditions = "-";
+  String sleep = "-";
+  String water = "-";
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +53,8 @@ class _FitRidePageState extends State<FitRidePage> {
       dateList.add({
         "day": DateFormat.E().format(date),
         "date": DateFormat.d().format(date),
+        "fullDate": DateFormat('yyyy-MM-dd')
+            .format(date), // Store full date for Firebase
       });
     }
     return dateList;
@@ -68,62 +68,55 @@ class _FitRidePageState extends State<FitRidePage> {
       }
 
       String uid = user.uid;
+      String fullDate = dates.firstWhere(
+        (date) => selectedDate == "${date['day']} ${date['date']}",
+      )['fullDate']!;
+
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('User Questionnaires')
+          .collection('testAfterCycle')
           .doc(uid)
+          .collection('dailyData')
+          .doc(fullDate)
           .get();
 
       if (userDoc.exists) {
         setState(() {
-          age = userDoc['age']?.toString() ?? "-";
-          currentWeight = userDoc['weight']?.toString() ?? "-";
-          bodyFat = userDoc['bodyFat']?.toString() ?? "-";
-          bodyWater = userDoc['bodyWater']?.toString() ?? "-";
-          exertionLevel = userDoc['exertionLevel']?.toString() ?? "-";
-          restingHeartRate = userDoc['restingHeartRate']?.toString() ??
-              "-"; // Fetch resting heart rate
-          preExistingConditions = userDoc['preExistingConditions'] ??
-              "-"; // Fetch pre-existing conditions
+          weight = userDoc['weight']?.toString() ?? "-";
+          bodyFat = userDoc['body_fat']?.toString() ?? "-";
+          exertionLevel = userDoc['exertion_level']?.toString() ?? "-";
+          sleep = userDoc['sleep']?.toString() ?? "-";
+          water = userDoc['water']?.toString() ?? "-";
         });
       } else {
         setState(() {
-          age = "No data found";
-          currentWeight = "No data found";
+          weight = "No data found";
           bodyFat = "No data found";
-          bodyWater = "No data found";
           exertionLevel = "No data found";
-          restingHeartRate = "No data found"; // Default value
-          preExistingConditions = "No data found"; // Default value
+          sleep = "No data found";
+          water = "No data found";
         });
       }
     } catch (e) {
       setState(() {
-        age = "Error fetching data";
-        currentWeight = "Error fetching data";
+        weight = "Error fetching data";
         bodyFat = "Error fetching data";
-        bodyWater = "Error fetching data";
         exertionLevel = "Error fetching data";
-        restingHeartRate = "Error fetching data"; // Error handling
-        preExistingConditions = "Error fetching data"; // Error handling
+        sleep = "Error fetching data";
+        water = "Error fetching data";
       });
       print("Error fetching user data: $e");
     }
   }
 
   void _showEditDialog() {
-    TextEditingController ageController = TextEditingController(text: age);
     TextEditingController weightController =
-        TextEditingController(text: currentWeight);
+        TextEditingController(text: weight);
     TextEditingController bodyFatController =
         TextEditingController(text: bodyFat);
-    TextEditingController bodyWaterController =
-        TextEditingController(text: bodyWater);
     TextEditingController exertionController =
         TextEditingController(text: exertionLevel);
-    TextEditingController restingHeartRateController =
-        TextEditingController(text: restingHeartRate); // New controller
-    TextEditingController preExistingConditionsController =
-        TextEditingController(text: preExistingConditions); // New controller
+    TextEditingController sleepController = TextEditingController(text: sleep);
+    TextEditingController waterController = TextEditingController(text: water);
 
     showDialog(
       context: context,
@@ -137,15 +130,11 @@ class _FitRidePageState extends State<FitRidePage> {
           content: SingleChildScrollView(
             child: Column(
               children: [
-                _buildEditField("Age", ageController),
                 _buildEditField("Weight (kg)", weightController),
                 _buildEditField("Body Fat (%)", bodyFatController),
-                _buildEditField("Body Water (%)", bodyWaterController),
                 _buildEditField("Exertion Level (1-10)", exertionController),
-                _buildEditField("Resting Heart Rate",
-                    restingHeartRateController), // New field
-                _buildEditField("Pre-existing Conditions",
-                    preExistingConditionsController), // New field
+                _buildEditField("Sleep (hours)", sleepController),
+                _buildEditField("Water (liters)", waterController),
               ],
             ),
           ),
@@ -178,34 +167,32 @@ class _FitRidePageState extends State<FitRidePage> {
                 final user = FirebaseAuth.instance.currentUser;
                 if (user != null) {
                   String uid = user.uid;
+                  String fullDate = dates.firstWhere(
+                    (date) => selectedDate == "${date['day']} ${date['date']}",
+                  )['fullDate']!;
+
                   try {
                     await FirebaseFirestore.instance
-                        .collection('User Questionnaires')
+                        .collection('testAfterCycle')
                         .doc(uid)
-                        .update({
-                      'age': int.tryParse(ageController.text),
+                        .collection('dailyData')
+                        .doc(fullDate)
+                        .set({
                       'weight': double.tryParse(weightController.text),
-                      'bodyFat': double.tryParse(bodyFatController.text),
-                      'bodyWater': double.tryParse(bodyWaterController.text),
-                      'exertionLevel': exertionLevelValue,
-                      'restingHeartRate': int.tryParse(
-                          restingHeartRateController
-                              .text), // Save resting heart rate
-                      'preExistingConditions': preExistingConditionsController
-                          .text, // Save pre-existing conditions
+                      'body_fat': double.tryParse(bodyFatController.text),
+                      'exertion_level': exertionLevelValue,
+                      'sleep': double.tryParse(sleepController.text),
+                      'water': double.tryParse(waterController.text),
+                      'timestamp': FieldValue.serverTimestamp(),
                     });
 
                     // Update local state
                     setState(() {
-                      age = ageController.text;
-                      currentWeight = weightController.text;
+                      weight = weightController.text;
                       bodyFat = bodyFatController.text;
-                      bodyWater = bodyWaterController.text;
                       exertionLevel = exertionController.text;
-                      restingHeartRate = restingHeartRateController
-                          .text; // Update resting heart rate
-                      preExistingConditions = preExistingConditionsController
-                          .text; // Update pre-existing conditions
+                      sleep = sleepController.text;
+                      water = waterController.text;
                     });
 
                     Navigator.pop(context);
@@ -255,16 +242,11 @@ class _FitRidePageState extends State<FitRidePage> {
             // Navigate back to HomePage
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) =>
-                    HomePage(), // Replace with your HomePage widget
+                builder: (context) => HomePage(),
               ),
             );
           },
         ),
-        // title: Text(
-        //   'FitRide',
-        //   style: GoogleFonts.roboto(color: Colors.orange, fontSize: 24),
-        // ),
         backgroundColor: Colors.black,
         actions: [
           Icon(Icons.pedal_bike, color: Colors.orange, size: 28),
@@ -293,6 +275,7 @@ class _FitRidePageState extends State<FitRidePage> {
                         setState(() {
                           selectedDate = "${date['day']} ${date['date']}";
                         });
+                        _fetchUserData(); // Fetch data for the selected date
                       },
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -357,15 +340,11 @@ class _FitRidePageState extends State<FitRidePage> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      _buildDataRow("Age", age),
-                      _buildDataRow("Weight", "$currentWeight kg"),
+                      _buildDataRow("Weight", "$weight kg"),
                       _buildDataRow("Body Fat", "$bodyFat %"),
-                      _buildDataRow("Body Water", "$bodyWater %"),
                       _buildDataRow("Exertion Level", exertionLevel),
-                      _buildDataRow("Resting Heart Rate",
-                          "$restingHeartRate bpm"), // New field
-                      _buildDataRow("Pre-existing Conditions",
-                          preExistingConditions), // New field
+                      _buildDataRow("Sleep", "$sleep hours"),
+                      _buildDataRow("Water", "$water liters"),
                     ],
                   ),
                 ),

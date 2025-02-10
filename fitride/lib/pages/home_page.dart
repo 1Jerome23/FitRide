@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fitride/pages/recent_activity.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_register.dart';
-import 'package:geolocator/geolocator.dart'; 
+import 'package:geolocator/geolocator.dart';
 import 'recommendation.dart';
-
 
 class HomePage extends StatefulWidget {
   @override
@@ -25,12 +25,13 @@ class _HomePageState extends State<HomePage> {
   double? pm2_5;
   String airQualityStatus = "Loading...";
   String weatherImage = "assets/default_weather.png";
-  String userName = ''; 
+  String userName = '';
   String? bmi;
   double? weight;
   double? height;
   String? userId = FirebaseAuth.instance.currentUser?.uid;
-  //footer functionalities
+
+  // Footer functionalities
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -39,7 +40,7 @@ class _HomePageState extends State<HomePage> {
       case 0:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), 
+          MaterialPageRoute(builder: (context) => HomePage()),
         );
         break;
       case 1:
@@ -51,13 +52,13 @@ class _HomePageState extends State<HomePage> {
       case 2:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => GoalTrackingPage()), 
+          MaterialPageRoute(builder: (context) => GoalTrackingPage()),
         );
         break;
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => ProfilePage()), 
+          MaterialPageRoute(builder: (context) => ProfilePage()),
         );
         break;
     }
@@ -67,20 +68,19 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     fetchWeatherData();
-    _getUserName(); 
-
+    _getUserName();
   }
 
-   Future<void> _getUserName() async {
+  Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? fetchedUserName = prefs.getString('userName');
     if (fetchedUserName != null) {
       setState(() {
-        userName = fetchedUserName; 
+        userName = fetchedUserName;
       });
     }
   }
-  
+
   // Logout function
   void _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -133,11 +133,13 @@ class _HomePageState extends State<HomePage> {
 
         setState(() {
           temperature = (currentWeather['temperature'] as num).toDouble();
-          humidity = (hourly['relative_humidity_2m'] != null && hourly['relative_humidity_2m'].isNotEmpty)
+          humidity = (hourly['relative_humidity_2m'] != null &&
+                  hourly['relative_humidity_2m'].isNotEmpty)
               ? (hourly['relative_humidity_2m'][0] as num).toDouble()
               : 0.0;
 
-          weatherImage = _getWeatherImage(currentWeather['weathercode'].toString());
+          weatherImage =
+              _getWeatherImage(currentWeather['weathercode'].toString());
         });
       } else {
         print('Failed to fetch temperature and humidity.');
@@ -155,9 +157,10 @@ class _HomePageState extends State<HomePage> {
         final hourlyData = data['hourly'];
 
         setState(() {
-          pm2_5 = (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
-              ? (hourlyData['pm2_5'][0] as num).toDouble()
-              : 0.0;
+          pm2_5 =
+              (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
+                  ? (hourlyData['pm2_5'][0] as num).toDouble()
+                  : 0.0;
 
           airQualityStatus = _evaluateAirQuality(pm2_5);
         });
@@ -169,23 +172,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-String _getWeatherImage(String? condition) {
-  switch (condition) {
-    case "0": 
-      return "assets/sunny.png"; 
-    case "2": 
-      return "assets/cloudy.png"; 
-    case "3": 
-      return "assets/overcast.png"; 
-    case "61": 
-      return "assets/rainy.png"; 
-    case "77": 
-      return "assets/stormy.png"; 
-    default:
-      return "assets/sunny.png"; 
+  String _getWeatherImage(String? condition) {
+    switch (condition) {
+      case "0":
+        return "assets/sunny.png";
+      case "2":
+        return "assets/cloudy.png";
+      case "3":
+        return "assets/overcast.png";
+      case "61":
+        return "assets/rainy.png";
+      case "77":
+        return "assets/stormy.png";
+      default:
+        return "assets/sunny.png";
+    }
   }
-}
-
 
   String _evaluateAirQuality(double? pm2_5) {
     if (pm2_5 == null) return "Unknown";
@@ -202,12 +204,12 @@ String _getWeatherImage(String? condition) {
           title: Text("Record the Weather"),
           content: Text(
             "Record the weather to get accurate information tailored for you!\nOnly record when you're going to cycle.",
-            style: TextStyle(color:Colors.black),
+            style: TextStyle(color: Colors.black),
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); 
+                Navigator.of(context).pop();
               },
               child: Text(
                 "Cancel",
@@ -216,7 +218,7 @@ String _getWeatherImage(String? condition) {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.of(context).pop(); 
+                Navigator.of(context).pop();
                 if (temperature != null && humidity != null && pm2_5 != null) {
                   String? userId = FirebaseAuth.instance.currentUser?.uid;
 
@@ -227,16 +229,22 @@ String _getWeatherImage(String? condition) {
                       'pm2_5': pm2_5,
                       'airQualityStatus': airQualityStatus,
                       'timestamp': FieldValue.serverTimestamp(),
-                      'userId': userId, 
+                      'userId': userId,
                     };
 
-                    FirebaseFirestore.instance.collection('weatherData').add(weatherData).then((value) {
+                    FirebaseFirestore.instance
+                        .collection('weatherData')
+                        .add(weatherData)
+                        .then((value) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Weather recorded successfully to Firebase!")),
+                        SnackBar(
+                            content: Text(
+                                "Weather recorded successfully to Firebase!")),
                       );
                     }).catchError((error) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Failed to record weather: $error")),
+                        SnackBar(
+                            content: Text("Failed to record weather: $error")),
                       );
                     });
                   } else {
@@ -252,7 +260,7 @@ String _getWeatherImage(String? condition) {
               },
               child: Text(
                 "Okay",
-                style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)), 
+                style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)),
               ),
             ),
           ],
@@ -260,355 +268,473 @@ String _getWeatherImage(String? condition) {
       },
     );
   }
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      automaticallyImplyLeading: false,
-      backgroundColor: Theme.of(context).primaryColor,
-      title: Text(
-        "FitRide",
-        style: GoogleFonts.roboto(
-          color: Colors.orange,
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: GestureDetector(
-            onTap: _logout,
-            child: Image.asset(
-              'assets/logobike.png',
-              height: 40,
-            ),
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Theme.of(context).primaryColor,
+        title: Text(
+          "FitRide",
+          style: GoogleFonts.roboto(
+            color: Colors.orange,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
         ),
-      ],
-    ),
-    body: SingleChildScrollView(  
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.5),
-                  spreadRadius: 3,
-                  blurRadius: 5,
-                  offset: Offset(0, 3),
-                ),
-              ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: GestureDetector(
+              onTap: _logout,
+              child: Image.asset(
+                'assets/logobike.png',
+                height: 40,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (temperature != null)
-                  Center(
-                    child: Image.asset(weatherImage, height: 120),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.5),
+                    spreadRadius: 3,
+                    blurRadius: 5,
+                    offset: Offset(0, 3),
                   ),
-                SizedBox(height: 12),
-                if (temperature != null)
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (temperature != null)
+                    Center(
+                      child: Image.asset(weatherImage, height: 120),
+                    ),
+                  SizedBox(height: 12),
+                  if (temperature != null)
+                    Text(
+                      "Temperature: ${temperature!.toStringAsFixed(1)}°C",
+                      style: GoogleFonts.lato(
+                          fontSize: 16,
+                          color: Colors.black,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  if (humidity != null)
+                    Text(
+                      "Humidity: ${humidity!.toStringAsFixed(1)}%",
+                      style: GoogleFonts.lato(
+                          fontSize: 16,
+                          color: Colors.black,
+                          fontWeight: FontWeight.w500),
+                    ),
                   Text(
-                    "Temperature: ${temperature!.toStringAsFixed(1)}°C",
-                    style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
+                    "Air Quality: $airQualityStatus",
+                    style: GoogleFonts.lato(
+                        fontSize: 16,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w500),
                   ),
-                if (humidity != null)
-                  Text(
-                    "Humidity: ${humidity!.toStringAsFixed(1)}%",
-                    style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
-                  ),
-                Text(
-                  "Air Quality: $airQualityStatus",
-                  style: GoogleFonts.lato(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _recordWeather,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 248, 155, 14),
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _recordWeather,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 248, 155, 14),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      "Record the weather?",
+                      style: GoogleFonts.lato(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Body Goals",
+                    style: GoogleFonts.roboto(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                LoginPage()), // Replace with your settings page
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.5),
+                            spreadRadius: 3,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            "Edit Goals",
+                            style: GoogleFonts.lato(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.settings,
+                            color: Colors.black,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildGoalCard("Goal 1", Colors.orange),
+                  _buildGoalCard("Goal 2", Colors.blue),
+                  _buildGoalCard("Goal 3", Colors.green),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+
+            // Added section for User Data
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "User Data",
+                    style: GoogleFonts.roboto(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                FitRidePage()), // Replace with your User page
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.5),
+                            spreadRadius: 3,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            "Edit Data",
+                            style: GoogleFonts.lato(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.settings,
+                            color: Colors.black,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('User Questionnaires')
+                    .doc(userId)
+                    .get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return CircularProgressIndicator();
+                  }
+
+                  if (snapshot.hasError) {
+                    return Text("Error fetching data");
+                  }
+
+                  if (!snapshot.hasData || !snapshot.data!.exists) {
+                    return Text("No data available");
+                  }
+
+                  var data = snapshot.data!.data() as Map<String, dynamic>;
+                  double weight =
+                      double.tryParse(data['weight'].toString()) ?? 0.0;
+                  double height =
+                      double.tryParse(data['height'].toString()) ?? 0.0;
+
+                  // Calculate BMI
+                  double bmi = (weight /
+                      ((height / 100) *
+                          (height / 100))); // Convert height to meters
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildDataCard(
+                          "BMI", bmi.toStringAsFixed(1), Colors.orange),
+                      _buildDataCard(
+                          "Weight", weight.toStringAsFixed(1), Colors.blue),
+                      _buildDataCard(
+                          "Height", height.toStringAsFixed(1), Colors.green),
+                    ],
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 16),
+
+            // Added section for Recent Activity
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Recent Activity",
+                    style: GoogleFonts.roboto(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      // Navigate to the Recent Activity page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                RecentActivityPage()), // Replace with your Recent Activity page
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.5),
+                            spreadRadius: 3,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            "See All",
+                            style: GoogleFonts.lato(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.arrow_forward,
+                            color: Colors.black,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.5),
+                      spreadRadius: 3,
+                      blurRadius: 5,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Center(
                   child: Text(
-                    "Record the weather?",
+                    "No recent activity",
                     style: GoogleFonts.lato(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Body Goals",
-                  style: GoogleFonts.roboto(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => LoginPage()), // Replace with your settings page
-                    );
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.5),
-                          spreadRadius: 3,
-                          blurRadius: 5,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          "Edit Goals",
-                          style: GoogleFonts.lato(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(
-                          Icons.settings,
-                          color: Colors.black,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildGoalCard("Goal 1", Colors.orange),
-                _buildGoalCard("Goal 2", Colors.blue),
-                _buildGoalCard("Goal 3", Colors.green),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-
-          // Added section for User Data
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "User Data",
-                  style: GoogleFonts.roboto(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => FitRidePage()), // Replace with your User page
-                    );
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.5),
-                          spreadRadius: 3,
-                          blurRadius: 5,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          "Edit Data",
-                          style: GoogleFonts.lato(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(
-                          Icons.settings,
-                          color: Colors.black,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: FutureBuilder<DocumentSnapshot>( 
-              future: FirebaseFirestore.instance.collection('User Questionnaires').doc(userId).get(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return CircularProgressIndicator();
-                }
-
-                if (snapshot.hasError) {
-                  return Text("Error fetching data");
-                }
-
-                if (!snapshot.hasData || !snapshot.data!.exists) {
-                  return Text("No data available");
-                }
-
-                var data = snapshot.data!.data() as Map<String, dynamic>;
-                double weight = double.tryParse(data['weight'].toString()) ?? 0.0;
-                double height = double.tryParse(data['height'].toString()) ?? 0.0;
-
-                // Calculate BMI
-                double bmi = (weight / ((height / 100) * (height / 100))); // Convert height to meters
-
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildDataCard("BMI", bmi.toStringAsFixed(1), Colors.orange),
-                    _buildDataCard("Weight", weight.toStringAsFixed(1), Colors.blue),
-                    _buildDataCard("Height", height.toStringAsFixed(1), Colors.green),
-                  ],
-                );
-              },
-            ),
-          ),
-          SizedBox(height: 16),
-        ],
-      ),
-    ),
-    bottomNavigationBar: BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      selectedItemColor: Theme.of(context).colorScheme.primary,
-      unselectedItemColor: Colors.grey,
-      onTap: _onItemTapped,
-      items: const <BottomNavigationBarItem>[
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: 'Home',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.insights),
-          label: 'Insights',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.data_usage),
-          label: 'Goal/Progress',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildGoalCard(String title, Color color) {
-  return Container(
-    width: 100,
-    height: 100,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.5),
-          spreadRadius: 3,
-          blurRadius: 5,
-          offset: Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Center(
-      child: Text(
-        title,
-        style: GoogleFonts.lato(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+            SizedBox(height: 16),
+          ],
         ),
       ),
-    ),
-  );
-}
-
-Widget _buildDataCard(String title, String value, Color color) {
-  return Container(
-    width: 100,
-    height: 100,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.5),
-          spreadRadius: 3,
-          blurRadius: 5,
-          offset: Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.lato(fontSize: 14, color: Colors.white),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
           ),
-          Text(
-            value,
-            style: GoogleFonts.lato(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.data_usage),
+            label: 'Goal/Progress',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
+  Widget _buildGoalCard(String title, Color color) {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 3,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          title,
+          style: GoogleFonts.lato(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildDataCard(String title, String value, Color color) {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 3,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.lato(fontSize: 14, color: Colors.white),
+            ),
+            Text(
+              value,
+              style: GoogleFonts.lato(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
