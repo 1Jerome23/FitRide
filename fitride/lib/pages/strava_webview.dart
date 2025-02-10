@@ -25,7 +25,7 @@ class _StravaWebViewState extends State<StravaWebView> {
   bool _isExchangingCode = false; 
 
   String userAgent =
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.106 Safari/537.36";
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.163 Safari/537.36";
 
  @override
 void initState() {
@@ -84,21 +84,23 @@ void initState() {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        final String accessToken = data['access_token'];
-        final String refreshToken = data['refresh_token'];
-        final userId = FirebaseAuth.instance.currentUser?.uid;
+        final String expiresAt = data['expires_at'].toString();
+        final String accessToken = data['access_token'].toString();
+        final String refreshToken = data['refresh_token'].toString();
+        final String userId = data['athlete']['id'].toString();
 
         if (userId != null) {
           await FirebaseFirestore.instance
               .collection('user_tokens')
               .doc(userId)
               .set({
+            'expires_at': expiresAt,
             'access_token': accessToken,
             'refresh_token': refreshToken,
           });
 
           print('Tokens saved in Firestore');
-          await _fetchStravaData(accessToken);
+          await _fetchStravaData(userId, accessToken);
           await _subscribeToStravaWebhook();
           return true; 
         } else {
@@ -117,8 +119,7 @@ void initState() {
     }
   }
 
-Future<void> _fetchStravaData(String accessToken) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
+Future<void> _fetchStravaData(String userId, String accessToken) async {
     if (userId != null) {
       try {
         final athleteResponse = await http.get(
