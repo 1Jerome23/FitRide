@@ -6,6 +6,7 @@ buildscript {
     dependencies {
         // Add the Google Services plugin
         classpath 'com.google.gms:google-services:4.4.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         // Other classpath dependencies can be added here
     }
 }

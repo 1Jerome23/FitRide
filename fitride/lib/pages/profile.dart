@@ -12,10 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:fitride/pages/change_password.dart';
 import 'strava_webview.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:fitride/pages/edit_goal.dart';
-import 'package:fitride/pages/strava_webview.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -24,7 +21,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 3;
-  bool _isLoading = true;
   String name = "Loading...";
   String email = "Loading...";
   String? _imagePath;

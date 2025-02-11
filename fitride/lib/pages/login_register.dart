@@ -4,25 +4,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart'; 
+import 'package:google_sign_in/google_sign_in.dart';
 import 'question.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
   String? errorMessage = '';
   bool isLogin = true;
   late SharedPreferences _prefs;
-
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn(); 
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
@@ -32,61 +32,94 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> signInWithEmailAndPassword() async {
-  try {
-    await Auth().signInWithEmailAndPassword(
-      email: _controllerEmail.text,
-      password: _controllerPassword.text,
-    );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      errorMessage = 'Invalid email or password.';
-    });
+  Future signInWithEmailAndPassword() async {
+    try {
+      await Auth().signInWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
+      await _onLoginSuccess();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = 'Invalid email or password.';
+      });
+    }
   }
-}
 
+  Future createUserWithEmailAndPassword() async {
+    try {
+      await Auth().createUserWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
+      await _onLoginSuccess();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
+  }
 
-Future<void> createUserWithEmailAndPassword() async {
-  try {
-    await Auth().createUserWithEmailAndPassword(
-      email: _controllerEmail.text,
-      password: _controllerPassword.text,
+  Future _onLoginSuccess() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _prefs.setBool('isFirstLogin', true);
+    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+
+    await _getFCMToken();
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      print("New FCM Token: $newToken");
+      await _saveTokenToFirestore(newToken);
+    });
+
+    if (isFirstLogin) {
+      await _prefs.setBool('isFirstLogin', false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFirstLoginDialog();
+      });
+    }
+  }
+
+  Future _getFCMToken() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    // Request notification permissions
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
     );
 
-    await _onLoginSuccess();
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      errorMessage = e.message;
-    });
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      String? token = await messaging.getToken();
+      if (token != null) {
+        print("FCM Token: $token");
+        await _saveTokenToFirestore(token);
+      } else {
+        print("Failed to retrieve FCM token.");
+      }
+    } else {
+      print("User denied notification permissions.");
+    }
   }
-}
 
-Future<void> _onLoginSuccess() async {
-  _prefs = await SharedPreferences.getInstance();
-  
-  await _prefs.setBool('isFirstLogin', true);
-  
-  bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
-
-  if (isFirstLogin) {
-    await _prefs.setBool('isFirstLogin', false);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showFirstLoginDialog();
-    });
+  Future _saveTokenToFirestore(String token) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('user_device_tokens')
+          .doc(user.uid)
+          .set({'tokens': FieldValue.arrayUnion([token])}, SetOptions(merge: true));
+    }
   }
-}
-
 
   void _showFirstLoginDialog() {
     showDialog(
@@ -101,7 +134,7 @@ Future<void> _onLoginSuccess() async {
             "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
             style: TextStyle(color: Colors.black),
           ),
-          actions: <Widget>[
+          actions: [
             TextButton(
               child: Text(
                 "OK",
@@ -120,37 +153,31 @@ Future<void> _onLoginSuccess() async {
     );
   }
 
-Future<void> signInWithGoogle() async {
-  try {
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-    if (googleUser == null) {
+  Future signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() {
+          errorMessage = 'Google Sign-In was canceled.';
+        });
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await _auth.signInWithCredential(credential);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } catch (e) {
       setState(() {
-        errorMessage = 'Google Sign-In was canceled.';
+        errorMessage = 'Google Sign-In failed: $e';
       });
-      return;
     }
-
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    await _auth.signInWithCredential(credential);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } catch (e) {
-    setState(() {
-      errorMessage = 'Google Sign-In failed: $e';
-    });
   }
-}
-
 
   Widget _submitButton() {
     return ElevatedButton(
@@ -211,7 +238,7 @@ Future<void> signInWithGoogle() async {
 
   Widget _socialButton(String text, Color color, IconData icon, VoidCallback onPressed) {
     return ElevatedButton.icon(
-      onPressed: signInWithGoogle,  
+      onPressed: signInWithGoogle,
       icon: Icon(icon, color: Colors.white),
       label: Text(
         text,
@@ -242,7 +269,7 @@ Future<void> signInWithGoogle() async {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
+              children: [
                 Container(
                   margin: const EdgeInsets.only(top: 30.0),
                   child: Text(

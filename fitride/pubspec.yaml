@@ -49,7 +49,9 @@ dependencies:
   webview_flutter: ^4.10.0
   image_picker: ^0.8.5+3
   google_sign_in: ^6.1.0
-
+  firebase_messaging : ^15.2.2
+  flutter_local_notifications: ^18.0.1
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
