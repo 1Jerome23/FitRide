@@ -29,7 +29,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="fitride.trycloudflare.com" android:pathPrefix="/strava/callback" />
+                <data android:scheme="https" android:host="fitride.uk" android:pathPrefix="/strava/callback" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="fitride.trycloudflare.com" android:pathPrefix="/webhook" />
             </intent-filter>
         </activity>
 
