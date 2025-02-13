@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';  
 import 'package:fitride/pages/recommendation.dart';
 import 'package:fitride/pages/profile.dart';
+import 'package:fitride/pages/welcome.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(),
+        '/': (context) => WelcomePage(),
         '/questionnaire': (context) => QuestionPage(),
         '/homepage': (context) => WidgetTree(),
         '/recommendation': (context) => RecommendationPage(), 
