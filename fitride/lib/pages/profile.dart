@@ -1,3 +1,4 @@
+import 'package:fitride/pages/health_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,8 +13,9 @@ import 'dart:io';
 import 'package:fitride/pages/change_password.dart';
 import 'strava_webview.dart';
 import 'package:http/http.dart' as http;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import 'package:fitride/pages/edit_goal.dart';
+import 'package:fitride/pages/strava_webview.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -140,148 +142,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-Future<void> _fetchStravaData(String accessToken) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      try {
-        final athleteResponse = await http.get(
-          Uri.parse('https://www.strava.com/api/v3/athlete'),
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-          },
-        );
-
-        if (athleteResponse.statusCode == 200) {
-          final Map<String, dynamic> athleteData = json.decode(athleteResponse.body);
-          print("Athlete Data: $athleteData");
-
-          await _saveAthleteDataToFirestore(userId, athleteData);
-        } else {
-          print('Error fetching athlete data: ${athleteResponse.body}');
-        }
-
-        final activitiesResponse = await http.get(
-          Uri.parse('https://www.strava.com/api/v3/athlete/activities'),
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-          },
-        );
-
-        if (activitiesResponse.statusCode == 200) {
-          final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
-          print("Activities Data: $activitiesData");
-
-          await _saveActivitiesDataToFirestore(userId, activitiesData);
-        } else {
-          print('Error fetching activities: ${activitiesResponse.body}');
-        }
-      } catch (e) {
-        print('Error fetching Strava data: $e');
-      } finally {
-        setState(() {
-          _isLoading = false;  
-        });
-      }
-    }
-  }
-
-  Future<void> _saveAthleteDataToFirestore(String userId, Map<String, dynamic> athleteData) async {
-    try {
-      await FirebaseFirestore.instance.collection('athletes').doc(userId).set({
-        'athlete_name': '${athleteData['firstname']} ${athleteData['lastname']}',
-        'sex': athleteData['sex'] ?? '',
-        'country': athleteData['country'] ?? '',
-        'city': athleteData['city'] ?? '',
-        'weight': athleteData['weight'] ?? '',
-        'bio': athleteData['bio'] ?? '',
-        'created_at': athleteData['created_at'] ?? '',
-        'updated_at': athleteData['updated_at'] ?? '',
-      });
-      print('Athlete data saved to Firestore.');
-    } catch (e) {
-      print('Error saving athlete data to Firestore: $e');
-    }
-  }
-
-  Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (var activity in activitiesData) {
-
-        double distanceInKm = (activity['distance'] ?? 0) / 1000; 
-        double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
-
-        double averageHeartRate = (activity['average_heartrate'] ?? 0); 
-
-        final activityRef = FirebaseFirestore.instance.collection('activities').doc();
-        batch.set(activityRef, {
-          'user_id': userId,
-          'name': activity['name'] ?? 'Unnamed Activity',
-          'distance': distanceInKm, 
-          'start_date': activity['start_date'] ?? '',
-          'type': activity['type'] ?? '',
-          'average_speed': averageSpeedInKmh,
-          'average_heartrate': averageHeartRate,
-        });
-      }
-
-      await batch.commit();
-      print('Activities data saved to Firestore.');
-    } catch (e) {
-      print('Error saving activities data to Firestore: $e');
-    }
-}
-
-
-  Future<void> _exchangeAuthorizationCodeForTokens(String code) async {
-    final String clientId = "146579";
-    final String clientSecret = "3b0d8a915656534ea34c07b2cf870cf1bb9f31ee";
-
-    try {
-      final response = await http.post(
-        Uri.parse('https://www.strava.com/oauth/token'),
-        body: {
-          'client_id': clientId,
-          'client_secret': clientSecret,
-          'code': code,
-          'grant_type': 'authorization_code',
-        },
-      );
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final String accessToken = data['access_token'];
-        final String refreshToken = data['refresh_token'];
-
-        final userId = FirebaseAuth.instance.currentUser?.uid;
-
-        if (userId != null) {
-          await FirebaseFirestore.instance.collection('user_tokens').doc(userId).set({
-            'access_token': accessToken,
-            'refresh_token': refreshToken,
-          });
-
-          print('Tokens saved in Firestore');
-
-          await _fetchStravaData(accessToken);
-        } else {
-          print('User is not authenticated.');
-        }
-      } else {
-        print('Error exchanging authorization code: ${response.body}');
-      }
-    } catch (e) {
-      print('Error during token exchange: $e');
-    }
-  }
-
   void _authorizeStrava() {
-    final String clientId = "146579";
-    final String redirectUri = 'https://fitride.trycloudflare.com/callback';
+    final String clientId = "146485";
+    final String redirectUri = 'https://fitride.uk/callback';
     final String responseType = "code";
     final String approvalPrompt = "force";
     final String scope = "activity:read_all";
@@ -310,7 +173,7 @@ Future<void> _fetchStravaData(String accessToken) async {
 
               if (authCode != null && authCode.isNotEmpty) {
                 print('Authorization Code: $authCode');
-                _exchangeAuthorizationCodeForTokens(authCode);
+
               } else {
                 print('Authorization failed: No code found in redirect URL.');
               }
@@ -378,7 +241,10 @@ Future<void> _fetchStravaData(String accessToken) async {
                 _authorizeStrava();
               }),
               _buildProfileButton("Edit Your Goal", Icons.arrow_forward, () {
-                // Navigate to Edit Your Goal page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChangeGoalPage()),
+                );
               }),
               _buildProfileButton("Change Password", Icons.arrow_forward, () {
                 Navigator.push(
@@ -387,7 +253,10 @@ Future<void> _fetchStravaData(String accessToken) async {
                 );
               }),
               _buildProfileButton("Health Summary", Icons.arrow_forward, () {
-                // Navigate to Health Summary page
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => HealthSummary()),
+                );             
               }),
               SizedBox(height: 20),
               ElevatedButton(
