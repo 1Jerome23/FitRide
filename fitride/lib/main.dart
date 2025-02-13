@@ -4,133 +4,136 @@ import 'package:fitride/pages/question.dart';
 import 'package:flutter/material.dart';
 import 'package:fitride/widget_tree.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; 
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; 
+import 'package:firebase_notifications_handler/firebase_notifications_handler.dart';
 import 'package:fitride/pages/recommendation.dart';
 import 'package:fitride/pages/profile.dart';
-
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+import 'package:fitride/globals.dart';
+import 'dart:developer';
+import 'package:fitride/pages/question_after_exercise.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Add this import
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  setupNotificationChannel(); // Set up the notification channel
+  runApp(const _MainApp());
+}
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
+/// Sets up the notification channel for Android 8.0+ devices.
+void setupNotificationChannel() {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel', 
-    'High Importance Notifications', 
-    description: 'This channel is used for important notifications.', 
+    'default_notification_channel', // ID
+    'Default Channel', // Name
+    description: 'This is the default notification channel for the app.', // Description
     importance: Importance.high,
   );
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+  flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
-
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("Foreground message received: ${message.notification?.title}");
-
-    flutterLocalNotificationsPlugin.show(
-      message.hashCode,
-      message.notification?.title,
-      message.notification?.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          channelDescription: channel.description,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
-    );
-  });
-
-  runApp(const MyApp());
 }
 
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("Handling a background message: ${message.messageId}");
-
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel', 
-    'High Importance Notifications', 
-    description: 'This channel is used for important notifications.',
-    importance: Importance.high,
-  );
-
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-
-  flutterLocalNotificationsPlugin.show(
-    message.hashCode,
-    message.notification?.title,
-    message.notification?.body,
-    NotificationDetails(
-      android: AndroidNotificationDetails(
-        channel.id,
-        channel.name,
-        channelDescription: channel.description,
-        icon: '@mipmap/ic_launcher',
-      ),
-    ),
-  );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class _MainApp extends StatelessWidget {
+  static const id = '_MainApp';
+  const _MainApp();
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: Colors.black,
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: Colors.black,
-          secondary: Colors.black,
-        ),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        textTheme: Theme.of(context).textTheme.apply(
-              bodyColor: Colors.white,
-              displayColor: Colors.white,
+    return FirebaseNotificationsHandler(
+      localNotificationsConfiguration: LocalNotificationsConfiguration(
+        androidConfig: AndroidNotificationsConfig(),
+        iosConfig: IosNotificationsConfig(),
+      ),
+      shouldHandleNotification: (msg) => true,
+      onOpenNotificationArrive: (info) {
+        log(
+          'Notification received while app is open with payload ${info.payload}',
+          name: id,
+        );
+      },
+      onTap: (info) {
+        final payload = info.payload;
+        final appState = info.appState;
+        final firebaseMessage = info.firebaseMessage;
+
+        // Log the notification details
+        log(
+          'Notification tapped with $appState & payload $payload. Firebase message: $firebaseMessage',
+          name: id,
+        );
+
+        // Check if the notification should redirect to question_after_exercise
+        if (payload != null && payload.containsKey('redirect_to')) {
+          final redirectTo = payload['redirect_to'];
+          log('Redirecting to: $redirectTo', name: id);
+
+          if (redirectTo == 'question_after_exercise') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (Globals.navigatorKey.currentContext != null) {
+                log('Navigating to /question_after_exercise', name: id);
+                Navigator.pushNamed(Globals.navigatorKey.currentContext!, '/question_after_exercise');
+              } else {
+                log('Navigation failed: No valid context available.', name: id);
+              }
+            });
+          }
+        } else {
+          log('No valid redirect_to key in payload.', name: id);
+        }
+      },
+      onFcmTokenInitialize: (token) {
+        print('FCM Token Initialized: $token');
+        Globals.fcmTokenNotifier.value = token;
+      },
+      onFcmTokenUpdate: (token) {
+        print('FCM Token Updated: $token');
+        Globals.fcmTokenNotifier.value = token;
+      },
+      child: MaterialApp(
+        navigatorKey: Globals.navigatorKey,
+        scaffoldMessengerKey: Globals.scaffoldMessengerKey,
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primaryColor: Colors.black,
+          colorScheme: ColorScheme.fromSwatch().copyWith(
+            primary: Colors.black,
+            secondary: Colors.black,
+          ),
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+          textTheme: Theme.of(context).textTheme.apply(
+                bodyColor: Colors.white,
+                displayColor: Colors.white,
+              ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: Colors.black,
+            elevation: 5,
+            titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+          ),
+          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.grey,
+            backgroundColor: Colors.black,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ButtonStyle(
+              backgroundColor: MaterialStateProperty.all(Colors.black),
+              foregroundColor: MaterialStateProperty.all(Colors.white),
             ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 5,
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
-        ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.black,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(Colors.black),
-            foregroundColor: MaterialStateProperty.all(Colors.white),
           ),
         ),
+        initialRoute: '/',
+        routes: {
+          '/': (context) => LoginPage(),
+          '/questionnaire': (context) => QuestionPage(),
+          '/homepage': (context) => WidgetTree(),
+          '/recommendation': (context) => RecommendationPage(),
+          '/goal_tracking': (context) => GoalTrackingPage(),
+          '/profile': (context) => ProfilePage(),
+          '/question_after_exercise': (context) => LoginPage(),
+        },
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => LoginPage(),
-        '/questionnaire': (context) => QuestionPage(),
-        '/homepage': (context) => WidgetTree(),
-        '/recommendation': (context) => RecommendationPage(),
-        '/goal_tracking': (context) => GoalTrackingPage(),
-        '/profile': (context) => ProfilePage(),
-      },
     );
   }
 }

@@ -26,8 +26,16 @@ app.get('/auth', (req, res) => {
 
 app.get('/callback', async (req, res) => {
   const authorizationCode = req.query.code;
+  const idToken = req.headers.authorization?.split('Bearer ')[1];
+
+  if (!idToken) {
+    return res.status(401).send('Unauthorized: Missing Firebase ID token');
+  }
 
   try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const firebaseUid = decodedToken.uid;
+
     const response = await axios.post('https://www.strava.com/oauth/token', {
       client_id: STRAVA_CLIENT_ID,
       client_secret: STRAVA_CLIENT_SECRET,
@@ -35,10 +43,20 @@ app.get('/callback', async (req, res) => {
       grant_type: 'authorization_code',
     });
 
-    userTokens[response.data.athlete.id] = response.data.access_token;
-    console.log('Strava Access Token:', response.data.access_token);
+    const { athlete, access_token } = response.data;
+    const athleteId = athlete.id; 
 
-    res.send('OAuth callback received. Access token saved!');
+    await admin.firestore().collection('user_tokens').doc(firebaseUid).set({
+      accessToken: access_token,
+    });
+
+    await admin.firestore().collection('user_mappings').doc(athleteId.toString()).set({
+      athleteId: athleteId,
+      uid: firebaseUid,
+    });
+
+    console.log(`Mapping created: Strava athleteId ${athleteId} -> Firebase UID ${firebaseUid}`);
+    res.send('OAuth callback received. Access token and mapping saved!');
   } catch (error) {
     console.error('Error during token exchange:', error.response ? error.response.data : error.message);
     res.status(500).send('Error exchanging authorization code');
@@ -98,37 +116,81 @@ app.get('/webhook', (req, res) => {
 });
 
 
-// Webhook event handler
-app.post('/webhook', (req, res) => {
+app.post('/webhook', async (req, res) => {
   const eventData = req.body;
+  const athleteId = eventData.owner_id;
 
   console.log('Received webhook event:', eventData);
+  console.log('Strava Athlete ID:', athleteId);
 
-  if (eventData.aspect_type === 'create' && eventData.object_type === 'activity') {
-    const athleteId = eventData.owner_id;
-    const activityId = eventData.object_id;
+  try {
 
-    console.log(`New activity created by athlete ${athleteId}: Activity ID ${activityId}`);
+    const userMappingRef = admin.firestore().collection('user_mappings').doc(athleteId.toString());
+    const userMappingSnapshot = await userMappingRef.get();
 
-    const accessToken = userTokens[athleteId];
-
-    if (!accessToken) {
-      console.error(`No access token found for athlete ${athleteId}`);
-      return res.status(400).send('No access token found');
+    if (!userMappingSnapshot.exists) {
+      throw new Error(`No user mapping found for Strava athlete ${athleteId}`);
     }
 
-    axios.get(`https://www.strava.com/api/v3/activities/${activityId}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
-    .then(response => {
-      console.log('Activity details:', response.data);
-    })
-    .catch(error => {
-      console.error('Error fetching activity details:', error.response ? error.response.data : error.message);
+    const firebaseUid = userMappingSnapshot.data().uid; 
+    console.log('Firebase UID:', firebaseUid);
+
+    const userDeviceTokensRef = admin.firestore().collection('user_device_tokens').doc(firebaseUid);
+    const userDeviceTokensSnapshot = await userDeviceTokensRef.get();
+
+    if (!userDeviceTokensSnapshot.exists || !userDeviceTokensSnapshot.data().tokens) {
+      console.error(`No FCM tokens found for user with UID ${firebaseUid}`);
+      return res.status(200).send('Webhook received but no FCM tokens available');
+    }
+
+    const fcmTokens = userDeviceTokensSnapshot.data().tokens;
+
+    const tokensRef = admin.firestore().collection('user_tokens').doc(firebaseUid);
+    const tokensSnapshot = await tokensRef.get();
+    const accessToken = tokensSnapshot.data().accessToken;
+
+    const activityResponse = await axios.get(`https://www.strava.com/api/v3/activities/${eventData.object_id}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
+
+    const activityData = activityResponse.data;
+
+    await admin.firestore().collection('activities').doc(activityData.id.toString()).set({
+      'user_id': firebaseUid,
+      'name': activityData.name || 'Unnamed Activity',
+      'distance': (activityData.distance / 1000).toFixed(2), 
+      'start_date': activityData.start_date,
+      'type': activityData.type,
+      'average_speed': (activityData.average_speed * 3.6).toFixed(2),
+      'average_heartrate': activityData.average_heartrate || null,
+      'calories_burned': activityData.calories || null,
+    });
+    console.log('Activity data saved successfully!');
+
+    const promises = fcmTokens.map((registrationToken) => {
+      const message = {
+        data: {
+          title: 'New Activity Recorded',
+          body: `You just recorded a new activity: ${activityData.name || 'Unnamed Activity'}`,
+        },
+        token: registrationToken,
+      };
+
+      return admin.messaging().send(message)
+        .then((response) => {
+          console.log(`Successfully sent message to token ${registrationToken}:`, response);
+        })
+        .catch((error) => {
+          console.error(`Error sending message to token ${registrationToken}:`, error.message);
+        });
+    });
+
+    await Promise.all(promises);
+    console.log('All notifications have been processed.');
+  } catch (error) {
+    console.error('Error processing webhook event:', error.message);
+    return res.status(500).send('Error processing webhook event');
   }
 
-  res.status(200).send('Webhook received'); 
+  res.status(200).send('Webhook received');
 });

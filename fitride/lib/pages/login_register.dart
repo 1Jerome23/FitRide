@@ -73,51 +73,11 @@ class _LoginPageState extends State<LoginPage> {
     await _prefs.setBool('isFirstLogin', true);
     bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
 
-    await _getFCMToken();
-
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-      print("New FCM Token: $newToken");
-      await _saveTokenToFirestore(newToken);
-    });
-
     if (isFirstLogin) {
       await _prefs.setBool('isFirstLogin', false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showFirstLoginDialog();
       });
-    }
-  }
-
-  Future _getFCMToken() async {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-
-    // Request notification permissions
-    NotificationSettings settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      String? token = await messaging.getToken();
-      if (token != null) {
-        print("FCM Token: $token");
-        await _saveTokenToFirestore(token);
-      } else {
-        print("Failed to retrieve FCM token.");
-      }
-    } else {
-      print("User denied notification permissions.");
-    }
-  }
-
-  Future _saveTokenToFirestore(String token) async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance
-          .collection('user_device_tokens')
-          .doc(user.uid)
-          .set({'tokens': FieldValue.arrayUnion([token])}, SetOptions(merge: true));
     }
   }
 
