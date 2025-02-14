@@ -131,7 +131,7 @@ class _MainApp extends StatelessWidget {
           '/recommendation': (context) => RecommendationPage(),
           '/goal_tracking': (context) => GoalTrackingPage(),
           '/profile': (context) => ProfilePage(),
-          '/question_after_exercise': (context) => LoginPage(),
+          '/question_after_exercise': (context) => PostExercise(),
         },
       ),
     );

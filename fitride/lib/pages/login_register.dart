@@ -32,6 +32,29 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future _getFCMToken() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    String? token = await messaging.getToken();
+    if (token != null) {
+      print("FCM Token: $token");
+      await _saveTokenToFirestore(token);
+    } else {
+      print("Failed to retrieve FCM token.");
+    }
+  }
+
+  Future _saveTokenToFirestore(String token) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('user_device_tokens')
+          .doc(user.uid)
+          .set({
+        'tokens': FieldValue.arrayUnion([token])
+      }, SetOptions(merge: true));
+    }
+  }
+
   Future signInWithEmailAndPassword() async {
     try {
       await Auth().signInWithEmailAndPassword(
@@ -72,6 +95,12 @@ class _LoginPageState extends State<LoginPage> {
     _prefs = await SharedPreferences.getInstance();
     await _prefs.setBool('isFirstLogin', true);
     bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+    await _getFCMToken();
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      print("New FCM Token: $newToken");
+      await _saveTokenToFirestore(newToken);
+    });
 
     if (isFirstLogin) {
       await _prefs.setBool('isFirstLogin', false);
@@ -122,7 +151,8 @@ class _LoginPageState extends State<LoginPage> {
         });
         return;
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -141,7 +171,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _submitButton() {
     return ElevatedButton(
-      onPressed: isLogin ? signInWithEmailAndPassword : createUserWithEmailAndPassword,
+      onPressed:
+          isLogin ? signInWithEmailAndPassword : createUserWithEmailAndPassword,
       child: Text(isLogin ? 'Login' : 'Register'),
       style: ElevatedButton.styleFrom(
         padding: EdgeInsets.symmetric(vertical: 12, horizontal: 30),
@@ -158,12 +189,14 @@ class _LoginPageState extends State<LoginPage> {
       },
       child: RichText(
         text: TextSpan(
-          text: isLogin ? "Don't have an account? " : "Already have an account? ",
+          text:
+              isLogin ? "Don't have an account? " : "Already have an account? ",
           style: TextStyle(color: Colors.white),
           children: [
             TextSpan(
               text: isLogin ? 'Register instead' : 'Login instead',
-              style: TextStyle(color: Colors.yellow[700], fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.yellow[700], fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -171,7 +204,8 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _entryField(String title, TextEditingController controller, {bool isPassword = false}) {
+  Widget _entryField(String title, TextEditingController controller,
+      {bool isPassword = false}) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
@@ -196,7 +230,8 @@ class _LoginPageState extends State<LoginPage> {
         : Text('Hmm? $errorMessage', style: TextStyle(color: Colors.red));
   }
 
-  Widget _socialButton(String text, Color color, IconData icon, VoidCallback onPressed) {
+  Widget _socialButton(
+      String text, Color color, IconData icon, VoidCallback onPressed) {
     return ElevatedButton.icon(
       onPressed: signInWithGoogle,
       icon: Icon(icon, color: Colors.white),
@@ -220,7 +255,10 @@ class _LoginPageState extends State<LoginPage> {
             height: MediaQuery.of(context).size.height,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color.fromARGB(255, 56, 56, 56), Color(0xFF383838)],
+                colors: [
+                  const Color.fromARGB(255, 56, 56, 56),
+                  Color(0xFF383838)
+                ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -234,7 +272,10 @@ class _LoginPageState extends State<LoginPage> {
                   margin: const EdgeInsets.only(top: 30.0),
                   child: Text(
                     'Welcome to',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ),
                 Container(
@@ -275,13 +316,15 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ],
                   ),
-                  child: _entryField('Password', _controllerPassword, isPassword: true),
+                  child: _entryField('Password', _controllerPassword,
+                      isPassword: true),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {},
-                    child: Text('Forgot Password?', style: TextStyle(color: Colors.blue)),
+                    child: Text('Forgot Password?',
+                        style: TextStyle(color: Colors.blue)),
                   ),
                 ),
                 _errorMessage(),
@@ -298,7 +341,8 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(height: 10),
                 Container(
                   width: double.infinity,
-                  child: _socialButton('Connect with Google', Colors.red, FontAwesomeIcons.google, () {}),
+                  child: _socialButton('Connect with Google', Colors.red,
+                      FontAwesomeIcons.google, () {}),
                 ),
               ],
             ),
