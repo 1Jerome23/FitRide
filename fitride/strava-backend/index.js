@@ -125,14 +125,14 @@ app.post('/webhook', async (req, res) => {
 
   try {
 
-    const userMappingRef = admin.firestore().collection('user_mappings').doc(athleteId.toString());
+    const userMappingRef = admin.firestore().collection('athletes').doc(athleteId.toString());
     const userMappingSnapshot = await userMappingRef.get();
 
     if (!userMappingSnapshot.exists) {
       throw new Error(`No user mapping found for Strava athlete ${athleteId}`);
     }
 
-    const firebaseUid = userMappingSnapshot.data().uid; 
+    const firebaseUid = userMappingSnapshot.data().app_id; 
     console.log('Firebase UID:', firebaseUid);
 
     const userDeviceTokensRef = admin.firestore().collection('user_device_tokens').doc(firebaseUid);
