@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class HealthSummary extends StatefulWidget {
+class PostExercise extends StatefulWidget {
   @override
-  _HealthSummaryState createState() => _HealthSummaryState();
+  _PostExercise createState() => _PostExercise();
 }
 
-class _HealthSummaryState extends State<HealthSummary> {
+class _PostExercise extends State<PostExercise> {
   Future<Map<String, dynamic>> _fetchData() async {
     try {
       // Fetch data from all four collections in parallel
