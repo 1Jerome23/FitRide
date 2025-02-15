@@ -2,10 +2,11 @@ import 'package:fitride/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/auth.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart'; 
+import 'package:google_sign_in/google_sign_in.dart';
 import 'question.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   final bool startWithSignup;
@@ -79,12 +80,39 @@ class _LoginPageState extends State<LoginPage> {
       });
     }
   }
+  Future _getFCMToken() async {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      String? token = await messaging.getToken();
+      if (token != null) {
+        print("FCM Token: $token");
+        await _saveTokenToFirestore(token);
+      } else {
+        print("Failed to retrieve FCM token.");
+      }
+    }
+
+    Future _saveTokenToFirestore(String token) async {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('user_device_tokens')
+            .doc(user.uid)
+            .set({
+          'tokens': FieldValue.arrayUnion([token])
+        }, SetOptions(merge: true));
+      }
+    }
 
   Future<void> _onLoginSuccess() async {
     _prefs = await SharedPreferences.getInstance();
     await _prefs.setBool('isFirstLogin', true);
     bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
+    await _getFCMToken();
 
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      print("New FCM Token: $newToken");
+      await _saveTokenToFirestore(newToken);
+    });
     if (isFirstLogin) {
       await _prefs.setBool('isFirstLogin', false);
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -173,6 +173,8 @@ Future<void> _fetchStravaData(String userId, String accessToken) async {
         'bio': athleteData['bio'] ?? '',
         'created_at': athleteData['created_at'] ?? '',
         'updated_at': athleteData['updated_at'] ?? '',
+        'app_id': FirebaseAuth.instance.currentUser?.uid ??'',
+
       });
       print('Athlete data saved to Firestore.');
     } catch (e) {
