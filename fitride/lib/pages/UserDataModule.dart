@@ -32,9 +32,15 @@ class _FitRidePageState extends State<FitRidePage> {
   late String selectedDate;
   String weight = "-";
   String bodyFat = "-";
-  String exertionLevel = "-";
-  String sleep = "-";
-  String water = "-";
+  String bodyWater = "-";
+  String foodTaken = "-";
+  String hydration = "-";
+  String levelofExertion = "-";
+  String averageHeartrate = "-";
+  String averageSpeed = "-";
+  String caloriesBurned = "-";
+  String distance = "-";
+  String weightTraining = "-";
 
   @override
   void initState() {
@@ -72,37 +78,88 @@ class _FitRidePageState extends State<FitRidePage> {
         (date) => selectedDate == "${date['day']} ${date['date']}",
       )['fullDate']!;
 
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('testAfterCycle')
+      // Fetch data from User Questionnaire collection
+      DocumentSnapshot userQuestionnaireDoc = await FirebaseFirestore.instance
+          .collection('User Questionnaire')
+          .doc(uid)
+          .get();
+
+      // Fetch data from after_exercise collection for the selected date
+      DocumentSnapshot afterExerciseDoc = await FirebaseFirestore.instance
+          .collection('after_exercise')
           .doc(uid)
           .collection('dailyData')
           .doc(fullDate)
           .get();
 
-      if (userDoc.exists) {
+      // Fetch data from activities collection for the selected date
+      DocumentSnapshot activitiesDoc = await FirebaseFirestore.instance
+          .collection('activities')
+          .doc(uid)
+          .collection('dailyData')
+          .doc(fullDate)
+          .get();
+
+      if (userQuestionnaireDoc.exists) {
         setState(() {
-          weight = userDoc['weight']?.toString() ?? "-";
-          bodyFat = userDoc['body_fat']?.toString() ?? "-";
-          exertionLevel = userDoc['exertion_level']?.toString() ?? "-";
-          sleep = userDoc['sleep']?.toString() ?? "-";
-          water = userDoc['water']?.toString() ?? "-";
+          weight = userQuestionnaireDoc['weight']?.toString() ?? "-";
+          bodyFat = userQuestionnaireDoc['bodyFat']?.toString() ?? "-";
+          bodyWater = userQuestionnaireDoc['bodyWater']?.toString() ?? "-";
         });
       } else {
         setState(() {
           weight = "No data found";
           bodyFat = "No data found";
-          exertionLevel = "No data found";
-          sleep = "No data found";
-          water = "No data found";
+          bodyWater = "No data found";
+        });
+      }
+
+      if (afterExerciseDoc.exists) {
+        setState(() {
+          foodTaken = afterExerciseDoc['foodTaken']?.toString() ?? "-";
+          hydration = afterExerciseDoc['hydration']?.toString() ?? "-";
+          levelofExertion =
+              afterExerciseDoc['levelofExertion']?.toString() ?? "-";
+        });
+      } else {
+        setState(() {
+          foodTaken = "No data found";
+          hydration = "No data found";
+          levelofExertion = "No data found";
+        });
+      }
+
+      if (activitiesDoc.exists) {
+        setState(() {
+          averageHeartrate =
+              activitiesDoc['average_heartrate']?.toString() ?? "-";
+          averageSpeed = activitiesDoc['average_speed']?.toString() ?? "-";
+          caloriesBurned = activitiesDoc['calories_burned']?.toString() ?? "-";
+          distance = activitiesDoc['distance']?.toString() ?? "-";
+          weightTraining = activitiesDoc['WeightTraining']?.toString() ?? "-";
+        });
+      } else {
+        setState(() {
+          averageHeartrate = "No data found";
+          averageSpeed = "No data found";
+          caloriesBurned = "No data found";
+          distance = "No data found";
+          weightTraining = "No data found";
         });
       }
     } catch (e) {
       setState(() {
         weight = "Error fetching data";
         bodyFat = "Error fetching data";
-        exertionLevel = "Error fetching data";
-        sleep = "Error fetching data";
-        water = "Error fetching data";
+        bodyWater = "Error fetching data";
+        foodTaken = "Error fetching data";
+        hydration = "Error fetching data";
+        levelofExertion = "Error fetching data";
+        averageHeartrate = "Error fetching data";
+        averageSpeed = "Error fetching data";
+        caloriesBurned = "Error fetching data";
+        distance = "Error fetching data";
+        weightTraining = "Error fetching data";
       });
       print("Error fetching user data: $e");
     }
@@ -113,10 +170,24 @@ class _FitRidePageState extends State<FitRidePage> {
         TextEditingController(text: weight);
     TextEditingController bodyFatController =
         TextEditingController(text: bodyFat);
+    TextEditingController bodyWaterController =
+        TextEditingController(text: bodyWater);
+    TextEditingController foodTakenController =
+        TextEditingController(text: foodTaken);
+    TextEditingController hydrationController =
+        TextEditingController(text: hydration);
     TextEditingController exertionController =
-        TextEditingController(text: exertionLevel);
-    TextEditingController sleepController = TextEditingController(text: sleep);
-    TextEditingController waterController = TextEditingController(text: water);
+        TextEditingController(text: levelofExertion);
+    TextEditingController heartrateController =
+        TextEditingController(text: averageHeartrate);
+    TextEditingController speedController =
+        TextEditingController(text: averageSpeed);
+    TextEditingController caloriesController =
+        TextEditingController(text: caloriesBurned);
+    TextEditingController distanceController =
+        TextEditingController(text: distance);
+    TextEditingController weightTrainingController =
+        TextEditingController(text: weightTraining);
 
     showDialog(
       context: context,
@@ -132,9 +203,15 @@ class _FitRidePageState extends State<FitRidePage> {
               children: [
                 _buildEditField("Weight (kg)", weightController),
                 _buildEditField("Body Fat (%)", bodyFatController),
-                _buildEditField("Exertion Level (1-10)", exertionController),
-                _buildEditField("Sleep (hours)", sleepController),
-                _buildEditField("Water (liters)", waterController),
+                _buildEditField("Body Water (%)", bodyWaterController),
+                _buildEditField("Food Taken", foodTakenController),
+                _buildEditField("Hydration (liters)", hydrationController),
+                _buildEditField("Level of Exertion (1-10)", exertionController),
+                _buildEditField("Average Heartrate (bpm)", heartrateController),
+                _buildEditField("Average Speed (km/h)", speedController),
+                _buildEditField("Calories Burned", caloriesController),
+                _buildEditField("Distance (km)", distanceController),
+                _buildEditField("Weight Training", weightTrainingController),
               ],
             ),
           ),
@@ -172,27 +249,60 @@ class _FitRidePageState extends State<FitRidePage> {
                   )['fullDate']!;
 
                   try {
+                    // Update User Questionnaire collection
                     await FirebaseFirestore.instance
-                        .collection('testAfterCycle')
+                        .collection('User Questionnaire')
+                        .doc(uid)
+                        .set({
+                      'weight': double.tryParse(weightController.text),
+                      'bodyFat': double.tryParse(bodyFatController.text),
+                      'bodyWater': double.tryParse(bodyWaterController.text),
+                    });
+
+                    // Update after_exercise collection
+                    await FirebaseFirestore.instance
+                        .collection('after_exercise')
                         .doc(uid)
                         .collection('dailyData')
                         .doc(fullDate)
                         .set({
-                      'weight': double.tryParse(weightController.text),
-                      'body_fat': double.tryParse(bodyFatController.text),
-                      'exertion_level': exertionLevelValue,
-                      'sleep': double.tryParse(sleepController.text),
-                      'water': double.tryParse(waterController.text),
+                      'foodTaken': foodTakenController.text,
+                      'hydration': double.tryParse(hydrationController.text),
+                      'levelofExertion': exertionLevelValue,
                       'timestamp': FieldValue.serverTimestamp(),
+                    });
+
+                    // Update activities collection
+                    await FirebaseFirestore.instance
+                        .collection('activities')
+                        .doc(uid)
+                        .collection('dailyData')
+                        .doc(fullDate)
+                        .set({
+                      'average_heartrate':
+                          double.tryParse(heartrateController.text),
+                      'average_speed': double.tryParse(speedController.text),
+                      'calories_burned':
+                          double.tryParse(caloriesController.text),
+                      'distance': double.tryParse(distanceController.text),
+                      'WeightTraining': weightTrainingController.text,
+                      'start_date': DateTime.now()
+                          .toIso8601String(), // Automatically set the date
                     });
 
                     // Update local state
                     setState(() {
                       weight = weightController.text;
                       bodyFat = bodyFatController.text;
-                      exertionLevel = exertionController.text;
-                      sleep = sleepController.text;
-                      water = waterController.text;
+                      bodyWater = bodyWaterController.text;
+                      foodTaken = foodTakenController.text;
+                      hydration = hydrationController.text;
+                      levelofExertion = exertionController.text;
+                      averageHeartrate = heartrateController.text;
+                      averageSpeed = speedController.text;
+                      caloriesBurned = caloriesController.text;
+                      distance = distanceController.text;
+                      weightTraining = weightTrainingController.text;
                     });
 
                     Navigator.pop(context);
@@ -342,9 +452,16 @@ class _FitRidePageState extends State<FitRidePage> {
                       SizedBox(height: 20),
                       _buildDataRow("Weight", "$weight kg"),
                       _buildDataRow("Body Fat", "$bodyFat %"),
-                      _buildDataRow("Exertion Level", exertionLevel),
-                      _buildDataRow("Sleep", "$sleep hours"),
-                      _buildDataRow("Water", "$water liters"),
+                      _buildDataRow("Body Water", "$bodyWater %"),
+                      _buildDataRow("Food Taken", foodTaken),
+                      _buildDataRow("Hydration", "$hydration liters"),
+                      _buildDataRow("Level of Exertion", levelofExertion),
+                      _buildDataRow(
+                          "Average Heartrate", "$averageHeartrate bpm"),
+                      _buildDataRow("Average Speed", "$averageSpeed km/h"),
+                      _buildDataRow("Calories Burned", "$caloriesBurned kcal"),
+                      _buildDataRow("Distance", "$distance km"),
+                      _buildDataRow("Weight Training", weightTraining),
                     ],
                   ),
                 ),
