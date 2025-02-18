@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_page.dart'; 
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 
 class PostExercise extends StatefulWidget {
   @override
@@ -19,6 +22,7 @@ class _PostExerciseState extends State<PostExercise> {
     if (_formKey.currentState!.validate()) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        
         await FirebaseFirestore.instance.collection('after_exercise').doc(user.uid).set({
           'levelOfExertion': int.parse(_exertionController.text),
           'foodTaken': _foodController.text,
@@ -26,16 +30,105 @@ class _PostExerciseState extends State<PostExercise> {
           'timestamp': FieldValue.serverTimestamp(),
         });
 
+        await fetchWeatherData(user.uid);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Data saved successfully!")),
         );
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), 
+          MaterialPageRoute(builder: (context) => HomePage()),
         );
       }
     }
+  }
+
+  Future<void> fetchWeatherData(String userId) async {
+    Position position;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print("Location services are disabled.");
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.deniedForever) {
+        print("Location permission is denied permanently.");
+        return;
+      }
+
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print("Location permission is denied.");
+        return;
+      }
+      position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+    } catch (e) {
+      print('Error fetching location: $e');
+      return;
+    }
+
+    final latitude = position.latitude;
+    final longitude = position.longitude;
+
+    try {
+      final weatherResponse = await http.get(Uri.parse(
+          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
+
+      if (weatherResponse.statusCode == 200) {
+        final data = json.decode(weatherResponse.body);
+        final currentWeather = data['current_weather'];
+        final hourly = data['hourly'];
+
+        double temperature = (currentWeather['temperature'] as num).toDouble();
+        double humidity = (hourly['relative_humidity_2m'] != null &&
+                hourly['relative_humidity_2m'].isNotEmpty)
+            ? (hourly['relative_humidity_2m'][0] as num).toDouble()
+            : 0.0;
+
+        // Air quality data
+        final airQualityResponse = await http.get(Uri.parse(
+            'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
+
+        double pm2_5 = 0.0;
+        String airQualityStatus = "Unknown";
+        if (airQualityResponse.statusCode == 200) {
+          final airData = json.decode(airQualityResponse.body);
+          final hourlyData = airData['hourly'];
+
+          pm2_5 =
+              (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
+                  ? (hourlyData['pm2_5'][0] as num).toDouble()
+                  : 0.0;
+
+          airQualityStatus = _evaluateAirQuality(pm2_5);
+        }
+
+        // Store weather data in Firestore
+        FirebaseFirestore.instance.collection('weatherData').add({
+          'userId': userId,
+          'temperature': temperature,
+          'humidity': humidity,
+          'pm2_5': pm2_5,
+          'airQualityStatus': airQualityStatus,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } else {
+        print('Failed to fetch weather data.');
+      }
+    } catch (e) {
+      print('Error fetching weather data: $e');
+    }
+  }
+
+  String _evaluateAirQuality(double? pm2_5) {
+    if (pm2_5 == null) return "Unknown";
+    if (pm2_5 <= 25) return "Good";
+    if (pm2_5 <= 50) return "Moderate";
+    return "Poor";
   }
 
   Widget _buildTextInput({
