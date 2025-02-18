@@ -40,7 +40,7 @@ class _FitRidePageState extends State<FitRidePage> {
   String averageSpeed = "-";
   String caloriesBurned = "-";
   String distance = "-";
-  String weightTraining = "-";
+  String type = "-";
 
   @override
   void initState() {
@@ -87,7 +87,7 @@ class _FitRidePageState extends State<FitRidePage> {
       // Fetch data from after_exercise collection for the selected date
       DocumentSnapshot afterExerciseDoc = await FirebaseFirestore.instance
           .doc(uid)
-          .collection('dailyData')
+          .collection('after_exercise')
           .doc(fullDate)
           .get();
 
@@ -95,7 +95,7 @@ class _FitRidePageState extends State<FitRidePage> {
       DocumentSnapshot activitiesDoc = await FirebaseFirestore.instance
           .collection('activities')
           .doc(uid)
-          .collection('dailyData')
+          .collection('after_exercise')
           .doc(fullDate)
           .get();
 
@@ -135,7 +135,7 @@ class _FitRidePageState extends State<FitRidePage> {
           averageSpeed = activitiesDoc['average_speed']?.toString() ?? "-";
           caloriesBurned = activitiesDoc['calories_burned']?.toString() ?? "-";
           distance = activitiesDoc['distance']?.toString() ?? "-";
-          weightTraining = activitiesDoc['WeightTraining']?.toString() ?? "-";
+          type = activitiesDoc['type']?.toString() ?? "-";
         });
       } else {
         setState(() {
@@ -143,22 +143,22 @@ class _FitRidePageState extends State<FitRidePage> {
           averageSpeed = "No data found";
           caloriesBurned = "No data found";
           distance = "No data found";
-          weightTraining = "No data found";
+          type = "No data found";
         });
       }
     } catch (e) {
       setState(() {
-        weight = "Error fetching data";
-        bodyFat = "Error fetching data";
-        bodyWater = "Error fetching data";
-        foodTaken = "Error fetching data";
-        hydration = "Error fetching data";
-        levelofExertion = "Error fetching data";
-        averageHeartrate = "Error fetching data";
-        averageSpeed = "Error fetching data";
-        caloriesBurned = "Error fetching data";
-        distance = "Error fetching data";
-        weightTraining = "Error fetching data";
+        weight = "No data found";
+        bodyFat = "No data found";
+        bodyWater = "No data found";
+        foodTaken = "No data found";
+        hydration = "No data found";
+        levelofExertion = "No data found";
+        averageHeartrate = "No data found";
+        averageSpeed = "No data found";
+        caloriesBurned = "No data found";
+        distance = "No data found";
+        type = "No data found";
       });
       print("Error fetching user data: $e");
     }
@@ -185,8 +185,7 @@ class _FitRidePageState extends State<FitRidePage> {
         TextEditingController(text: caloriesBurned);
     TextEditingController distanceController =
         TextEditingController(text: distance);
-    TextEditingController weightTrainingController =
-        TextEditingController(text: weightTraining);
+    TextEditingController typeController = TextEditingController(text: type);
 
     showDialog(
       context: context,
@@ -211,7 +210,7 @@ class _FitRidePageState extends State<FitRidePage> {
                 _buildEditField("Average Speed (km/h)", speedController),
                 _buildEditField("Calories Burned", caloriesController),
                 _buildEditField("Distance (km)", distanceController),
-                _buildEditField("Weight Training", weightTrainingController),
+                _buildEditField("Weight Training", typeController),
               ],
             ),
           ),
@@ -285,7 +284,7 @@ class _FitRidePageState extends State<FitRidePage> {
                       'calories_burned':
                           double.tryParse(caloriesController.text),
                       'distance': double.tryParse(distanceController.text),
-                      'WeightTraining': weightTrainingController.text,
+                      'type': typeController.text,
                       'start_date': DateTime.now()
                           .toIso8601String(), // Automatically set the date
                     });
@@ -302,7 +301,7 @@ class _FitRidePageState extends State<FitRidePage> {
                       averageSpeed = speedController.text;
                       caloriesBurned = caloriesController.text;
                       distance = distanceController.text;
-                      weightTraining = weightTrainingController.text;
+                      type = typeController.text;
                     });
 
                     Navigator.pop(context);
@@ -463,7 +462,7 @@ class _FitRidePageState extends State<FitRidePage> {
                         _buildDataRow(
                             "Calories Burned", "$caloriesBurned kcal"),
                         _buildDataRow("Distance", "$distance km"),
-                        _buildDataRow("Weight Training", weightTraining),
+                        _buildDataRow("Type", type),
                       ],
                     ),
                   ),

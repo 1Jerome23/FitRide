@@ -21,6 +21,16 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
   String foodTaken = "-";
   String weightTraining = "-";
 
+  // Add these variables at the class level
+  double latestDistance = 0.0;
+  double previousDistance = 0.0;
+  double latestHydration = 0.0;
+  double previousHydration = 0.0;
+  double latestCaloriesBurned = 0.0;
+  double previousCaloriesBurned = 0.0;
+  double latestAverageSpeed = 0.0;
+  double previousAverageSpeed = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -124,30 +134,33 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
     var latestData = recentData[0];
     var previousData = recentData[1];
 
-    // Extract values for comparison
-    double latestDistance =
-        double.tryParse(latestData['distance']?.toString() ?? "0.0") ?? 0.0;
-    double previousDistance =
-        double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0;
+    // Update class-level variables
+    setState(() {
+      latestDistance =
+          double.tryParse(latestData['distance']?.toString() ?? "0.0") ?? 0.0;
+      previousDistance =
+          double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0;
 
-    double latestHydration =
-        double.tryParse(latestData['hydration']?.toString() ?? "0.0") ?? 0.0;
-    double previousHydration =
-        double.tryParse(previousData['hydration']?.toString() ?? "0.0") ?? 0.0;
+      latestHydration =
+          double.tryParse(latestData['hydration']?.toString() ?? "0.0") ?? 0.0;
+      previousHydration =
+          double.tryParse(previousData['hydration']?.toString() ?? "0.0") ??
+              0.0;
 
-    double latestCaloriesBurned =
-        double.tryParse(latestData['calories_burned']?.toString() ?? "0.0") ??
-            0.0;
-    double previousCaloriesBurned =
-        double.tryParse(previousData['calories_burned']?.toString() ?? "0.0") ??
-            0.0;
+      latestCaloriesBurned =
+          double.tryParse(latestData['calories_burned']?.toString() ?? "0.0") ??
+              0.0;
+      previousCaloriesBurned = double.tryParse(
+              previousData['calories_burned']?.toString() ?? "0.0") ??
+          0.0;
 
-    double latestAverageSpeed =
-        double.tryParse(latestData['average_speed']?.toString() ?? "0.0") ??
-            0.0;
-    double previousAverageSpeed =
-        double.tryParse(previousData['average_speed']?.toString() ?? "0.0") ??
-            0.0;
+      latestAverageSpeed =
+          double.tryParse(latestData['average_speed']?.toString() ?? "0.0") ??
+              0.0;
+      previousAverageSpeed =
+          double.tryParse(previousData['average_speed']?.toString() ?? "0.0") ??
+              0.0;
+    });
 
     // Compare historical data and generate recommendations
     String recommendationMessage = "";
@@ -275,37 +288,39 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (averageSpeed != "-")
+                  if (latestDistance < previousDistance &&
+                      latestHydration < previousHydration)
                     _buildGoalRecommendation(
-                      "✅ Increase Average Speed by X%",
-                      "Try increasing your cadence to improve speed by 0.5 km/h next week.",
+                      "⚠️ Warning",
+                      "Your distance and hydration have decreased. Try drinking more water and increasing your workout intensity!",
                     ),
-                  if (caloriesBurned != "-")
+                  if (latestDistance < previousDistance)
                     _buildGoalRecommendation(
-                      "✅ Increase Calories Burned per Ride",
-                      "Try extending your ride by 10 minutes to burn an extra 50 kcal.",
+                      "⚠️ Warning",
+                      "Your distance has decreased. Consider pushing yourself a bit more next time!",
                     ),
-                  if (distance != "-")
+                  if (latestHydration < previousHydration)
                     _buildGoalRecommendation(
-                      "✅ Improve Distance per Week",
-                      "Aim to ride 5 km more this week compared to last week.",
+                      "⚠️ Warning",
+                      "Your hydration has decreased. Make sure to drink enough water before and after your workout!",
                     ),
-                  if (hydration != "-" &&
-                      double.tryParse(hydration) != null &&
-                      double.parse(hydration) < 1.5)
+                  if (latestCaloriesBurned < previousCaloriesBurned)
                     _buildGoalRecommendation(
-                      "✅ Stay Hydrated (Hydration Goal)",
-                      "You drank only $hydration L today. Aim for at least 1.5-2L daily to improve recovery.",
+                      "⚠️ Warning",
+                      "You burned fewer calories this time. Try increasing the duration or intensity of your workout!",
                     ),
-                  if (foodTaken != "-" && foodTaken.isEmpty)
+                  if (latestAverageSpeed < previousAverageSpeed)
                     _buildGoalRecommendation(
-                      "✅ Maintain Energy Levels (Food & Nutrition)",
-                      "Your last ride was at high exertion with no food intake. Consider a pre-ride snack for energy.",
+                      "⚠️ Warning",
+                      "Your average speed has decreased. Focus on maintaining a consistent pace!",
                     ),
-                  if (weightTraining != "-" && weightTraining.isNotEmpty)
+                  if (latestDistance >= previousDistance &&
+                      latestHydration >= previousHydration &&
+                      latestCaloriesBurned >= previousCaloriesBurned &&
+                      latestAverageSpeed >= previousAverageSpeed)
                     _buildGoalRecommendation(
-                      "✅ Balance Weight Training & Cardio",
-                      "Strength training helps! Try 1-2 weight sessions per week to boost cycling power.",
+                      "✅ Good",
+                      "You're making progress! Keep up the good work!",
                     ),
                 ],
               ),
@@ -358,7 +373,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                           spreadRadius: 3,
                           blurRadius: 5,
                           offset: Offset(0, 3),
-                        ),
+                        )
                       ],
                     ),
                     child: Column(
@@ -428,7 +443,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
             style: GoogleFonts.lato(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.green,
+              color: _getRecommendationColor(title),
             ),
           ),
           SizedBox(height: 4),
