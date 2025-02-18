@@ -2,7 +2,6 @@ import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,7 +18,6 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   double? temperature;
@@ -35,7 +33,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Footer functionalities
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -102,7 +99,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Logout function
   void _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -217,8 +213,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return "Poor";
   }
 
-<<<<<<< Updated upstream
-=======
   Color _getAirQualityColor(String status) {
     switch (status) {
       case "Good":
@@ -354,23 +348,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
->>>>>>> Stashed changes
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Theme.of(context).primaryColor,
-        title: Text(
         backgroundColor: Colors.grey[900],
         elevation: 0,
         title: const Text(
           "FitRide",
-          style: GoogleFonts.roboto(
-            color: Colors.orange,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
           style: TextStyle(
             fontFamily: 'Fredoka-SemiBold',
             color: Color(0xffFFA500),
@@ -384,29 +371,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               onTap: _logout,
               child: Image.asset(
                 'assets/logobike.png',
-                height: 40,
                 height: 25,
               ),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.5),
-                    spreadRadius: 3,
-                    blurRadius: 5,
-                    offset: Offset(0, 3),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
@@ -423,38 +393,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     fontSize: 28,
                     color: Colors.black,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (temperature != null)
-                    Center(
-                      child: Image.asset(weatherImage, height: 120),
-                    ),
-                  SizedBox(height: 12),
-                  if (temperature != null)
-                    Text(
-                      "Temperature: ${temperature!.toStringAsFixed(1)}°C",
-                      style: GoogleFonts.lato(
-                          fontSize: 16,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w500),
-                    ),
-                  if (humidity != null)
-                    Text(
-                      "Humidity: ${humidity!.toStringAsFixed(1)}%",
-                      style: GoogleFonts.lato(
-                          fontSize: 16,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w500),
-                    ),
-                  Text(
-                    "Air Quality: $airQualityStatus",
-                    style: GoogleFonts.lato(
-                        fontSize: 16,
-                        color: Colors.black,
-                        fontWeight: FontWeight.w500),
                 ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slide(begin: Offset(0, -0.1), end: Offset.zero),
                 Text(
                   "Glad to see you! Let’s make today’s ride a great one. Hop on and ride!",
@@ -463,100 +401,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     color: Colors.grey[600],
                     fontFamily: "Inter",
                   ),
-<<<<<<< Updated upstream
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Body Goals",
-                    style: GoogleFonts.roboto(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                LoginPage()), // Replace with your settings page
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.5),
-                            spreadRadius: 3,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            "Edit Goals",
-                            style: GoogleFonts.lato(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(
-                            Icons.settings,
-                            color: Colors.black,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildGoalCard("Goal 1", Colors.orange),
-                  _buildGoalCard("Goal 2", Colors.blue),
-                  _buildGoalCard("Goal 3", Colors.green),
-                ],
-              ),
-            ),
-            SizedBox(height: 16),
-=======
                 ).animate().fadeIn(duration: 600.ms, delay: 300.ms).slide(begin: Offset(0, -0.1), end: Offset.zero),
                 SizedBox(height: 25),
->>>>>>> Stashed changes
 
-            // Added section for User Data
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "User Data",
-                    style: GoogleFonts.roboto(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
                 // Weather Section
                 Container(
                   decoration: BoxDecoration(
@@ -578,26 +425,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     ],
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                FitRidePage()), // Replace with your User page
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.5),
-                            spreadRadius: 3,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
@@ -617,16 +444,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            "Edit Data",
-                            style: GoogleFonts.lato(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
                         ),
                         SizedBox(height: 24),
                         if (temperature != null)
@@ -690,43 +507,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               "Air Quality",
                               _getAirQualityColor(airQualityStatus),
                             ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(
-                            Icons.settings,
-                            color: Colors.black,
-                            size: 20,
-                          ),
-                        ],
-                      ),
                           ],
                         ).animate().fadeIn(duration: 800.ms, delay: 600.ms),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection('User Questionnaires')
-                    .doc(userId)
-                    .get(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return CircularProgressIndicator();
-                  }
-
-                  if (snapshot.hasError) {
-                    return Text("Error fetching data");
-                  }
-
-                  if (!snapshot.hasData || !snapshot.data!.exists) {
-                    return Text("No data available");
-                  }
                 ).animate()
                   .fadeIn(duration: 600.ms, delay: 400.ms)
                   .slideY(begin: 0.1, end: 0)
@@ -734,26 +519,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 
                 SizedBox(height: 30),
 
-                  var data = snapshot.data!.data() as Map<String, dynamic>;
-                  double weight =
-                      double.tryParse(data['weight'].toString()) ?? 0.0;
-                  double height =
-                      double.tryParse(data['height'].toString()) ?? 0.0;
-
-                  // Calculate BMI
-                  double bmi = (weight /
-                      ((height / 100) *
-                          (height / 100))); // Convert height to meters
-
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildDataCard(
-                          "BMI", bmi.toStringAsFixed(1), Colors.orange),
-                      _buildDataCard(
-                          "Weight", weight.toStringAsFixed(1), Colors.blue),
-                      _buildDataCard(
-                          "Height", height.toStringAsFixed(1), Colors.green),
                 
                 Text(
                   "Your Data",
@@ -777,47 +542,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         offset: Offset(0, 4),
                       ),
                     ],
-                  );
-                },
-              ),
-            ),
-            SizedBox(height: 16),
-
-            // Added section for Recent Activity
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Recent Activity",
-                    style: GoogleFonts.roboto(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      // Navigate to the Recent Activity page
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                RecentActivityPage()), // Replace with your Recent Activity page
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.5),
-                            spreadRadius: 3,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
                   child: FutureBuilder<DocumentSnapshot>(
                     future: FirebaseFirestore.instance
                         .collection('User Questionnaires')
@@ -829,9 +554,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: CircularProgressIndicator(
                             color: Color(0xffFFA500),
                           ),
-                        ],
-                      ),
-                      child: Row(
                         );
                       }
 
@@ -902,13 +624,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Text(
-                            "See All",
-                            style: GoogleFonts.lato(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                            ),
                           _buildStatCard(
                             "BMI",
                             bmi.toStringAsFixed(1),
@@ -916,11 +631,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             _getBmiColor(bmi),
                             _getBmiCategory(bmi),
                           ),
-                          SizedBox(width: 8),
-                          Icon(
-                            Icons.arrow_forward,
-                            color: Colors.black,
-                            size: 20,
                           _buildStatCard(
                             "Weight",
                             "${weight.toStringAsFixed(1)} kg",
@@ -954,24 +664,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         color: Colors.black,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 3,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -1008,14 +700,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     ),
                   ],
-                ),
-                child: Center(
-                  child: Text(
-                    "No recent activity",
-                    style: GoogleFonts.lato(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
                 ).animate().fadeIn(duration: 600.ms, delay: 800.ms),
                 SizedBox(height: 15),
                 Container(
@@ -1049,34 +733,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       );
                     },
                   ),
-                ),
-              ),
                 ).animate().fadeIn(duration: 600.ms, delay: 900.ms).slideY(begin: 0.1, end: 0),
                 SizedBox(height: 20),
               ],
             ),
-            SizedBox(height: 16),
-          ],
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights),
-            label: 'Insights',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.data_usage),
-            label: 'Goal/Progress',
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -1093,9 +756,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
           child: BottomNavigationBar(
             backgroundColor: Colors.grey[900],
             currentIndex: _selectedIndex,
@@ -1132,28 +792,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
             ],
           ),
-        ],
-      ),
         ),
       )
     );
   }
 
-  Widget _buildGoalCard(String title, Color color) {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 3,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
   Widget _weatherInfoItem(IconData icon, String value, String label, Color color) {
   return Column(
     children: [
@@ -1176,14 +819,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           size: 24,
         ),
       ),
-      child: Center(
-        child: Text(
-          title,
-          style: GoogleFonts.lato(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
       SizedBox(height: 8),
       Text(
         value,
@@ -1200,7 +835,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ],
         ),
       ),
-    );
       Text(
         label,
         style: TextStyle(
@@ -1233,21 +867,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return "Obese";
   }
 
-  Widget _buildDataCard(String title, String value, Color color) {
   Widget _buildStatCard(String title, String value, String iconAsset, Color iconColor, String? subtitle) {
     return Container(
       padding: EdgeInsets.all(10),
       width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 3,
-            blurRadius: 5,
-            offset: Offset(0, 3),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1264,15 +887,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               color: iconColor,
             ),
           ),
-        ],
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.lato(fontSize: 14, color: Colors.white),
           SizedBox(height: 12),
           Text(
             value,
@@ -1281,12 +895,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               fontSize: 20,
               color: Colors.black,
             ),
-            Text(
-              value,
-              style: GoogleFonts.lato(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white),
           ),
           SizedBox(height: 4),
           Text(
