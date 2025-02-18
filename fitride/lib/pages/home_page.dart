@@ -196,79 +196,6 @@ class _HomePageState extends State<HomePage> {
     return "Poor";
   }
 
-  void _recordWeather() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Record the Weather"),
-          content: Text(
-            "Record the weather to get accurate information tailored for you!\nOnly record when you're going to cycle.",
-            style: TextStyle(color: Colors.black),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                "Cancel",
-                style: TextStyle(color: Colors.black),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                if (temperature != null && humidity != null && pm2_5 != null) {
-                  String? userId = FirebaseAuth.instance.currentUser?.uid;
-
-                  if (userId != null) {
-                    Map<String, dynamic> weatherData = {
-                      'temperature': temperature,
-                      'humidity': humidity,
-                      'pm2_5': pm2_5,
-                      'airQualityStatus': airQualityStatus,
-                      'timestamp': FieldValue.serverTimestamp(),
-                      'userId': userId,
-                    };
-
-                    FirebaseFirestore.instance
-                        .collection('weatherData')
-                        .add(weatherData)
-                        .then((value) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                "Weather recorded successfully to Firebase!")),
-                      );
-                    }).catchError((error) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text("Failed to record weather: $error")),
-                      );
-                    });
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("User is not logged in.")),
-                    );
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to fetch weather data.")),
-                  );
-                }
-              },
-              child: Text(
-                "Okay",
-                style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -345,26 +272,6 @@ class _HomePageState extends State<HomePage> {
                         fontSize: 16,
                         color: Colors.black,
                         fontWeight: FontWeight.w500),
-                  ),
-                  SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _recordWeather,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 248, 155, 14),
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      "Record the weather?",
-                      style: GoogleFonts.lato(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
                   ),
                 ],
               ),
