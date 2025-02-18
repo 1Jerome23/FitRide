@@ -135,30 +135,28 @@ class _RecommendationPageState extends State<RecommendationPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Theme.of(context).primaryColor,
-        title: Row(
-          children: [
-            Text(
-              "FitRide",
-              style: GoogleFonts.roboto(
-                color: Colors.orange,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Spacer(),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: GestureDetector(
-                onTap: _logout,
-                child: Image.asset(
-                  'assets/logobike.png',
-                  height: 40,
-                ),
-              ),
-            ),
-          ],
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
+        title: const Text(
+          "FitRide",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            color: Color(0xffFFA500),
+            fontSize: 22,
+          ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: GestureDetector(
+              onTap: _logout,
+              child: Image.asset(
+                'assets/logobike.png',
+                height: 25,
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
@@ -200,29 +198,59 @@ class _RecommendationPageState extends State<RecommendationPage> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: Offset(0, -3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights),
-            label: 'Insights',
+          child: BottomNavigationBar(
+            backgroundColor: Colors.grey[900],
+            currentIndex: _selectedIndex,
+            selectedItemColor: Color(0xffFFA500),
+            unselectedItemColor: Colors.grey[400],
+            selectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontFamily: "Inter",
+            ),
+            unselectedLabelStyle: TextStyle(
+              fontSize: 12,
+              fontFamily: "Inter",
+            ),
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            onTap: _onItemTapped,
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.insights_rounded),
+                label: 'Insights',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.track_changes_rounded),
+                label: 'Goals',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.data_usage),
-            label: 'Goals',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }

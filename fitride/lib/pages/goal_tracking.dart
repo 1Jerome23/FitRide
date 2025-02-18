@@ -439,7 +439,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
           style: TextStyle(
             fontFamily: 'Fredoka-SemiBold',
             color: Color(0xffFFA500),
-            fontSize: 28,
+            fontSize: 22,
           ),
         ),
         actions: [
@@ -449,7 +449,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
               onTap: _logout,
               child: Image.asset(
                 'assets/logobike.png',
-                height: 40,
+                height: 25,
               ),
             ),
           ),
@@ -743,41 +743,56 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[900],
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 0,
               blurRadius: 10,
-              offset: const Offset(0, -5),
+              offset: Offset(0, -3),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xffFFA500),
-          unselectedItemColor: Colors.grey[600],
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          onTap: _onItemTapped,
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Home',
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          child: BottomNavigationBar(
+            backgroundColor: Colors.grey[900],
+            currentIndex: _selectedIndex,
+            selectedItemColor: Color(0xffFFA500),
+            unselectedItemColor: Colors.grey[400],
+            selectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontFamily: "Inter",
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.insights_rounded),
-              label: 'Insights',
+            unselectedLabelStyle: TextStyle(
+              fontSize: 12,
+              fontFamily: "Inter",
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.track_changes_rounded),
-              label: 'Goals',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            onTap: _onItemTapped,
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.insights_rounded),
+                label: 'Insights',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.track_changes_rounded),
+                label: 'Goals',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );
