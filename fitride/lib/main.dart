@@ -1,25 +1,81 @@
-import 'package:fitride/pages/goal_tracking.dart';
-import 'package:fitride/pages/login_register.dart';
-import 'package:fitride/pages/question.dart';
 import 'package:flutter/material.dart';
-import 'package:fitride/widget_tree.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_notifications_handler/firebase_notifications_handler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'mi_scale.dart'; 
+import 'package:fitride/widget_tree.dart';
+import 'package:fitride/pages/login_register.dart';
+import 'package:fitride/pages/question.dart';
 import 'package:fitride/pages/recommendation.dart';
 import 'package:fitride/pages/profile.dart';
-import 'package:fitride/globals.dart';
-import 'dart:developer';
+import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/question_after_exercise.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Add this import
+import 'package:fitride/globals.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  setupNotificationChannel(); // Set up the notification channel
+
+  setupNotificationChannel();
+
+  await _requestPermissions();
+
+  final MiScaleService miScaleService = MiScaleService();
+
+  await _initializeMiScaleService(miScaleService);
+
   runApp(const _MainApp());
 }
 
-/// Sets up the notification channel for Android 8.0+ devices.
+Future<void> _requestPermissions() async {
+  Map<Permission, PermissionStatus> statuses = await [
+    Permission.bluetooth,
+    Permission.location,
+    Permission.bluetoothScan,
+    Permission.bluetoothConnect,
+  ].request();
+
+  if (statuses[Permission.bluetooth] != PermissionStatus.granted ||
+      statuses[Permission.location] != PermissionStatus.granted) {
+    throw Exception('Bluetooth or Location permission not granted.');
+  }
+}
+
+Future<void> _initializeMiScaleService(MiScaleService miScaleService) async {
+  try {
+    print("Scanning for Mi Scale devices...");
+    List<String> deviceIds = await miScaleService.scanForDevices();
+
+    if (deviceIds.isEmpty) {
+      print("No Mi Scale devices found. Retrying in 5 seconds...");
+      await Future.delayed(Duration(seconds: 5));
+      deviceIds = await miScaleService.scanForDevices();
+    }
+
+    if (deviceIds.isNotEmpty) {
+      String selectedDeviceId = deviceIds.first;
+      print("Connecting to device: $selectedDeviceId");
+
+      bool isConnected = await miScaleService.connectToScale(selectedDeviceId);
+      if (!isConnected) {
+        throw Exception("Failed to connect to the Mi Scale device.");
+      }
+
+      final weightData = await miScaleService.getWeightData(selectedDeviceId);
+      final bodyWater = weightData['bodyWater'];
+      final bodyMass = weightData['bodyMass'];
+      print("Weight: ${weightData['weight']}, Body Water: $bodyWater, Body Mass: $bodyMass");
+
+    } else {
+      print("No Mi Scale devices found after retry.");
+    }
+  } catch (e) {
+    print("MiScaleService Error: $e");
+  }
+}
+
+// Set up the notification channel
 void setupNotificationChannel() {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'default_notification_channel', // ID
@@ -29,7 +85,6 @@ void setupNotificationChannel() {
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
   flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
@@ -48,39 +103,32 @@ class _MainApp extends StatelessWidget {
       ),
       shouldHandleNotification: (msg) => true,
       onOpenNotificationArrive: (info) {
-        log(
+        print(
           'Notification received while app is open with payload ${info.payload}',
-          name: id,
         );
       },
       onTap: (info) {
         final payload = info.payload;
         final appState = info.appState;
         final firebaseMessage = info.firebaseMessage;
-
-        // Log the notification details
-        log(
+        print(
           'Notification tapped with $appState & payload $payload. Firebase message: $firebaseMessage',
-          name: id,
         );
-
-        // Check if the notification should redirect to question_after_exercise
         if (payload != null && payload.containsKey('redirect_to')) {
           final redirectTo = payload['redirect_to'];
-          log('Redirecting to: $redirectTo', name: id);
-
+          print('Redirecting to: $redirectTo');
           if (redirectTo == 'question_after_exercise') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (Globals.navigatorKey.currentContext != null) {
-                log('Navigating to /question_after_exercise', name: id);
+                print('Navigating to /question_after_exercise');
                 Navigator.pushNamed(Globals.navigatorKey.currentContext!, '/question_after_exercise');
               } else {
-                log('Navigation failed: No valid context available.', name: id);
+                print('Navigation failed: No valid context available.');
               }
             });
           }
         } else {
-          log('No valid redirect_to key in payload.', name: id);
+          print('No valid redirect_to key in payload.');
         }
       },
       onFcmTokenInitialize: (token) {
