@@ -124,49 +124,65 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
     var latestData = recentData[0];
     var previousData = recentData[1];
 
-    double latestWeight =
-        double.tryParse(latestData['weight']?.toString() ?? "0.0") ?? 0.0;
-    double latestBodyFat =
-        double.tryParse(latestData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
-    double previousWeight =
-        double.tryParse(previousData['weight']?.toString() ?? "0.0") ?? 0.0;
-    double previousBodyFat =
-        double.tryParse(previousData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
+    // Extract values for comparison
+    double latestDistance =
+        double.tryParse(latestData['distance']?.toString() ?? "0.0") ?? 0.0;
+    double previousDistance =
+        double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0;
 
-    String weightTrend = _getTrend(latestWeight, previousWeight);
-    String bodyFatTrend = _getTrend(latestBodyFat, previousBodyFat);
+    double latestHydration =
+        double.tryParse(latestData['hydration']?.toString() ?? "0.0") ?? 0.0;
+    double previousHydration =
+        double.tryParse(previousData['hydration']?.toString() ?? "0.0") ?? 0.0;
+
+    double latestCaloriesBurned =
+        double.tryParse(latestData['calories_burned']?.toString() ?? "0.0") ??
+            0.0;
+    double previousCaloriesBurned =
+        double.tryParse(previousData['calories_burned']?.toString() ?? "0.0") ??
+            0.0;
+
+    double latestAverageSpeed =
+        double.tryParse(latestData['average_speed']?.toString() ?? "0.0") ??
+            0.0;
+    double previousAverageSpeed =
+        double.tryParse(previousData['average_speed']?.toString() ?? "0.0") ??
+            0.0;
+
+    // Compare historical data and generate recommendations
+    String recommendationMessage = "";
+    String feedbackMessage = "";
+
+    if (latestDistance < previousDistance &&
+        latestHydration < previousHydration) {
+      recommendationMessage = "⚠️ Warning";
+      feedbackMessage =
+          "Your distance and hydration have decreased. Try drinking more water and increasing your workout intensity!";
+    } else if (latestDistance < previousDistance) {
+      recommendationMessage = "⚠️ Warning";
+      feedbackMessage =
+          "Your distance has decreased. Consider pushing yourself a bit more next time!";
+    } else if (latestHydration < previousHydration) {
+      recommendationMessage = "⚠️ Warning";
+      feedbackMessage =
+          "Your hydration has decreased. Make sure to drink enough water before and after your workout!";
+    } else if (latestCaloriesBurned < previousCaloriesBurned) {
+      recommendationMessage = "⚠️ Warning";
+      feedbackMessage =
+          "You burned fewer calories this time. Try increasing the duration or intensity of your workout!";
+    } else if (latestAverageSpeed < previousAverageSpeed) {
+      recommendationMessage = "⚠️ Warning";
+      feedbackMessage =
+          "Your average speed has decreased. Focus on maintaining a consistent pace!";
+    } else {
+      recommendationMessage = "✅ Good";
+      feedbackMessage = "You're making progress! Keep up the good work!";
+    }
 
     setState(() {
-      if (weightTrend == "↓" && bodyFatTrend == "↓") {
-        recommendation = "✅ Good";
-        feedback =
-            "You're losing weight & fat! Keep it up by maintaining your routine.";
-      } else if (weightTrend == "↓" && bodyFatTrend == "↑") {
-        recommendation = "⚠️ Warning";
-        feedback =
-            "You're losing weight but gaining fat. Try increasing protein intake & strength training.";
-      } else if (weightTrend == "↑" && bodyFatTrend == "↓") {
-        recommendation = "✅ Good";
-        feedback = "You're gaining muscle and losing fat. Great progress!";
-      } else if (weightTrend == "=" && bodyFatTrend == "↓") {
-        recommendation = "✅ Good";
-        feedback =
-            "You're maintaining weight but reducing fat. Keep up the balance!";
-      } else if (weightTrend == "=" && bodyFatTrend == "↑") {
-        recommendation = "❌ Bad";
-        feedback =
-            "You might be gaining fat. Consider adjusting nutrition & workouts.";
-      } else {
-        recommendation = "No clear trend detected.";
-        feedback = "Ensure consistent tracking for better insights.";
-      }
+      recommendation = recommendationMessage;
+      feedback = feedbackMessage;
     });
-  }
-
-  String _getTrend(double current, double previous) {
-    if (current > previous) return "↑";
-    if (current < previous) return "↓";
-    return "=";
   }
 
   @override
@@ -209,7 +225,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                     spreadRadius: 3,
                     blurRadius: 5,
                     offset: Offset(0, 3),
-                  ),
+                  )
                 ],
               ),
               child: Column(
@@ -253,7 +269,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                     spreadRadius: 3,
                     blurRadius: 5,
                     offset: Offset(0, 3),
-                  ),
+                  )
                 ],
               ),
               child: Column(

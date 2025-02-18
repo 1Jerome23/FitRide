@@ -86,7 +86,6 @@ class _FitRidePageState extends State<FitRidePage> {
 
       // Fetch data from after_exercise collection for the selected date
       DocumentSnapshot afterExerciseDoc = await FirebaseFirestore.instance
-          .collection('after_exercise')
           .doc(uid)
           .collection('dailyData')
           .doc(fullDate)
@@ -195,11 +194,12 @@ class _FitRidePageState extends State<FitRidePage> {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
           title: Text(
-            "Edit User Data",
+            "Update User Data",
             style: GoogleFonts.roboto(color: Colors.orange),
           ),
           content: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildEditField("Weight (kg)", weightController),
                 _buildEditField("Body Fat (%)", bodyFatController),
@@ -365,13 +365,13 @@ class _FitRidePageState extends State<FitRidePage> {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Calendar
               SizedBox(
-                height: 80,
+                height: 60,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: dates.length,
@@ -389,7 +389,7 @@ class _FitRidePageState extends State<FitRidePage> {
                       },
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                        width: 60,
+                        width: 50,
                         decoration: BoxDecoration(
                           color: isSelected ? Colors.orange : Colors.white,
                           borderRadius: BorderRadius.circular(30),
@@ -401,7 +401,7 @@ class _FitRidePageState extends State<FitRidePage> {
                               date['day']!,
                               style: GoogleFonts.roboto(
                                 color: isSelected ? Colors.white : Colors.black,
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -410,7 +410,7 @@ class _FitRidePageState extends State<FitRidePage> {
                               date['date']!,
                               style: GoogleFonts.roboto(
                                 color: isSelected ? Colors.white : Colors.black,
-                                fontSize: 16,
+                                fontSize: 14,
                               ),
                             ),
                           ],
@@ -420,7 +420,7 @@ class _FitRidePageState extends State<FitRidePage> {
                   },
                 ),
               ),
-              SizedBox(height: 20),
+              SizedBox(height: 16),
               // Edit Button
               Align(
                 alignment: Alignment.centerRight,
@@ -429,40 +429,43 @@ class _FitRidePageState extends State<FitRidePage> {
                   onPressed: _showEditDialog,
                 ),
               ),
-              SizedBox(height: 20),
+              SizedBox(height: 16),
               // Expanded User Data Section
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey[900],
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "User Data",
-                        style: GoogleFonts.roboto(
-                          color: Colors.orange,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "User Data",
+                          style: GoogleFonts.roboto(
+                            color: Colors.orange,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 20),
-                      _buildDataRow("Weight", "$weight kg"),
-                      _buildDataRow("Body Fat", "$bodyFat %"),
-                      _buildDataRow("Body Water", "$bodyWater %"),
-                      _buildDataRow("Food Taken", foodTaken),
-                      _buildDataRow("Hydration", "$hydration liters"),
-                      _buildDataRow("Level of Exertion", levelofExertion),
-                      _buildDataRow(
-                          "Average Heartrate", "$averageHeartrate bpm"),
-                      _buildDataRow("Average Speed", "$averageSpeed km/h"),
-                      _buildDataRow("Calories Burned", "$caloriesBurned kcal"),
-                      _buildDataRow("Distance", "$distance km"),
-                      _buildDataRow("Weight Training", weightTraining),
-                    ],
+                        SizedBox(height: 16),
+                        _buildDataRow("Weight", "$weight kg"),
+                        _buildDataRow("Body Fat", "$bodyFat %"),
+                        _buildDataRow("Body Water", "$bodyWater %"),
+                        _buildDataRow("Food Taken", foodTaken),
+                        _buildDataRow("Hydration", "$hydration liters"),
+                        _buildDataRow("Level of Exertion", levelofExertion),
+                        _buildDataRow(
+                            "Average Heartrate", "$averageHeartrate bpm"),
+                        _buildDataRow("Average Speed", "$averageSpeed km/h"),
+                        _buildDataRow(
+                            "Calories Burned", "$caloriesBurned kcal"),
+                        _buildDataRow("Distance", "$distance km"),
+                        _buildDataRow("Weight Training", weightTraining),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -475,21 +478,21 @@ class _FitRidePageState extends State<FitRidePage> {
 
   Widget _buildDataRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Text(
             "$label: ",
             style: GoogleFonts.roboto(
               color: Colors.grey[400],
-              fontSize: 18,
+              fontSize: 16,
             ),
           ),
           Text(
             value,
             style: GoogleFonts.roboto(
               color: Colors.orange,
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
