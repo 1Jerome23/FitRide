@@ -9,11 +9,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 class StravaWebView extends StatefulWidget {
   final String initialUrl;
   final void Function(String) onRedirect;
+  final Function(bool success, String message)? onAuthComplete;
 
   const StravaWebView({
     Key? key,
     required this.initialUrl,
     required this.onRedirect,
+    this.onAuthComplete,
   }) : super(key: key);
 
   @override
@@ -44,16 +46,37 @@ void initState() {
               print("Extracted Auth Code: $authCode");
               _isExchangingCode = true; 
               _exchangeAuthorizationCodeForTokens(authCode).then((success) {
-                if (success && mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => ProfilePage()),
-                  );
+                if (mounted) {
+                  // Return to the liquid swipe page with success or failure status
+                  Navigator.pop(context, {
+                    'success': success,
+                    'message': success ? 'Strava authentication successful!' : 'Failed to authenticate with Strava. Please try again.'
+                  });
+                  
+                  // If callback is provided, notify parent widget
+                  if (widget.onAuthComplete != null) {
+                    widget.onAuthComplete!(
+                      success,
+                      success ? 'Strava authentication successful!' : 'Failed to authenticate with Strava. Please try again.'
+                    );
+                  }
                 }
               });
               return NavigationDecision.prevent; 
             } else {
               print("Authorization failed: No valid code found.");
+              // Return to the liquid swipe page with failure status
+              if (mounted) {
+                Navigator.pop(context, {
+                  'success': false,
+                  'message': 'Authorization failed: No valid code found.'
+                });
+                
+                // If callback is provided, notify parent widget
+                if (widget.onAuthComplete != null) {
+                  widget.onAuthComplete!(false, 'Authorization failed: No valid code found.');
+                }
+              }
             }
           }
           return NavigationDecision.navigate;
@@ -254,29 +277,19 @@ Future<void> _subscribeToStravaWebhook() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Strava Authentication')),
-      body: WebViewWidget(controller: _controller),
-    );
-  }
-}
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FitRide',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: StravaWebView(
-        initialUrl:
-            'https://www.strava.com/oauth/mobile/authorize?client_id=146485&redirect_uri=https://fitride.uk/callback&response_type=code&scope=activity:read_all&approval_prompt=force&login=true',
-        onRedirect: (authCode) {
-          print('Authorization Code: $authCode');
-        },
+      appBar: AppBar(
+        title: const Text('Strava Authentication'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context, {
+              'success': false,
+              'message': 'Authentication cancelled'
+            });
+          },
+        ),
       ),
+      body: WebViewWidget(controller: _controller),
     );
   }
 }

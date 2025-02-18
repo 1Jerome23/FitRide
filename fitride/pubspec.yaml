@@ -55,6 +55,7 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   firebase_notifications_handler: ^2.0.2+1
   table_calendar: ^3.0.9
+  flutter_animate: ^4.5.0
 
 dev_dependencies:
   flutter_test:
