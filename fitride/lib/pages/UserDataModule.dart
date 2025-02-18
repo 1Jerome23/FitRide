@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase initialization
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:table_calendar/table_calendar.dart'; // Add this import
 import 'home_page.dart';
 
 void main() async {
@@ -41,6 +42,12 @@ class _FitRidePageState extends State<FitRidePage> {
   String caloriesBurned = "-";
   String distance = "-";
   String type = "-";
+  bool showAllData = false; // Toggle to show all data
+
+  // TableCalendar variables
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
   @override
   void initState() {
@@ -48,6 +55,7 @@ class _FitRidePageState extends State<FitRidePage> {
     dates = _generateDateList();
     selectedDate =
         "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
+    _selectedDay = _focusedDay;
     _fetchUserData(); // Fetch user data when the page is initialized
   }
 
@@ -210,7 +218,7 @@ class _FitRidePageState extends State<FitRidePage> {
                 _buildEditField("Average Speed (km/h)", speedController),
                 _buildEditField("Calories Burned", caloriesController),
                 _buildEditField("Distance (km)", distanceController),
-                _buildEditField("Weight Training", typeController),
+                _buildEditField("Type", typeController),
               ],
             ),
           ),
@@ -363,83 +371,93 @@ class _FitRidePageState extends State<FitRidePage> {
       ),
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Calendar
-              SizedBox(
-                height: 60,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: dates.length,
-                  itemBuilder: (context, index) {
-                    final date = dates[index];
-                    bool isSelected =
-                        selectedDate == "${date['day']} ${date['date']}";
-
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedDate = "${date['day']} ${date['date']}";
-                        });
-                        _fetchUserData(); // Fetch data for the selected date
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                        width: 50,
-                        decoration: BoxDecoration(
-                          color: isSelected ? Colors.orange : Colors.white,
-                          borderRadius: BorderRadius.circular(30),
+        child: Column(
+          children: [
+            // Calendar (Expanded to take more space)
+            Expanded(
+              flex: 2, // Takes 2/3 of the screen
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      "Calendar",
+                      style: GoogleFonts.roboto(
+                        color: Colors.orange,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // TableCalendar
+                    Expanded(
+                      child: TableCalendar(
+                        firstDay: DateTime.utc(2020, 1, 1),
+                        lastDay: DateTime.utc(2030, 12, 31),
+                        focusedDay: _focusedDay,
+                        calendarFormat: _calendarFormat,
+                        selectedDayPredicate: (day) {
+                          return isSameDay(_selectedDay, day);
+                        },
+                        onDaySelected: (selectedDay, focusedDay) {
+                          setState(() {
+                            _selectedDay = selectedDay;
+                            _focusedDay = focusedDay;
+                          });
+                        },
+                        onFormatChanged: (format) {
+                          setState(() {
+                            _calendarFormat = format;
+                          });
+                        },
+                        onPageChanged: (focusedDay) {
+                          _focusedDay = focusedDay;
+                        },
+                        calendarStyle: CalendarStyle(
+                          todayDecoration: BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                          selectedDecoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          weekendTextStyle: TextStyle(color: Colors.orange),
+                          defaultTextStyle: TextStyle(color: Colors.white),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              date['day']!,
-                              style: GoogleFonts.roboto(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Text(
-                              date['date']!,
-                              style: GoogleFonts.roboto(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+                        headerStyle: HeaderStyle(
+                          formatButtonVisible: false, // Hide format button
+                          titleTextStyle: TextStyle(color: Colors.orange),
+                          leftChevronIcon:
+                              Icon(Icons.chevron_left, color: Colors.orange),
+                          rightChevronIcon:
+                              Icon(Icons.chevron_right, color: Colors.orange),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 16),
-              // Edit Button
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  icon: Icon(Icons.edit, color: Colors.orange),
-                  onPressed: _showEditDialog,
+            ),
+            SizedBox(height: 16),
+            // User Data Section
+            Expanded(
+              flex: 1, // Takes 1/3 of the screen
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-              SizedBox(height: 16),
-              // Expanded User Data Section
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           "User Data",
@@ -449,27 +467,62 @@ class _FitRidePageState extends State<FitRidePage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 16),
-                        _buildDataRow("Weight", "$weight kg"),
-                        _buildDataRow("Body Fat", "$bodyFat %"),
-                        _buildDataRow("Body Water", "$bodyWater %"),
-                        _buildDataRow("Food Taken", foodTaken),
-                        _buildDataRow("Hydration", "$hydration liters"),
-                        _buildDataRow("Level of Exertion", levelofExertion),
-                        _buildDataRow(
-                            "Average Heartrate", "$averageHeartrate bpm"),
-                        _buildDataRow("Average Speed", "$averageSpeed km/h"),
-                        _buildDataRow(
-                            "Calories Burned", "$caloriesBurned kcal"),
-                        _buildDataRow("Distance", "$distance km"),
-                        _buildDataRow("Type", type),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.orange),
+                              onPressed: _showEditDialog,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  showAllData = !showAllData;
+                                });
+                              },
+                              child: Text(
+                                showAllData ? "Hide All" : "View All",
+                                style: GoogleFonts.roboto(
+                                  color: Colors.orange,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ),
+                    SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDataRow("Weight", "$weight kg"),
+                            _buildDataRow("Body Fat", "$bodyFat %"),
+                            _buildDataRow("Body Water", "$bodyWater %"),
+                            if (showAllData) ...[
+                              _buildDataRow("Food Taken", foodTaken),
+                              _buildDataRow("Hydration", "$hydration liters"),
+                              _buildDataRow(
+                                  "Level of Exertion", levelofExertion),
+                              _buildDataRow(
+                                  "Average Heartrate", "$averageHeartrate bpm"),
+                              _buildDataRow(
+                                  "Average Speed", "$averageSpeed km/h"),
+                              _buildDataRow(
+                                  "Calories Burned", "$caloriesBurned kcal"),
+                              _buildDataRow("Distance", "$distance km"),
+                              _buildDataRow("Type", type),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
