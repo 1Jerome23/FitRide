@@ -128,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(
-            "Welcome!",
+            "Hi There!",
             style: TextStyle(
               color: Color(0xffFFA500),
               fontFamily: "Fredoka-SemiBold",
