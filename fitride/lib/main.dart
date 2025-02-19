@@ -19,7 +19,7 @@ Future<void> main() async {
 
   setupNotificationChannel();
 
-  await _requestPermissions();
+  await requestPermissions();
 
   final MiScaleService miScaleService = MiScaleService();
 
@@ -28,16 +28,23 @@ Future<void> main() async {
   runApp(const _MainApp());
 }
 
-Future<void> _requestPermissions() async {
+Future<bool> requestPermissions() async {
   Map<Permission, PermissionStatus> statuses = await [
     Permission.bluetooth,
-    Permission.location,
     Permission.bluetoothScan,
     Permission.bluetoothConnect,
+    Permission.bluetoothAdvertise,
+    Permission.location,
   ].request();
 
-  if (statuses[Permission.bluetooth] != PermissionStatus.granted ||
-      statuses[Permission.location] != PermissionStatus.granted) {
+  // Check if all permissions were granted
+  bool allGranted = statuses.values.every((status) => status.isGranted);
+  return allGranted;
+}
+
+Future<void> checkPermissions() async {
+  bool granted = await requestPermissions();
+  if (!granted) {
     throw Exception('Bluetooth or Location permission not granted.');
   }
 }
