@@ -129,17 +129,23 @@ class _LoginPageState extends State<LoginPage> {
         return AlertDialog(
           title: Text(
             "Welcome!",
-            style: TextStyle(color: Colors.black),
+            style: TextStyle(
+              color: Color(0xffFFA500),
+              fontFamily: "Fredoka-SemiBold",
+            ),
           ),
           content: Text(
             "We noticed this is your first time using the application. We'd like to collect some data for you\nto enhance the personalization of the application.",
-            style: TextStyle(color: Colors.black),
+            style: TextStyle(
+              color: Colors.black,
+              fontFamily: "Inter",
+            ),
           ),
           actions: <Widget>[
             TextButton(
               child: Text(
                 "OK",
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(color: Colors.black, fontFamily: "Inter"),
               ),
               onPressed: () {
                 Navigator.of(context).pop();
