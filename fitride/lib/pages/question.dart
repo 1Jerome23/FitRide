@@ -3,9 +3,6 @@ import 'package:liquid_swipe/liquid_swipe.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fitride/pages/strava_webview.dart';
-import 'strava_webview.dart';
-import 'dart:io';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'package:fitride/pages/home_page.dart';
 

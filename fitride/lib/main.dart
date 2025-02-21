@@ -5,29 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:fitride/widget_tree.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_notifications_handler/firebase_notifications_handler.dart';
-import 'package:fitride/pages/recommendation.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:fitride/globals.dart';
 import 'dart:developer';
 import 'package:fitride/pages/question_after_exercise.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Add this import
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
-  setupNotificationChannel(); // Set up the notification channel
+  setupNotificationChannel(); 
   runApp(const _MainApp());
 }
 
-/// Sets up the notification channel for Android 8.0+ devices.
 void setupNotificationChannel() {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'default_notification_channel', // ID
-    'Default Channel', // Name
-    description: 'This is the default notification channel for the app.', // Description
+    'default_notification_channel', 
+    'Default Channel', 
+    description: 'This is the default notification channel for the app.', 
     importance: Importance.high,
   );
-
+ 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   flutterLocalNotificationsPlugin
@@ -58,13 +57,11 @@ class _MainApp extends StatelessWidget {
         final appState = info.appState;
         final firebaseMessage = info.firebaseMessage;
 
-        // Log the notification details
         log(
           'Notification tapped with $appState & payload $payload. Firebase message: $firebaseMessage',
           name: id,
         );
 
-        // Check if the notification should redirect to question_after_exercise
         if (payload != null && payload.containsKey('redirect_to')) {
           final redirectTo = payload['redirect_to'];
           log('Redirecting to: $redirectTo', name: id);
@@ -128,7 +125,7 @@ class _MainApp extends StatelessWidget {
           '/': (context) => LoginPage(),
           '/questionnaire': (context) => QuestionPage(),
           '/homepage': (context) => WidgetTree(),
-          '/recommendation': (context) => RecommendationPage(),
+          '/recommendation': (context) => PostExercise(),
           '/goal_tracking': (context) => GoalTrackingPage(),
           '/profile': (context) => ProfilePage(),
           '/question_after_exercise': (context) => PostExercise(),

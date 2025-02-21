@@ -6,6 +6,7 @@ import 'home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PostExercise extends StatefulWidget {
   @override
@@ -19,116 +20,180 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _hydrationController = TextEditingController();
 
   Future<void> _saveToFirestore() async {
-    if (_formKey.currentState!.validate()) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        
-        await FirebaseFirestore.instance.collection('after_exercise').doc(user.uid).set({
-          'levelOfExertion': int.parse(_exertionController.text),
-          'foodTaken': _foodController.text,
-          'hydration': int.parse(_hydrationController.text),
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        await fetchWeatherData(user.uid);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Data saved successfully!")),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
-      }
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
-  }
+    FocusScope.of(context).unfocus();
 
-  Future<void> fetchWeatherData(String userId) async {
-    Position position;
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        print("Location services are disabled.");
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.deniedForever) {
-        print("Location permission is denied permanently.");
-        return;
-      }
-
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        print("Location permission is denied.");
-        return;
-      }
-      position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-    } catch (e) {
-      print('Error fetching location: $e');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("User not logged in!");
       return;
     }
 
-    final latitude = position.latitude;
-    final longitude = position.longitude;
+    try {
+      double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+
+      await FirebaseFirestore.instance.collection('after_exercise').add({
+      'userId': user.uid,  
+      'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
+      'foodTaken': _foodController.text,
+      'estimatedCalories': estimatedCalories,
+      'hydration': int.tryParse(_hydrationController.text) ?? 0,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+      await fetchWeatherData(user.uid);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Data saved successfully!")),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } catch (e) {
+      print("Error saving data: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to save data! Please try again.")),
+      );
+    }
+  }
+
+  Future<double> _getCaloriesFromUSDA(String foodInput) async {
+    if (foodInput.isEmpty) return 0.0;
+
+    final apiKey = dotenv.env['API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      print("API key is missing!");
+      return 0.0;
+    }
+
+    final RegExp regex = RegExp(r'(\d+)\s*(.*)'); 
+    int quantity = 1;
+    String food = foodInput.trim();
+
+    final match = regex.firstMatch(foodInput);
+    if (match != null) {
+      quantity = int.parse(match.group(1)!);
+      food = match.group(2)!.trim();
+    }
+
+    final url = Uri.parse("https://api.nal.usda.gov/fdc/v1/foods/search?query=$food&api_key=$apiKey");
 
     try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data["foods"] != null && data["foods"].isNotEmpty) {
+          final firstFood = data["foods"][0];
+
+          for (var nutrient in firstFood["foodNutrients"]) {
+            if (nutrient["nutrientName"] == "Energy" && nutrient["unitName"] == "KCAL") {
+              double caloriesPerUnit = nutrient["value"].toDouble();
+              return caloriesPerUnit * quantity;
+            }
+          }
+        }
+        print("No calorie data found for '$food'.");
+        return 0.0;
+      } else {
+        print("USDA API Error: ${response.body}");
+        return 0.0;
+      }
+    } catch (e) {
+      print("Error fetching calorie data: $e");
+      return 0.0;
+    }
+  }
+
+
+  Future<void> fetchWeatherData(String userId) async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final latitude = position.latitude;
+      final longitude = position.longitude;
+
       final weatherResponse = await http.get(Uri.parse(
           'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
 
       if (weatherResponse.statusCode == 200) {
         final data = json.decode(weatherResponse.body);
-        final currentWeather = data['current_weather'];
-        final hourly = data['hourly'];
+        double temperature = (data['current_weather']['temperature'] as num).toDouble();
+        double humidity = data['hourly']['relative_humidity_2m'][0]?.toDouble() ?? 0.0;
 
-        double temperature = (currentWeather['temperature'] as num).toDouble();
-        double humidity = (hourly['relative_humidity_2m'] != null &&
-                hourly['relative_humidity_2m'].isNotEmpty)
-            ? (hourly['relative_humidity_2m'][0] as num).toDouble()
-            : 0.0;
-
-        // Air quality data
-        final airQualityResponse = await http.get(Uri.parse(
-            'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
-
-        double pm2_5 = 0.0;
-        String airQualityStatus = "Unknown";
-        if (airQualityResponse.statusCode == 200) {
-          final airData = json.decode(airQualityResponse.body);
-          final hourlyData = airData['hourly'];
-
-          pm2_5 =
-              (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
-                  ? (hourlyData['pm2_5'][0] as num).toDouble()
-                  : 0.0;
-
-          airQualityStatus = _evaluateAirQuality(pm2_5);
-        }
-
-        // Store weather data in Firestore
         FirebaseFirestore.instance.collection('weatherData').add({
           'userId': userId,
           'temperature': temperature,
           'humidity': humidity,
-          'pm2_5': pm2_5,
-          'airQualityStatus': airQualityStatus,
           'timestamp': FieldValue.serverTimestamp(),
         });
-      } else {
-        print('Failed to fetch weather data.');
       }
     } catch (e) {
       print('Error fetching weather data: $e');
     }
   }
 
-  String _evaluateAirQuality(double? pm2_5) {
-    if (pm2_5 == null) return "Unknown";
-    if (pm2_5 <= 25) return "Good";
-    if (pm2_5 <= 50) return "Moderate";
-    return "Poor";
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).primaryColor,
+        title: Text(
+          "Post Exercise Form",
+          style: GoogleFonts.roboto(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _buildTextInput(
+                label: "Level of exertion (1-10)",
+                controller: _exertionController,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return "Required";
+                  final numValue = int.tryParse(value);
+                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
+                  return null;
+                },
+              ),
+              _buildTextInput(
+                label: "Food taken today",
+                controller: _foodController,
+                validator: (value) => value == null || value.isEmpty ? "Required" : null,
+              ),
+              _buildTextInput(
+                label: "Hydration (bottles of water 1-10)",
+                controller: _hydrationController,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return "Required";
+                  final numValue = int.tryParse(value);
+                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
+                  return null;
+                },
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _saveToFirestore,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                  textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                child: Text("Submit", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildTextInput({
@@ -154,79 +219,6 @@ class _PostExerciseState extends State<PostExercise> {
           labelText: label,
           labelStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).primaryColor,
-        title: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Post Exercise Form",
-            style: GoogleFonts.roboto(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTextInput(
-                label: "Level of exertion (1-10)",
-                controller: _exertionController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  final numValue = int.tryParse(value);
-                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
-                  return null;
-                },
-              ),
-              _buildTextInput(
-                label: "Food taken today",
-                controller: _foodController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  return null;
-                },
-              ),
-              _buildTextInput(
-                label: "Hydration (bottles of water 1-10)",
-                controller: _hydrationController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  final numValue = int.tryParse(value);
-                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _saveToFirestore,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                    textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  child: Text("Submit", style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

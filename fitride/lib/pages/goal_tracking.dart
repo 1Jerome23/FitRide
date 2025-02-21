@@ -6,7 +6,6 @@ import 'home_page.dart';
 import 'recommendation.dart';
 import 'profile.dart';
 import 'login_register.dart';
-import 'dart:math' as math;
 
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_core/firebase_core.dart'; // Firebase initialization
-import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
+import 'package:firebase_core/firebase_core.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:table_calendar/table_calendar.dart'; // Add this import
+import 'package:table_calendar/table_calendar.dart'; 
 import 'home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp(); 
   runApp(MyApp());
 }
 
@@ -42,9 +42,8 @@ class _FitRidePageState extends State<FitRidePage> {
   String caloriesBurned = "-";
   String distance = "-";
   String type = "-";
-  bool showAllData = false; // Toggle to show all data
+  bool showAllData = false;
 
-  // TableCalendar variables
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -56,7 +55,7 @@ class _FitRidePageState extends State<FitRidePage> {
     selectedDate =
         "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
     _selectedDay = _focusedDay;
-    _fetchUserData(); // Fetch user data when the page is initialized
+    _fetchUserData();
   }
 
   List<Map<String, String>> _generateDateList() {
@@ -68,7 +67,7 @@ class _FitRidePageState extends State<FitRidePage> {
         "day": DateFormat.E().format(date),
         "date": DateFormat.d().format(date),
         "fullDate": DateFormat('yyyy-MM-dd')
-            .format(date), // Store full date for Firebase
+            .format(date),
       });
     }
     return dateList;

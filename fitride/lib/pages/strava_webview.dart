@@ -1,4 +1,3 @@
-import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -47,13 +46,11 @@ void initState() {
               _isExchangingCode = true; 
               _exchangeAuthorizationCodeForTokens(authCode).then((success) {
                 if (mounted) {
-                  // Return to the liquid swipe page with success or failure status
                   Navigator.pop(context, {
                     'success': success,
                     'message': success ? 'Strava authentication successful!' : 'Failed to authenticate with Strava. Please try again.'
                   });
                   
-                  // If callback is provided, notify parent widget
                   if (widget.onAuthComplete != null) {
                     widget.onAuthComplete!(
                       success,
@@ -65,14 +62,12 @@ void initState() {
               return NavigationDecision.prevent; 
             } else {
               print("Authorization failed: No valid code found.");
-              // Return to the liquid swipe page with failure status
               if (mounted) {
                 Navigator.pop(context, {
                   'success': false,
                   'message': 'Authorization failed: No valid code found.'
                 });
                 
-                // If callback is provided, notify parent widget
                 if (widget.onAuthComplete != null) {
                   widget.onAuthComplete!(false, 'Authorization failed: No valid code found.');
                 }
@@ -172,7 +167,6 @@ Future<void> _fetchStravaData(String userId, String accessToken) async {
           final List<dynamic> activitiesData = json.decode(activitiesResponse.body);
           print("Activities Data: $activitiesData");
 
-          await _saveActivitiesDataToFirestore(userId, activitiesData);
         } else {
           print('Error fetching activities: ${activitiesResponse.body}');
         }
@@ -204,37 +198,6 @@ Future<void> _fetchStravaData(String userId, String accessToken) async {
       print('Error saving athlete data to Firestore: $e');
     }
   }
-
- Future<void> _saveActivitiesDataToFirestore(String userId, List<dynamic> activitiesData) async {
-  try {
-    final batch = FirebaseFirestore.instance.batch();
-
-    for (var activity in activitiesData) {
-
-      double distanceInKm = (activity['distance'] ?? 0) / 1000; 
-      double averageSpeedInKmh = (activity['average_speed'] ?? 0) * 3.6;
-      double averageHeartRate = (activity['average_heartrate'] ?? 0); 
-      double caloriesBurned = (activity['calories'] ?? 0);  
-
-      final activityRef = FirebaseFirestore.instance.collection('activities').doc();
-      batch.set(activityRef, {
-        'user_id': userId,
-        'name': activity['name'] ?? 'Unnamed Activity',
-        'distance': distanceInKm, 
-        'start_date': activity['start_date'] ?? '',
-        'type': activity['type'] ?? '',
-        'average_speed': averageSpeedInKmh,
-        'average_heartrate': averageHeartRate,
-        'calories_burned': caloriesBurned,  
-      });
-    }
-
-    await batch.commit();
-    print('Activities data saved to Firestore.');
-  } catch (e) {
-    print('Error saving activities data to Firestore: $e');
-  }
-}
 
 Future<void> _subscribeToStravaWebhook() async {
   final String clientId = "146485";
