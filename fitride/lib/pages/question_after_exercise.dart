@@ -18,23 +18,32 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _exertionController = TextEditingController();
   final TextEditingController _foodController = TextEditingController();
   final TextEditingController _hydrationController = TextEditingController();
+  bool _isSubmitting = false;
 
   Future<void> _saveToFirestore() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    FocusScope.of(context).unfocus();
+  if (_isSubmitting) return;  
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print("User not logged in!");
-      return;
-    }
+  setState(() {
+    _isSubmitting = true; 
+  });
 
-    try {
-      double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+  FocusScope.of(context).unfocus();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    print("User not logged in!");
+    setState(() {
+      _isSubmitting = false;
+    });
+    return;
+  }
 
-      await FirebaseFirestore.instance.collection('after_exercise').add({
+  try {
+    double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+
+    await FirebaseFirestore.instance.collection('after_exercise').add({
       'userId': user.uid,  
       'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
       'foodTaken': _foodController.text,
@@ -43,24 +52,27 @@ class _PostExerciseState extends State<PostExercise> {
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-      await fetchWeatherData(user.uid);
+    await fetchWeatherData(user.uid);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Data saved successfully!")),
-      );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Data saved successfully!")),
+    );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } catch (e) {
-      print("Error saving data: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save data! Please try again.")),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } catch (e) {
+    print("Error saving data: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Failed to save data! Please try again.")),
+    );
+  } finally {
+    setState(() {
+      _isSubmitting = false;  
+    });
   }
-
+}
   Future<double> _getCaloriesFromUSDA(String foodInput) async {
     if (foodInput.isEmpty) return 0.0;
 
@@ -181,13 +193,15 @@ class _PostExerciseState extends State<PostExercise> {
               ),
               SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _saveToFirestore,
+                onPressed: _isSubmitting ? null : _saveToFirestore,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).primaryColor,
                   padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                   textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                child: Text("Submit", style: TextStyle(color: Colors.white)),
+                child: _isSubmitting
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : Text("Submit", style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
