@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StravaWebView extends StatefulWidget {
   final String initialUrl;
@@ -20,6 +21,34 @@ class StravaWebView extends StatefulWidget {
   @override
   _StravaWebViewState createState() => _StravaWebViewState();
 }
+Future<String?> getStravaUserId() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? stravaUserId = prefs.getString('stravaUserId');
+
+  if (stravaUserId == null) {
+    print("Strava User ID not found in SharedPreferences. Checking Firestore...");
+    User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user != null) {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection('user_tokens')
+          .doc(user.uid)
+          .get();
+          
+      if (snapshot.exists) {
+        stravaUserId = snapshot.get('strava_user_id');
+        if (stravaUserId != null) {
+          await prefs.setString('stravaUserId', stravaUserId);
+          print("Retrieved Strava User ID from Firestore: $stravaUserId");
+        }
+      }
+    }
+  }
+  
+  print("Final Strava User ID: $stravaUserId");
+  return stravaUserId;
+}
+
 
 class _StravaWebViewState extends State<StravaWebView> {
   late final WebViewController _controller;
@@ -102,11 +131,15 @@ void initState() {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
+        final String stravaUserId = data['athlete']['id'].toString();
         final String expiresAt = data['expires_at'].toString();
         final String accessToken = data['access_token'].toString();
         final String refreshToken = data['refresh_token'].toString();
         final String userId = data['athlete']['id'].toString();
+        print("Strava User ID: $stravaUserId");
 
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('stravaUserId', stravaUserId);
         if (userId != null) {
           await FirebaseFirestore.instance
               .collection('user_tokens')
