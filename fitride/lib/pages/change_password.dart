@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:fitride/pages/home_page.dart';
 import 'package:fitride/pages/recommendation.dart';
 import 'package:fitride/pages/profile.dart';
@@ -19,6 +18,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _isCurrentPasswordVisible = false;
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  
+  // Define custom colors to match profile page
+  final Color orangeColor = const Color(0xffFFA500);
+  final Color darkGrey = const Color(0xFF303030);
 
   void _onItemTapped(int index) {
     setState(() {
@@ -77,8 +80,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
         await user.updatePassword(newPassword);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Password changed successfully")),
+       ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Password changed successfully"),
+            backgroundColor: Colors.green,
+          ),
         );
 
         _currentPasswordController.clear();
@@ -120,127 +126,137 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Theme.of(context).primaryColor,
-        title: Text(
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
+        title: const Text(
           "FitRide",
-          style: GoogleFonts.roboto(
-            color: Colors.orange,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            color: Color(0xffFFA500),
+            fontSize: 22,
           ),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Image.asset(
-              'assets/logobike.png',
-              height: 40,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+              },
+              child: Image.asset(
+                'assets/logobike.png',
+                height: 25,
+              ),
             ),
           ),
         ],
       ),
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(25.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                "Change Password",
-                style: GoogleFonts.roboto(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-                textAlign: TextAlign.center,
+              // Header with back button
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios,
+                      color: orangeColor,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                  Text(
+                    "Change Password",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 30),
-              TextField(
+              
+              // Current password field
+              _buildPasswordField(
                 controller: _currentPasswordController,
-                obscureText: !_isCurrentPasswordVisible,
-                style: TextStyle(color: Colors.black), 
-                decoration: InputDecoration(
-                  labelText: "Current Password",
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isCurrentPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isCurrentPasswordVisible = !_isCurrentPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
+                isVisible: _isCurrentPasswordVisible,
+                label: "Current Password",
+                toggleVisibility: () {
+                  setState(() {
+                    _isCurrentPasswordVisible = !_isCurrentPasswordVisible;
+                  });
+                },
               ),
-              SizedBox(height: 20),
-              TextField(
+              SizedBox(height: 16),
+              
+              // New password field
+              _buildPasswordField(
                 controller: _newPasswordController,
-                obscureText: !_isNewPasswordVisible,
-                style: TextStyle(color: Colors.black), 
-                decoration: InputDecoration(
-                  labelText: "New Password",
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isNewPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isNewPasswordVisible = !_isNewPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
+                isVisible: _isNewPasswordVisible,
+                label: "New Password",
+                toggleVisibility: () {
+                  setState(() {
+                    _isNewPasswordVisible = !_isNewPasswordVisible;
+                  });
+                },
               ),
-              SizedBox(height: 20),
-              TextField(
+              SizedBox(height: 16),
+              
+              // Confirm password field
+              _buildPasswordField(
                 controller: _confirmPasswordController,
-                obscureText: !_isConfirmPasswordVisible,
-                style: TextStyle(color: Colors.black), 
-                decoration: InputDecoration(
-                  labelText: "Confirm Password",
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
+                isVisible: _isConfirmPasswordVisible,
+                label: "Confirm Password",
+                toggleVisibility: () {
+                  setState(() {
+                    _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                  });
+                },
               ),
-              SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _changePassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: EdgeInsets.symmetric(vertical: 15),
+              SizedBox(height: 40),
+              
+              // Update password button
+              Container(
+                height: 55,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [orangeColor.withOpacity(0.8), orangeColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: orangeColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  "Update Password",
-                  style: GoogleFonts.lato(
-                    fontSize: 18,
-                    color: Colors.black,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(15),
+                    onTap: _changePassword,
+                    child: Center(
+                      child: Text(
+                        "Update Password",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -248,29 +264,120 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights),
-            label: 'Insights',
+          child: BottomNavigationBar(
+            backgroundColor: Colors.grey[900],
+            currentIndex: _selectedIndex,
+            selectedItemColor: orangeColor,
+            unselectedItemColor: Colors.grey[400],
+            selectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontFamily: "Inter",
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 12,
+              fontFamily: "Inter",
+            ),
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            onTap: _onItemTapped,
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.insights_rounded),
+                label: 'Insights',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.track_changes_rounded),
+                label: 'Goals',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Profile',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.data_usage),
-            label: 'Goal/Progress',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required bool isVisible,
+    required String label,
+    required VoidCallback toggleVisibility,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
           ),
         ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: !isVisible,
+        style: TextStyle(
+          color: Colors.black87,
+          fontFamily: 'Inter',
+          fontSize: 15,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Colors.grey[600],
+            fontFamily: 'Inter',
+            fontSize: 14,
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide(color: Colors.grey[200]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide(color: Colors.grey[200]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide(color: orangeColor.withOpacity(0.7), width: 1.5),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          suffixIcon: IconButton(
+            icon: Icon(
+              isVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              color: orangeColor,
+              size: 20,
+            ),
+            onPressed: toggleVisibility,
+          ),
+        ),
       ),
     );
   }

@@ -18,12 +18,31 @@ class _QuestionPageState extends State<QuestionPage>
   final LiquidController _controller = LiquidController();
   int _currentPage = 0;
   bool _stravaAuthSuccessful = false;
-  bool _showManualInput = false;
+  String? _selectedGoal;
   
-  // Add controllers for new fields
+  // User data controllers
+  final TextEditingController ageController = TextEditingController();
+  final TextEditingController heightController = TextEditingController();
+  String? _healthCondition;
+  
+  // Additional health condition questions
+  String? _weatherCondition;
+  String? _heartRateLimit;
+  String? _maxDuration;
+  
+  // Weight loss goal controllers
   final TextEditingController weightController = TextEditingController();
   final TextEditingController bodyWaterController = TextEditingController();
   final TextEditingController bodyFatController = TextEditingController();
+  final TextEditingController targetWeightController = TextEditingController();
+  
+  // Leisure goal controllers
+  final TextEditingController daysPerWeekController = TextEditingController();
+  final TextEditingController sessionDurationController = TextEditingController();
+  
+  // Endurance goal controllers
+  final TextEditingController targetDistanceController = TextEditingController();
+  final TextEditingController targetDurationController = TextEditingController();
 
   int _selectedIndex = 3;
   bool _isLoading = true;
@@ -33,10 +52,6 @@ class _QuestionPageState extends State<QuestionPage>
   
   late AnimationController _animationController;
   late Animation<double> _opacityAnimation;
-  
-  final TextEditingController ageController = TextEditingController();
-  final TextEditingController heightController = TextEditingController();
-  String? _healthCondition;
 
   static const Color primaryBlack = Color(0xFF1A1A1A);
   static const Color primaryGray = Color(0xFF676767);
@@ -65,6 +80,51 @@ class _QuestionPageState extends State<QuestionPage>
       'description': 'Both cardiovascular and respiratory conditions'
     },
   ];
+  
+  final List<String> _weatherOptions = [
+    'No limitations',
+    'High temperatures affect me',
+    'Cold temperatures affect me',
+    'High humidity affects me',
+    'Poor air quality affects me',
+    'Rain or strong winds affect me'
+  ];
+  
+  final List<String> _heartRateOptions = [
+    'No limitations',
+    'Stay below 120 BPM',
+    'Stay below 140 BPM',
+    'Stay below 160 BPM',
+    'Must monitor continuously',
+    'Other (consult with doctor)'
+  ];
+  
+  final List<String> _durationOptions = [
+    'No limitations',
+    '15 minutes maximum',
+    '30 minutes maximum',
+    '45 minutes maximum',
+    '60 minutes maximum',
+    'Other (consult with doctor)'
+  ];
+  
+  final List<Map<String, dynamic>> _goalOptions = [
+    {
+      'image': 'assets/leisure.png',
+      'label': 'Leisure',
+      'description': 'Casual cycling for enjoyment and light exercise'
+    },
+    {
+      'image': 'assets/weight_loss.png',
+      'label': 'High Intensity Cycling',
+      'description': 'Focus on calorie burning and weight loss'
+    },
+    {
+      'image': 'assets/endurance.png',
+      'label': 'Endurance',
+      'description': 'Build stamina for longer rides and events'
+    },
+  ];
 
   @override
   void initState() {
@@ -85,6 +145,16 @@ class _QuestionPageState extends State<QuestionPage>
   @override
   void dispose() {
     _animationController.dispose();
+    ageController.dispose();
+    heightController.dispose();
+    weightController.dispose();
+    bodyWaterController.dispose();
+    bodyFatController.dispose();
+    targetWeightController.dispose();
+    daysPerWeekController.dispose();
+    sessionDurationController.dispose();
+    targetDistanceController.dispose();
+    targetDurationController.dispose();
     super.dispose();
   }
 
@@ -110,40 +180,6 @@ class _QuestionPageState extends State<QuestionPage>
     }
   }
 
-  Future<void> submitScaleData() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to submit your data')),
-      );
-      return;
-    }
-
-    try {
-      Map<String, dynamic> scaleData = {
-        'uid': user.uid,
-        'timestamp': FieldValue.serverTimestamp(),
-        'weight': weightController.text,
-        'bodyWater': bodyWaterController.text,
-        'bodyFat': bodyFatController.text,
-      };
-
-      await FirebaseFirestore.instance
-          .collection('userData')
-          .doc(user.uid)  // Using user.uid as the document ID
-          .set(scaleData, SetOptions(merge: true));  // merge: true is key here
-
-      _controller.animateToPage(
-        page: _currentPage + 1,
-        duration: 600,
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit data: $e')),
-      );
-    }
-  }
-
   Future<void> submitUserData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -161,6 +197,12 @@ class _QuestionPageState extends State<QuestionPage>
         'height': heightController.text,
         'healthCondition': _healthCondition,
       };
+      
+      if (_healthCondition != 'None') {
+        userData['weatherCondition'] = _weatherCondition;
+        userData['heartRateLimit'] = _heartRateLimit;
+        userData['maxDuration'] = _maxDuration;
+      }
 
       await FirebaseFirestore.instance
           .collection('userData')
@@ -174,6 +216,54 @@ class _QuestionPageState extends State<QuestionPage>
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit data: $e')),
+      );
+    }
+  }
+  
+  Future<void> submitGoalData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to submit your data')),
+      );
+      return;
+    }
+
+    try {
+      Map<String, dynamic> goalData = {
+        'uid': user.uid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'goalType': _selectedGoal,
+      };
+      
+      // Add goal-specific data
+      if (_selectedGoal == 'Leisure') {
+        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
+        goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
+      } else if (_selectedGoal == 'High Intensity Cycling') {
+        goalData['weight'] = weightController.text;
+        goalData['bodyWater'] = bodyWaterController.text;
+        goalData['bodyFat'] = bodyFatController.text;
+        goalData['targetWeight'] = targetWeightController.text;
+        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
+        goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
+      } else if (_selectedGoal == 'Endurance') {
+        goalData['targetDistance'] = targetDistanceController.text;
+        goalData['targetDuration'] = targetDurationController.text;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(user.uid) 
+          .set(goalData, SetOptions(merge: true)); 
+
+      _controller.animateToPage(
+        page: _currentPage + 1,
+        duration: 600,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit goal data: $e')),
       );
     }
   }
@@ -214,12 +304,10 @@ class _QuestionPageState extends State<QuestionPage>
         ),
       ),
     ).then((result) {
-      // Handle the result from the StravaWebView
       if (result != null && result is Map<String, dynamic>) {
         bool success = result['success'] ?? false;
         String message = result['message'] ?? 'Authentication process completed';
         
-        // Show a snackbar with the message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -228,7 +316,6 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         );
         
-        // Update state to show the Next button if authentication was successful
         if (success) {
           setState(() {
             _stravaAuthSuccessful = true;
@@ -238,10 +325,132 @@ class _QuestionPageState extends State<QuestionPage>
     });
   }
 
+  Widget buildStravaAuthPage() {
+    var media = MediaQuery.of(context).size;
+    return Scaffold(
+      backgroundColor: Color(0xFFEEF9FF),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(25.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(height: 100),
+              Image.asset(
+                'assets/strava_logo.png',
+                height: media.width * 0.4, 
+              ),
+              SizedBox(height: 30),
+              Text(
+                "Authorize Strava",
+                style: TextStyle(
+                  fontFamily: "Fredoka-SemiBold",
+                  color: Colors.black,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  children: [
+                    Text(
+                      "Connect your Strava account to sync your activities and track your progress",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryGray,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "⚠️ This is a requirement to use FitRide",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryOrange,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 40),
+              Container(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _authorizeStrava();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFFC4C02),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(width: 10),
+                      Text(
+                        "Connect with Strava",
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              if (_stravaAuthSuccessful) ...[
+                SizedBox(height: 30),
+                Container(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _controller.animateToPage(
+                        page: 1,
+                        duration: 600,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryOrange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: Text(
+                      "Next",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget buildDataEntryPage() {
     var media = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: Color(0xFFFFF8EE), // Light orange/cream background color
+      backgroundColor: Color(0xFFFFF8EE),
       body: SingleChildScrollView(
         child: SafeArea(
           child: Padding(
@@ -257,6 +466,7 @@ class _QuestionPageState extends State<QuestionPage>
                 Text(
                   "Enter your data below",
                   style: TextStyle(
+                    fontFamily: "Fredoka-SemiBold",
                     color: Colors.black,
                     fontSize: 20,
                     fontWeight: FontWeight.w700
@@ -264,14 +474,17 @@ class _QuestionPageState extends State<QuestionPage>
                 ),
                 Text(
                   "It will help us to know more about you!",
-                  style: TextStyle(color: primaryGray, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: "Inter",
+                    color: primaryGray, 
+                    fontSize: 12
+                  ),
                 ),
                 SizedBox(height: media.width * 0.05),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 15.0),
                   child: Column(
                     children: [
-                      // Age Input
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -301,9 +514,15 @@ class _QuestionPageState extends State<QuestionPage>
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
                                   hintText: "Age",
-                                  hintStyle: TextStyle(color: primaryGray),
+                                  hintStyle: TextStyle(
+                                    fontFamily: "Inter",
+                                    color: primaryGray
+                                  ),
                                 ),
-                                style: TextStyle(color: Colors.black),
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: Colors.black
+                                ),
                               ),
                             ),
                           ],
@@ -311,7 +530,6 @@ class _QuestionPageState extends State<QuestionPage>
                       ),
                       SizedBox(height: 15),
 
-                      // Height Input with CM box
                       Row(
                         children: [
                           Expanded(
@@ -344,9 +562,15 @@ class _QuestionPageState extends State<QuestionPage>
                                       decoration: InputDecoration(
                                         border: InputBorder.none,
                                         hintText: "Height",
-                                        hintStyle: TextStyle(color: primaryGray),
+                                        hintStyle: TextStyle(
+                                          fontFamily: "Inter",
+                                          color: primaryGray
+                                        ),
                                       ),
-                                      style: TextStyle(color: Colors.black),
+                                      style: TextStyle(
+                                        fontFamily: "Inter",
+                                        color: Colors.black
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -366,20 +590,24 @@ class _QuestionPageState extends State<QuestionPage>
                             ),
                             child: Text(
                               "CM",
-                              style: TextStyle(color: Colors.white, fontSize: 12),
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                color: Colors.white, 
+                                fontSize: 12
+                              ),
                             ),
                           ),
                         ],
                       ),
                       SizedBox(height: 15),
 
-                      // Health Conditions
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             "Pre-existing Conditions",
                             style: TextStyle(
+                              fontFamily: "Fredoka-SemiBold",
                               color: Colors.black,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -413,8 +641,18 @@ class _QuestionPageState extends State<QuestionPage>
                                 width: 30,
                                 height: 30,
                               ),
-                              title: Text(condition['label']),
-                              subtitle: Text(condition['description']),
+                              title: Text(
+                                condition['label'],
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                )
+                              ),
+                              subtitle: Text(
+                                condition['description'],
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                )
+                              ),
                               onTap: () => setState(() => 
                                 _healthCondition = condition['label']
                               ),
@@ -422,9 +660,284 @@ class _QuestionPageState extends State<QuestionPage>
                           )).toList(),
                         ],
                       ),
+                      
+                      // Additional health questions that appear when a health condition is selected
+                      if (_healthCondition != null && _healthCondition != 'None') ...[
+                        SizedBox(height: 15),
+                        Text(
+                          "Additional Health Information",
+                          style: TextStyle(
+                            fontFamily: "Fredoka-SemiBold",
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        
+                        // Weather conditions dropdown
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 5,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Do you have any weather conditions that affect your ability to cycle?",
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  fontSize: 14,
+                                  color: primaryBlack,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              DropdownButtonFormField<String>(
+                                value: _weatherCondition,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _weatherCondition != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _weatherCondition != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _weatherCondition != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _weatherCondition != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: primaryOrange,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: _weatherCondition != null,
+                                  fillColor: _weatherCondition != null 
+                                      ? primaryOrange.withOpacity(0.1) 
+                                      : Colors.transparent,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                ),
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryBlack,
+                                  fontSize: 14,
+                                ),
+                                dropdownColor: Colors.white,
+                                items: _weatherOptions.map((String option) {
+                                  return DropdownMenuItem<String>(
+                                    value: option,
+                                    child: Text(option),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _weatherCondition = newValue;
+                                  });
+                                },
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: _weatherCondition != null ? primaryOrange : primaryGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 15),
+                        
+                        // Heart rate limitations dropdown
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 5,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Do you have any heart rate limitations while cycling?",
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  fontSize: 14,
+                                  color: primaryBlack,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              DropdownButtonFormField<String>(
+                                value: _heartRateLimit,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _heartRateLimit != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _heartRateLimit != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _heartRateLimit != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _heartRateLimit != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: primaryOrange,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: _heartRateLimit != null,
+                                  fillColor: _heartRateLimit != null 
+                                      ? primaryOrange.withOpacity(0.1) 
+                                      : Colors.transparent,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                ),
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryBlack,
+                                  fontSize: 14,
+                                ),
+                                dropdownColor: Colors.white,
+                                items: _heartRateOptions.map((String option) {
+                                  return DropdownMenuItem<String>(
+                                    value: option,
+                                    child: Text(option),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _heartRateLimit = newValue;
+                                  });
+                                },
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: _heartRateLimit != null ? primaryOrange : primaryGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 15),
+                        
+                        // Maximum exercise duration dropdown
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 5,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Do you have a maximum exercise duration recommended by your doctor?",
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  fontSize: 14,
+                                  color: primaryBlack,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              DropdownButtonFormField<String>(
+                                value: _maxDuration,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _maxDuration != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _maxDuration != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: _maxDuration != null 
+                                          ? primaryOrange 
+                                          : Colors.grey.shade300,
+                                      width: _maxDuration != null ? 2 : 1,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: primaryOrange,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: _maxDuration != null,
+                                  fillColor: _maxDuration != null 
+                                      ? primaryOrange.withOpacity(0.1) 
+                                      : Colors.transparent,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                ),
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryBlack,
+                                  fontSize: 14,
+                                ),
+                                dropdownColor: Colors.white,
+                                items: _durationOptions.map((String option) {
+                                  return DropdownMenuItem<String>(
+                                    value: option,
+                                    child: Text(option),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _maxDuration = newValue;
+                                  });
+                                },
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: _maxDuration != null ? primaryOrange : primaryGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      
                       SizedBox(height: media.width * 0.07),
                       
-                      // Next Button
                       Container(
                         width: double.infinity,
                         height: 50,
@@ -438,7 +951,11 @@ class _QuestionPageState extends State<QuestionPage>
                           ),
                           child: Text(
                             "Next",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
+                            style: TextStyle(
+                              fontFamily: "Inter",
+                              color: Colors.white, 
+                              fontSize: 16
+                            ),
                           ),
                         ),
                       ),
@@ -453,451 +970,1018 @@ class _QuestionPageState extends State<QuestionPage>
     );
   }
 
-  Widget buildStravaAuthPage() {
+  Widget buildGoalsPage() {
     var media = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: Color(0xFFEEF9FF),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(height: 100),
-              Image.asset(
-                'assets/strava_logo.png',
-                height: media.width * 0.4, 
-              ),
-              SizedBox(height: 30),
-              Text(
-                "Authorize Strava",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+      backgroundColor: Color(0xFFFFEEDD),
+      body: SingleChildScrollView(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(15.0),
+            child: Column(
+              children: [
+                Image.asset(
+                  "assets/goals.png",
+                  width: 300,
+                  height: 300,
+                  fit: BoxFit.fitWidth,
                 ),
-              ),
-              SizedBox(height: 20),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  children: [
-                    Text(
-                      "Connect your Strava account to sync your activities and track your progress",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: primaryGray,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "⚠️ This is a requirement to use FitRide",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: primaryOrange,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 40),
-              Container(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _authorizeStrava();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFFC4C02), // Strava orange
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+                SizedBox(height: media.width * 0.01),
+                Text(
+                  "Set Your Cycling Goals",
+                  style: TextStyle(
+                    fontFamily: "Fredoka-SemiBold",
+                    color: Colors.black,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(width: 10),
-                      Text(
-                        "Connect with Strava",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                ),
+                Text(
+                  "Choose a goal to personalize your cycling experience with us!",
+                  style: TextStyle(
+                    fontFamily: "Inter",
+                    color: primaryGray,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: media.width * 0.05),
+                
+                AnimatedSwitcher(
+                  duration: Duration(milliseconds: 500),
+                  child: _selectedGoal == null 
+                      ? _buildGoalSelection(media)
+                      : _buildGoalQuestions(media),
+                ),
+                
+                SizedBox(height: 20),
+                
+                if (_selectedGoal != null) ...[
+                  Container(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: submitGoalData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryOrange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
                         ),
                       ),
-                    ],
+                      child: Text(
+                        "Save Goals",
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          color: Colors.black,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              
-              // Only show Next button after successful Strava authentication
-              if (_stravaAuthSuccessful) ...[
-                SizedBox(height: 30),
-                Container(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
+                  SizedBox(height: 15),
+                  TextButton(
                     onPressed: () {
-                      _controller.animateToPage(
-                        page: 1, // Index of buildDataEntryPage
-                        duration: 600,
-                      );
+                      setState(() {
+                        _selectedGoal = null;
+                      });
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryOrange,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
                     child: Text(
-                      "Next",
+                      "Go Back",
                       style: TextStyle(
-                        color: Colors.white,
+                        fontFamily: "Inter",
+                        color: primaryOrange,
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  Widget buildXiaomiScalePage() {
-    var media = MediaQuery.of(context).size;
-    
-    // Previous code remains the same until the manual input section in buildXiaomiScalePage...
-
-if (_showManualInput) {
-      return Scaffold(
-        backgroundColor: Color(0xFFF5F5F5),
-        body: SingleChildScrollView(
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(15.0),
-              child: Column(
-                children: [
-                  Image.asset(
-                    "assets/profile2.png",
-                    width: MediaQuery.of(context).size.width,
-                    fit: BoxFit.fitWidth,
+  
+  Widget _buildGoalSelection(Size media) {
+    return Column(
+      key: ValueKey<String>('goal_selection'),
+      children: _goalOptions.map((goal) => 
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedGoal = goal['label'];
+            });
+          },
+          child: Container(
+            margin: EdgeInsets.only(bottom: 15),
+            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Image.asset(
+                  goal['image'],
+                  width: 50,
+                  height: 50,
+                ),
+                SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        goal['label'],
+                        style: TextStyle(
+                          fontFamily: "Fredoka-SemiBold",
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        goal['description'],
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          fontSize: 14,
+                          color: primaryGray,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: MediaQuery.of(context).size.width * 0.05),
-                  Text(
-                    "Enter your measurements",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: primaryOrange,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        )
+      ).toList(),
+    );
+  }
+  
+  Widget _buildGoalQuestions(Size media) {
+    switch (_selectedGoal) {
+      case 'Leisure':
+        return _buildLeisureQuestions(media);
+      case 'High Intensity Cycling':
+        return _buildHighIntensityQuestions(media);
+      case 'Endurance':
+        return _buildEnduranceQuestions(media);
+      default:
+        return Container();
+    }
+  }
+  
+  Widget _buildLeisureQuestions(Size media) {
+    return Column(
+      key: ValueKey<String>('leisure_questions'),
+      children: [
+        Container(
+          padding: EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: primaryOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            children: [
+              Text(
+                "Leisure Cycling",
+                style: TextStyle(
+                  fontFamily: "Fredoka-SemiBold",
+                  fontSize: 25,
+                  color: primaryOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 5),
+              Text(
+                "Enjoy casual rides while still maintaining good health",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 12,
+                  color: primaryGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        
+        // Days per week
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How many days per week do you plan to cycle?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: daysPerWeekController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Enter a number between 1-7",
+                  hintStyle: TextStyle(
+                    fontFamily: "Inter",
+                    color: primaryGray,
+                    fontSize: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                ),
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  color: primaryBlack,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        
+        // Session duration
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How long will each cycling session last?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: sessionDurationController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Enter duration",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      ),
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryBlack,
+                      ),
                     ),
                   ),
-                  Text(
-                    "It will help us track your progress!",
-                    style: TextStyle(color: primaryGray, fontSize: 12),
-                  ),
-                  SizedBox(height: MediaQuery.of(context).size.width * 0.05),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(15),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 5,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 50,
-                                      height: 50,
-                                      padding: EdgeInsets.all(15),
-                                      child: Image.asset(
-                                        "assets/weight.png",
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: weightController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: "Weight",
-                                          hintStyle: TextStyle(color: primaryGray),
-                                        ),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Container(
-                              width: 50,
-                              height: 50,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
-                                ),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Text(
-                                "KG",
-                                style: TextStyle(color: Colors.white, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 15),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(15),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 5,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 50,
-                                      height: 50,
-                                      padding: EdgeInsets.all(15),
-                                      child: Image.asset(
-                                        "assets/water.png",
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: bodyWaterController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: "Body Water",
-                                          hintStyle: TextStyle(color: primaryGray),
-                                        ),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Container(
-                              width: 50,
-                              height: 50,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
-                                ),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Text(
-                                "%",
-                                style: TextStyle(color: Colors.white, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 15),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(15),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 5,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 50,
-                                      height: 50,
-                                      padding: EdgeInsets.all(15),
-                                      child: Image.asset(
-                                        "assets/fat.png",
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: bodyFatController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: "Body Fat",
-                                          hintStyle: TextStyle(color: primaryGray),
-                                        ),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Container(
-                              width: 50,
-                              height: 50,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
-                                ),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Text(
-                                "%",
-                                style: TextStyle(color: Colors.white, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: MediaQuery.of(context).size.width * 0.07),
-
-                        // Next Button
-                        Container(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: submitScaleData,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryOrange,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                            ),
-                            child: Text(
-                              "Next",
-                              style: TextStyle(color: Colors.white, fontSize: 16),
-                            ),
-                          ),
-                        ),
-                      ],
+                  SizedBox(width: 10),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "MINS",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25.0),
+      ],
+    );
+  }
+  
+  Widget _buildHighIntensityQuestions(Size media) {
+    return Column(
+      key: ValueKey<String>('high_intensity_questions'),
+      children: [
+        Container(
+          padding: EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: primaryOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(15),
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SizedBox(height: 100),
-              Image.asset(
-                'assets/xiaomi_logo.png',
-                height: media.width * 0.3,
-              ),
-              SizedBox(height: 30),
               Text(
-                "Connect Xiaomi Scale",
+                "High Intensity Cycling",
                 style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 24,
+                  fontFamily: "Fredoka-SemiBold",
+                  fontSize: 25,
+                  color: primaryOrange,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 20),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Text(
-                  "Connect your Xiaomi Smart Scale to automatically sync your body metrics",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: primaryGray,
-                    fontSize: 16,
-                  ),
+              SizedBox(height: 5),
+              Text(
+                "Focus on calorie burning and weight loss through intense cycling sessions",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 14,
+                  color: primaryGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        
+        // Current Measurements Section
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Current Measurements",
+                style: TextStyle(
+                  fontFamily: "Fredoka-SemiBold",
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: primaryBlack,
                 ),
               ),
-              SizedBox(height: 40),
-              Container(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Implement Xiaomi scale connection logic here
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
+              SizedBox(height: 15),
+              
+              // Weight
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            padding: EdgeInsets.all(15),
+                            child: Image.asset(
+                              "assets/weight.png",
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: weightController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Weight",
+                                hintStyle: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryGray
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                color: Colors.black
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
                       borderRadius: BorderRadius.circular(15),
                     ),
-                  ),
-                  child: Text(
-                    "Connect Scale",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    child: Text(
+                      "KG",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
                     ),
                   ),
+                ],
+              ),
+              SizedBox(height: 15),
+
+              // Body Water
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            padding: EdgeInsets.all(15),
+                            child: Image.asset(
+                              "assets/water.png",
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: bodyWaterController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Body Water",
+                                hintStyle: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryGray
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                color: Colors.black
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "%",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 15),
+
+              // Body Fat
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            padding: EdgeInsets.all(15),
+                            child: Image.asset(
+                              "assets/fat.png",
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: bodyFatController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Body Fat",
+                                hintStyle: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryGray
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                color: Colors.black
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "%",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        
+        // Target Weight
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "What is your target weight?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
                 ),
               ),
-              SizedBox(height: 20),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showManualInput = true;
-                  });
-                },
-                child: Text(
-                  "Don't have this device? Try manual input",
-                  style: TextStyle(
-                    color: primaryOrange,
-                    fontSize: 16,
-                    decoration: TextDecoration.underline,
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: targetWeightController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Enter target weight",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      ),
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryBlack,
+                      ),
+                    ),
                   ),
+                  SizedBox(width: 10),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "KG",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        
+        // Days per week
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How many days per week do you plan to cycle?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: daysPerWeekController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Enter a number between 1-7",
+                  hintStyle: TextStyle(
+                    fontFamily: "Inter",
+                    color: primaryGray,
+                    fontSize: 14
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                ),
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  color: primaryBlack,
                 ),
               ),
             ],
           ),
         ),
-      ),
+        SizedBox(height: 15),
+        
+        // Session duration
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How long will each cycling session last?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: sessionDurationController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Enter duration",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      ),
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryBlack,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "MINS",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildEnduranceQuestions(Size media) {
+    return Column(
+      key: ValueKey<String>('endurance_questions'),
+      children: [
+        Container(
+          padding: EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: primaryOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            children: [
+              Text(
+                "Endurance Cycling",
+                style: TextStyle(
+                  fontFamily: "Fredoka-SemiBold",
+                  fontSize: 25,
+                  color: primaryOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 5),
+              Text(
+                "Build stamina and endurance for longer rides and cycling events",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 14,
+                  color: primaryGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        
+        // Target distance
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "What is your target cycling distance per session?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: targetDistanceController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Enter distance",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      ),
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryBlack,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "KM",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        
+        // Target duration
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How long do you aim to cycle per session?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: targetDurationController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Enter time",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      ),
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: primaryBlack,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      "MINS",
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.white, 
+                        fontSize: 12
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -982,8 +2066,8 @@ if (_showManualInput) {
   Widget build(BuildContext context) {
     final pages = [
       buildStravaAuthPage(),
-      buildXiaomiScalePage(),
       buildDataEntryPage(),
+      buildGoalsPage(),
       buildWelcomePage(),
     ];
 

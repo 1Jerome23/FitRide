@@ -81,6 +81,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _animationController.forward();
     fetchWeatherData();
     _getUserName();
+    _loadRecentActivities();
   }
 
   @override
@@ -186,6 +187,82 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     } catch (e) {
       print('Error fetching air quality: $e');
+    }
+  }
+
+  List<Map<String, dynamic>> _recentActivities = [];
+  bool _loadingActivities = false;
+
+  Future<void> _loadRecentActivities() async {
+    setState(() {
+      _loadingActivities = true;
+    });
+    
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        final athleteQuerySnapshot = await FirebaseFirestore.instance
+            .collection('athletes')
+            .where('app_id', isEqualTo: uid)
+            .limit(1)
+            .get();
+        
+        if (athleteQuerySnapshot.docs.isNotEmpty) {
+          final athleteDoc = athleteQuerySnapshot.docs.first;
+          final athleteId = athleteDoc.id;
+          
+          final userIdNumber = int.tryParse(athleteId);
+          
+          if (userIdNumber != null) {
+            final activitiesSnapshot = await FirebaseFirestore.instance
+                .collection('activities')
+                .where('user_id', isEqualTo: userIdNumber)
+                .limit(10)
+                .get();
+            
+            List<Map<String, dynamic>> activities = [];
+            for (var doc in activitiesSnapshot.docs) {
+              activities.add(doc.data() as Map<String, dynamic>);
+            }
+            
+            activities.sort((a, b) {
+              var aDate = a['start_date'];
+              var bDate = b['start_date'];
+              if (aDate == null || bDate == null) return 0;
+              if (aDate is Timestamp && bDate is Timestamp) {
+                return bDate.compareTo(aDate); 
+              }
+              return bDate.toString().compareTo(aDate.toString());
+            });
+            
+            if (activities.length > 3) {
+              activities = activities.sublist(0, 3);
+            }
+            
+            setState(() {
+              _recentActivities = activities;
+              _loadingActivities = false;
+            });
+          } else {
+            setState(() {
+              _loadingActivities = false;
+            });
+          }
+        } else {
+          setState(() {
+            _loadingActivities = false;
+          });
+        }
+      } catch (e) {
+        print('Error loading recent activities: $e');
+        setState(() {
+          _loadingActivities = false;
+        });
+      }
+    } else {
+      setState(() {
+        _loadingActivities = false;
+      });
     }
   }
 
@@ -715,25 +792,64 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     ],
                   ),
-                  child: ListView.separated(
-                    physics: NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    itemCount: 1, // Placeholder for one item, adjust when there's real data
-                    separatorBuilder: (context, index) => Divider(
-                      height: 1,
-                      color: Colors.grey[200],
-                    ),
-                    itemBuilder: (context, index) {
-                      // Placeholder for activity items
-                      return _buildActivityItem(
-                        "No recent activity",
-                        "Record your first ride to see it here!",
-                        "00:00",
-                        Icons.directions_bike_outlined,
-                      );
-                    },
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 900.ms).slideY(begin: 0.1, end: 0),
+                  child: _loadingActivities
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: CircularProgressIndicator(
+                              color: Color(0xffFFA500),
+                            ),
+                          ),
+                        )
+                      : _recentActivities.isEmpty
+                          ? ListView.builder(
+                              physics: NeverScrollableScrollPhysics(),
+                              shrinkWrap: true,
+                              itemCount: 1,
+                              itemBuilder: (context, index) {
+                                return _buildActivityItem(
+                                  "No recent activity",
+                                  "Record your first ride to see it here!",
+                                  "00:00",
+                                  Icons.directions_bike_outlined,
+                                );
+                              },
+                            )
+                          : ListView.separated(
+                              physics: NeverScrollableScrollPhysics(),
+                              shrinkWrap: true,
+                              itemCount: _recentActivities.length,
+                              separatorBuilder: (context, index) => Divider(
+                                height: 1,
+                                color: Colors.grey[200],
+                              ),
+                              itemBuilder: (context, index) {
+                                final activity = _recentActivities[index];
+                              
+                                final name = activity['name'] ?? 'Cycling Activity';
+                                final type = activity['type'] ?? 'Ride';
+                                
+                                String distanceStr = '0 km';
+                                if (activity['distance'] != null) {
+                                  try {
+                                    final distance = double.tryParse(activity['distance'].toString()) ?? 0.0;
+                                    
+                                    distanceStr = '${distance.toStringAsFixed(1)} km';
+                                  } catch (e) {
+                                    print('Error parsing distance: $e');
+                                    distanceStr = '0 km';
+                                  }
+                                }
+                                
+                                return _buildActivityItem(
+                                  name,
+                                  type,
+                                  distanceStr,
+                                  Icons.directions_bike_outlined,
+                                );
+                              },
+                            ),
+                ),
                 SizedBox(height: 20),
               ],
             ),
