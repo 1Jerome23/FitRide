@@ -1,4 +1,3 @@
-import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
@@ -9,15 +8,22 @@ import 'package:fitride/pages/recent_activity.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'login_register.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 import 'recommendation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:intl/intl.dart';
 
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
 }
+class ActivityData {
+  final String month;
+  final double distance; 
 
+  ActivityData(this.month, this.distance);
+}
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   double? temperature;
@@ -32,6 +38,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   String? userId = FirebaseAuth.instance.currentUser?.uid;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  String? _stravaUserId;
+
 
   void _onItemTapped(int index) {
     setState(() {
@@ -89,7 +97,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _animationController.dispose();
     super.dispose();
   }
-
+  Future<void> _loadStravaUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _stravaUserId = prefs.getString('stravaUserId');
+    });
+  }
   Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? fetchedUserName = prefs.getString('userName');
@@ -110,85 +123,108 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Future<void> fetchWeatherData() async {
-    Position position;
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        print("Location services are disabled.");
-        return;
-      }
+Future<void> fetchWeatherData() async {
+  geo.Position? position;
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.deniedForever) {
-        print("Location permission is denied permanently.");
-        return;
-      }
-
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        print("Location permission is denied.");
-        return;
-      }
-      position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-    } catch (e) {
-      print('Error fetching location: $e');
+  try {
+    // Ensure location services are enabled
+    bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint("Location services are disabled.");
       return;
     }
 
-    final latitude = position.latitude;
-    final longitude = position.longitude;
-
-    try {
-      final weatherResponse = await http.get(Uri.parse(
-          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
-
-      if (weatherResponse.statusCode == 200) {
-        final data = json.decode(weatherResponse.body);
-        final currentWeather = data['current_weather'];
-        final hourly = data['hourly'];
-
-        setState(() {
-          temperature = (currentWeather['temperature'] as num).toDouble();
-          humidity = (hourly['relative_humidity_2m'] != null &&
-                  hourly['relative_humidity_2m'].isNotEmpty)
-              ? (hourly['relative_humidity_2m'][0] as num).toDouble()
-              : 0.0;
-
-          weatherImage =
-              _getWeatherImage(currentWeather['weathercode'].toString());
-        });
-      } else {
-        print('Failed to fetch temperature and humidity.');
+    // Check & request permission
+    geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+    if (permission == geo.LocationPermission.deniedForever) {
+      debugPrint("Location permission is denied permanently.");
+      return;
+    }
+    if (permission == geo.LocationPermission.denied) {
+      permission = await geo.Geolocator.requestPermission();
+      if (permission == geo.LocationPermission.denied) {
+        debugPrint("Location permission is denied.");
+        return;
       }
-    } catch (e) {
-      print('Error fetching temperature and humidity: $e');
     }
 
-    try {
-      final airQualityResponse = await http.get(Uri.parse(
-          'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
+    // Get current position using geo.geolocation
+    position = await geo.Geolocator.getCurrentPosition(
+        desiredAccuracy: geo.LocationAccuracy.high);
+  } catch (e) {
+    debugPrint('Error fetching location: $e');
+    return;
+  }
 
-      if (airQualityResponse.statusCode == 200) {
-        final data = json.decode(airQualityResponse.body);
-        final hourlyData = data['hourly'];
+  final latitude = position.latitude;
+  final longitude = position.longitude;
 
+  try {
+    // Fetch weather data
+    final weatherResponse = await http.get(Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
+
+    if (weatherResponse.statusCode == 200) {
+      final data = json.decode(weatherResponse.body);
+      final currentWeather = data['current_weather'];
+      final hourly = data['hourly'];
+
+      if (currentWeather == null || hourly == null) {
+        debugPrint("Weather API response is missing expected data.");
+        return;
+      }
+
+      final weatherTemp = currentWeather['temperature'];
+      final weatherHumidity = hourly['relative_humidity_2m'] != null &&
+              hourly['relative_humidity_2m'].isNotEmpty
+          ? (hourly['relative_humidity_2m'][0] as num).toDouble()
+          : 0.0;
+
+      if (mounted) {
         setState(() {
-          pm2_5 =
-              (hourlyData['pm2_5'] != null && hourlyData['pm2_5'].isNotEmpty)
-                  ? (hourlyData['pm2_5'][0] as num).toDouble()
-                  : 0.0;
+          temperature = (weatherTemp as num).toDouble();
+          humidity = weatherHumidity;
+          weatherImage = _getWeatherImage(currentWeather['weathercode'].toString());
+        });
+      }
+    } else {
+      debugPrint('Failed to fetch temperature and humidity.');
+    }
+  } catch (e) {
+    debugPrint('Error fetching temperature and humidity: $e');
+  }
 
+  try {
+    // Fetch air quality data
+    final airQualityResponse = await http.get(Uri.parse(
+        'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
+
+    if (airQualityResponse.statusCode == 200) {
+      final data = json.decode(airQualityResponse.body);
+      final hourlyData = data['hourly'];
+
+      if (hourlyData == null || !hourlyData.containsKey('pm2_5')) {
+        debugPrint("Air Quality API response is missing expected data.");
+        return;
+      }
+
+      final airQualityPM25 = List<dynamic>.from(hourlyData['pm2_5']);
+      final pmValue = airQualityPM25.isNotEmpty ? (airQualityPM25[0] as num).toDouble() : 0.0;
+
+      if (mounted) {
+        setState(() {
+          pm2_5 = pmValue;
           airQualityStatus = _evaluateAirQuality(pm2_5);
         });
-      } else {
-        print('Failed to fetch air quality.');
       }
-    } catch (e) {
-      print('Error fetching air quality: $e');
+    } else {
+      debugPrint('Failed to fetch air quality.');
     }
+  } catch (e) {
+    debugPrint('Error fetching air quality: $e');
   }
+}
+
 
   List<Map<String, dynamic>> _recentActivities = [];
   bool _loadingActivities = false;
@@ -301,128 +337,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       default:
         return Colors.grey;
     }
-  }
-
-  void _recordWeather() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            "Record the Weather",
-            style: TextStyle(
-              fontFamily: 'Fredoka-SemiBold',
-              color: Color(0xffFFA500),
-            ),
-          ),
-          content: Text(
-            "Record the weather to get accurate information tailored for you!\nOnly record when you're going to cycle.",
-            style: TextStyle(color: Colors.black, fontFamily: "Inter"),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                "Cancel",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                if (temperature != null && humidity != null && pm2_5 != null) {
-                  String? userId = FirebaseAuth.instance.currentUser?.uid;
-
-                  if (userId != null) {
-                    Map<String, dynamic> weatherData = {
-                      'temperature': temperature,
-                      'humidity': humidity,
-                      'pm2_5': pm2_5,
-                      'airQualityStatus': airQualityStatus,
-                      'timestamp': FieldValue.serverTimestamp(),
-                      'userId': userId,
-                    };
-
-                    FirebaseFirestore.instance
-                        .collection('weatherData')
-                        .add(weatherData)
-                        .then((value) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Weather recorded successfully!"),
-                          backgroundColor: Color(0xffFFA500),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    }).catchError((error) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Failed to record weather: $error"),
-                          backgroundColor: Colors.red,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    });
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("User is not logged in."),
-                        backgroundColor: Colors.red,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    );
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Failed to fetch weather data."),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xffFFA500),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                "Record",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -594,140 +508,140 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   .slideY(begin: 0.1, end: 0)
                   .shimmer(delay: 1000.ms, duration: 1800.ms),
                 
-                SizedBox(height: 30),
-
-                
-                Text(
-                  "Your Data",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: Colors.black,
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
-                SizedBox(height: 15),
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('User Questionnaires')
-                        .doc(userId)
-                        .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xffFFA500),
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            "Error fetching data",
-                            style: TextStyle(color: Colors.red, fontFamily: "Inter"),
-                          ),
-                        );
-                      }
-
-                      if (!snapshot.hasData || !snapshot.data!.exists) {
-                        return Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.orange,
-                                size: 40,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                "No data available",
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
-                                  fontFamily: "Inter",
+                  SizedBox(height: 30),
+                  Text(
+                    "Your Activity Progress",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
+                  SizedBox(height: 15),
+                  Container(
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.15),
+                          spreadRadius: 4,
+                          blurRadius: 12,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: FutureBuilder<QuerySnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('activities')
+                          .where('user_id', isEqualTo: int.parse(_stravaUserId.toString()))
+                          .orderBy('start_date', descending: false)
+                          .get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xffFFA500),
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          print("Firestore Error: ${snapshot.error}");
+                          return Center(
+                            child: Text(
+                              "Error fetching data",
+                              style: TextStyle(color: Colors.red, fontFamily: "Inter"),
+                            ),
+                          );
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          print("No activities found for user: $_stravaUserId");
+                          return Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Colors.orange,
+                                  size: 50,
                                 ),
-                              ),
-                              SizedBox(height: 10),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => FitRidePage()),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xffFFA500),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                SizedBox(height: 10),
+                                Text(
+                                  "No activity data available",
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 18,
+                                    fontFamily: "Inter",
                                   ),
                                 ),
-                                child: Text(
-                                  "Add Your Data",
-                                  style: TextStyle(color: Colors.white, fontFamily: "Inter"),
-                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // Parse Firestore data into chart points
+                        List<ActivityData> activityData = [];
+                        for (var doc in snapshot.data!.docs) {
+                          var data = doc.data() as Map<String, dynamic>;
+                          double distance = double.tryParse(data['distance'].toString()) ?? 0.0;
+                          Timestamp? timestamp = data['start_date'];
+                          DateTime date = timestamp?.toDate() ?? DateTime.now();
+
+                          activityData.add(
+                            ActivityData(
+                              DateFormat('MMM').format(date),
+                              distance,
+                            ),
+                          );
+                        }
+
+                        return SizedBox(
+                          width: double.infinity,
+                          height: 300, // Increased height for better visibility
+                          child: SfCartesianChart(
+                            primaryXAxis: CategoryAxis(
+                              title: AxisTitle(
+                                text: 'Month',
+                                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              labelStyle: TextStyle(fontSize: 14),
+                            ),
+                            primaryYAxis: NumericAxis(
+                              title: AxisTitle(
+                                text: 'Distance (km)',
+                                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              labelFormat: '{value} km',
+                              labelStyle: TextStyle(fontSize: 14),
+                            ),
+                            title: ChartTitle(
+                              text: 'Monthly Distance Traveled',
+                              textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            legend: Legend(
+                              isVisible: true,
+                              position: LegendPosition.bottom,
+                              textStyle: TextStyle(fontSize: 14),
+                            ),
+                            tooltipBehavior: TooltipBehavior(enable: true),
+                            series: [
+                              LineSeries<ActivityData, String>(
+                                name: 'Distance',
+                                dataSource: activityData,
+                                xValueMapper: (ActivityData data, _) => data.month,
+                                yValueMapper: (ActivityData data, _) => data.distance,
+                                dataLabelSettings: DataLabelSettings(isVisible: true, textStyle: TextStyle(fontSize: 14)),
+                                markerSettings: MarkerSettings(isVisible: true, height: 8, width: 8),
+                                width: 4, // Thicker line for better visibility
+                                color: Color(0xffFFA500),
                               ),
                             ],
                           ),
-                        );
-                      }
-
-                      var data = snapshot.data!.data() as Map<String, dynamic>;
-                      double weight =
-                          double.tryParse(data['weight'].toString()) ?? 0.0;
-                      double height =
-                          double.tryParse(data['height'].toString()) ?? 0.0;
-
-                      
-                      double bmi = (weight /
-                          ((height / 100) *
-                              (height / 100))); 
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatCard(
-                            "BMI",
-                            bmi.toStringAsFixed(1),
-                            "assets/bmi_icon.png", 
-                            _getBmiColor(bmi),
-                            _getBmiCategory(bmi),
-                          ),
-                          _buildStatCard(
-                            "Weight",
-                            "${weight.toStringAsFixed(1)} kg",
-                            "assets/weight_icon.png", 
-                            Color(0xFF2E86C1),
-                            null,
-                          ),
-                          _buildStatCard(
-                            "Height",
-                            "${height.toStringAsFixed(1)} cm",
-                            "assets/height_icon.png", 
-                            Color(0xFF16A085),
-                            null,
-                          ),
-                        ],
-                      ).animate().fadeIn(duration: 800.ms, delay: 700.ms);
-                    },
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
-
+                        ).animate().fadeIn(duration: 800.ms, delay: 700.ms);
+                      },
+                    ),
+                  ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
                 SizedBox(height: 30),
 
                 Row(
@@ -968,82 +882,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     ],
   );
 }
-
-  Color _getBmiColor(double bmi) {
-    if (bmi < 18.5) return Colors.blue;
-    if (bmi < 25) return Colors.green;
-    if (bmi < 30) return Colors.orange;
-    return Colors.red;
-  }
-
-  String? _getBmiCategory(double bmi) {
-    if (bmi < 18.5) return "Underweight";
-    if (bmi < 25) return "Normal";
-    if (bmi < 30) return "Overweight";
-    return "Obese";
-  }
-
-  Widget _buildStatCard(String title, String value, String iconAsset, Color iconColor, String? subtitle) {
-    return Container(
-      padding: EdgeInsets.all(10),
-      width: 100,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Image.asset(
-              iconAsset,
-              width: 24,
-              height: 24,
-              color: iconColor,
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Fredoka-SemiBold',
-              fontSize: 20,
-              color: Colors.black,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontFamily: "Inter",
-            ),
-          ),
-          if (subtitle != null) ...[
-            SizedBox(height: 4),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: iconColor,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildActivityItem(String title, String subtitle, String time, IconData icon) {
     return ListTile(
