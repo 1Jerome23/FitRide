@@ -14,14 +14,27 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
   String recommendation = "Loading...";
   String feedback = "";
   bool showAllLogs = false;
+  String goalType = "-";
+  String currentLevel = "-";
+  String weight = "-";
+  String bodyFat = "-";
+  String bodyWater = "-";
+  String hydration = "-";
+  String levelOfExertion = "-";
+  String averageHeartrate = "-";
   String averageSpeed = "-";
   String caloriesBurned = "-";
   String distance = "-";
-  String hydration = "-";
-  String foodTaken = "-";
-  String weightTraining = "-";
+  String sessionDuration = "-";
+  String daysPerWeek = "-";
+  String targetDistance = "-";
+  String targetWeight = "-";
 
-  // Add these variables at the class level
+  // Variables for comparison
+  double latestWeight = 0.0;
+  double previousWeight = 0.0;
+  double latestBodyFat = 0.0;
+  double previousBodyFat = 0.0;
   double latestDistance = 0.0;
   double previousDistance = 0.0;
   double latestHydration = 0.0;
@@ -30,6 +43,8 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
   double previousCaloriesBurned = 0.0;
   double latestAverageSpeed = 0.0;
   double previousAverageSpeed = 0.0;
+  double latestAverageHeartrate = 0.0;
+  double previousAverageHeartrate = 0.0;
 
   @override
   void initState() {
@@ -41,9 +56,9 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
     if (userId == null) return;
 
     try {
-      // Fetch data from User Questionnaire collection
-      DocumentSnapshot userQuestionnaireDoc = await FirebaseFirestore.instance
-          .collection('User Questionnaire')
+      // Fetch data from goals collection
+      DocumentSnapshot goalsDoc = await FirebaseFirestore.instance
+          .collection('goals')
           .doc(userId)
           .get();
 
@@ -65,6 +80,20 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
           .limit(10) // Limit to 10 entries
           .get();
 
+      if (goalsDoc.exists) {
+        setState(() {
+          goalType = goalsDoc['goalType'] ?? "-";
+          currentLevel = goalsDoc['currentLevel'] ?? "-";
+          weight = goalsDoc['weight']?.toString() ?? "-";
+          bodyFat = goalsDoc['bodyFat']?.toString() ?? "-";
+          bodyWater = goalsDoc['bodyWater']?.toString() ?? "-";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "-";
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "-";
+          targetDistance = goalsDoc['targetDistance']?.toString() ?? "-";
+          targetWeight = goalsDoc['targetWeight']?.toString() ?? "-";
+        });
+      }
+
       if (afterExerciseSnapshot.docs.isNotEmpty ||
           activitiesSnapshot.docs.isNotEmpty) {
         setState(() {
@@ -81,12 +110,12 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
           var latestActivity =
               activitiesSnapshot.docs.first.data() as Map<String, dynamic>;
           setState(() {
+            averageHeartrate =
+                latestActivity['average_heartrate']?.toString() ?? "-";
             averageSpeed = latestActivity['average_speed']?.toString() ?? "-";
             caloriesBurned =
                 latestActivity['calories_burned']?.toString() ?? "-";
             distance = latestActivity['distance']?.toString() ?? "-";
-            weightTraining =
-                latestActivity['WeightTraining']?.toString() ?? "-";
           });
         }
 
@@ -94,8 +123,9 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
           var latestExercise =
               afterExerciseSnapshot.docs.first.data() as Map<String, dynamic>;
           setState(() {
-            hydration = latestExercise['hydration']?.toString() ?? "-";
-            foodTaken = latestExercise['foodTaken']?.toString() ?? "-";
+            hydration = latestExercise['Hydration']?.toString() ?? "-";
+            levelOfExertion =
+                latestExercise['levelOfExertion']?.toString() ?? "-";
           });
         }
 
@@ -136,15 +166,25 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
 
     // Update class-level variables
     setState(() {
+      latestWeight =
+          double.tryParse(latestData['weight']?.toString() ?? "0.0") ?? 0.0;
+      previousWeight =
+          double.tryParse(previousData['weight']?.toString() ?? "0.0") ?? 0.0;
+
+      latestBodyFat =
+          double.tryParse(latestData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
+      previousBodyFat =
+          double.tryParse(previousData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
+
       latestDistance =
           double.tryParse(latestData['distance']?.toString() ?? "0.0") ?? 0.0;
       previousDistance =
           double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0;
 
       latestHydration =
-          double.tryParse(latestData['hydration']?.toString() ?? "0.0") ?? 0.0;
+          double.tryParse(latestData['Hydration']?.toString() ?? "0.0") ?? 0.0;
       previousHydration =
-          double.tryParse(previousData['hydration']?.toString() ?? "0.0") ??
+          double.tryParse(previousData['Hydration']?.toString() ?? "0.0") ??
               0.0;
 
       latestCaloriesBurned =
@@ -160,42 +200,125 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
       previousAverageSpeed =
           double.tryParse(previousData['average_speed']?.toString() ?? "0.0") ??
               0.0;
+
+      latestAverageHeartrate = double.tryParse(
+              latestData['average_heartrate']?.toString() ?? "0.0") ??
+          0.0;
+      previousAverageHeartrate = double.tryParse(
+              previousData['average_heartrate']?.toString() ?? "0.0") ??
+          0.0;
     });
 
-    // Compare historical data and generate recommendations
-    String recommendationMessage = "";
-    String feedbackMessage = "";
-
-    if (latestDistance < previousDistance &&
-        latestHydration < previousHydration) {
-      recommendationMessage = "⚠️ Warning";
-      feedbackMessage =
-          "Your distance and hydration have decreased. Try drinking more water and increasing your workout intensity!";
-    } else if (latestDistance < previousDistance) {
-      recommendationMessage = "⚠️ Warning";
-      feedbackMessage =
-          "Your distance has decreased. Consider pushing yourself a bit more next time!";
-    } else if (latestHydration < previousHydration) {
-      recommendationMessage = "⚠️ Warning";
-      feedbackMessage =
-          "Your hydration has decreased. Make sure to drink enough water before and after your workout!";
-    } else if (latestCaloriesBurned < previousCaloriesBurned) {
-      recommendationMessage = "⚠️ Warning";
-      feedbackMessage =
-          "You burned fewer calories this time. Try increasing the duration or intensity of your workout!";
-    } else if (latestAverageSpeed < previousAverageSpeed) {
-      recommendationMessage = "⚠️ Warning";
-      feedbackMessage =
-          "Your average speed has decreased. Focus on maintaining a consistent pace!";
-    } else {
-      recommendationMessage = "✅ Good";
-      feedbackMessage = "You're making progress! Keep up the good work!";
+    // Generate recommendations based on goal type
+    switch (goalType) {
+      case "Leisure":
+        _generateLeisureRecommendations();
+        break;
+      case "Weight Management":
+        _generateWeightManagementRecommendations();
+        break;
+      case "Cycling Endurance":
+        _generateCyclingEnduranceRecommendations();
+        break;
+      default:
+        setState(() {
+          recommendation = "No goal type selected.";
+          feedback = "Please set a goal in the app.";
+        });
     }
+  }
 
-    setState(() {
-      recommendation = recommendationMessage;
-      feedback = feedbackMessage;
-    });
+  void _generateLeisureRecommendations() {
+    if (latestAverageHeartrate > previousAverageHeartrate &&
+        double.parse(levelOfExertion) > 5) {
+      setState(() {
+        recommendation = "⚠️ Warning";
+        feedback =
+            "Your effort today was higher than usual for a recovery ride. Try slowing down your pace next time to stay in a relaxed zone.";
+      });
+    } else if (latestAverageHeartrate <= previousAverageHeartrate &&
+        double.parse(levelOfExertion) <= 5) {
+      setState(() {
+        recommendation = "✅ Good";
+        feedback =
+            "Great job keeping your session light! Your recovery rides are staying within the ideal range.";
+      });
+    } else {
+      setState(() {
+        recommendation = "No clear trend detected.";
+        feedback = "Ensure consistent tracking for better insights.";
+      });
+    }
+  }
+
+  void _generateWeightManagementRecommendations() {
+    if (latestWeight < previousWeight && latestBodyFat < previousBodyFat) {
+      setState(() {
+        recommendation = "✅ Good";
+        feedback =
+            "Great job! You're losing both weight and body fat. Keep up the consistency with your cycling sessions and nutrition.";
+      });
+    } else if (latestWeight < previousWeight &&
+        latestBodyFat >= previousBodyFat) {
+      setState(() {
+        recommendation = "⚠️ Warning";
+        feedback =
+            "You're losing weight, but your body fat % isn’t dropping. Consider adding some strength training such as inclined cycling.";
+      });
+    } else if (latestWeight > previousWeight &&
+        latestBodyFat < previousBodyFat) {
+      setState(() {
+        recommendation = "✅ Good";
+        feedback =
+            "You're building muscle while burning fat! This is a great sign of improved fitness.";
+      });
+    } else if (latestWeight == previousWeight &&
+        latestBodyFat < previousBodyFat) {
+      setState(() {
+        recommendation = "✅ Good";
+        feedback =
+            "Your body fat % is going down while maintaining weight—this suggests you're replacing fat with muscle. Keep going!";
+      });
+    } else if (latestWeight == previousWeight &&
+        latestBodyFat > previousBodyFat) {
+      setState(() {
+        recommendation = "⚠️ Warning";
+        feedback =
+            "Your weight is stable, but body fat % is rising. Review your nutrition—ensure you're burning more than you consume.";
+      });
+    } else {
+      setState(() {
+        recommendation = "No clear trend detected.";
+        feedback = "Ensure consistent tracking for better insights.";
+      });
+    }
+  }
+
+  void _generateCyclingEnduranceRecommendations() {
+    if (latestDistance > previousDistance) {
+      setState(() {
+        recommendation = "✅ Good";
+        feedback =
+            "Impressive ride today! Your endurance is improving—keep building on this momentum.";
+      });
+    } else if (latestAverageSpeed < previousAverageSpeed) {
+      setState(() {
+        recommendation = "⚠️ Warning";
+        feedback =
+            "Your pace was lower today. Try to maintain a steady rhythm to improve endurance.";
+      });
+    } else if (latestAverageHeartrate > previousAverageHeartrate) {
+      setState(() {
+        recommendation = "⚠️ Warning";
+        feedback =
+            "Your heart rate was higher than usual. Ensure you’re pacing yourself to sustain longer rides.";
+      });
+    } else {
+      setState(() {
+        recommendation = "No clear trend detected.";
+        feedback = "Ensure consistent tracking for better insights.";
+      });
+    }
   }
 
   @override
@@ -244,14 +367,12 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Recommendation: $recommendation",
-                    style: GoogleFonts.lato(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _getRecommendationColor(recommendation),
-                    ),
-                  ),
+                  Text("Recommendation: $recommendation",
+                      style: GoogleFonts.lato(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _getRecommendationColor(recommendation),
+                      )),
                   SizedBox(height: 12),
                   Text(
                     feedback,
@@ -288,40 +409,69 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (latestDistance < previousDistance &&
-                      latestHydration < previousHydration)
-                    _buildGoalRecommendation(
-                      "⚠️ Warning",
-                      "Your distance and hydration have decreased. Try drinking more water and increasing your workout intensity!",
-                    ),
-                  if (latestDistance < previousDistance)
-                    _buildGoalRecommendation(
-                      "⚠️ Warning",
-                      "Your distance has decreased. Consider pushing yourself a bit more next time!",
-                    ),
-                  if (latestHydration < previousHydration)
-                    _buildGoalRecommendation(
-                      "⚠️ Warning",
-                      "Your hydration has decreased. Make sure to drink enough water before and after your workout!",
-                    ),
-                  if (latestCaloriesBurned < previousCaloriesBurned)
-                    _buildGoalRecommendation(
-                      "⚠️ Warning",
-                      "You burned fewer calories this time. Try increasing the duration or intensity of your workout!",
-                    ),
-                  if (latestAverageSpeed < previousAverageSpeed)
-                    _buildGoalRecommendation(
-                      "⚠️ Warning",
-                      "Your average speed has decreased. Focus on maintaining a consistent pace!",
-                    ),
-                  if (latestDistance >= previousDistance &&
-                      latestHydration >= previousHydration &&
-                      latestCaloriesBurned >= previousCaloriesBurned &&
-                      latestAverageSpeed >= previousAverageSpeed)
-                    _buildGoalRecommendation(
-                      "✅ Good",
-                      "You're making progress! Keep up the good work!",
-                    ),
+                  if (goalType == "Leisure") ...[
+                    if (latestAverageHeartrate > previousAverageHeartrate &&
+                        double.parse(levelOfExertion) > 5)
+                      _buildGoalRecommendation(
+                        "⚠️ Warning",
+                        "Your effort today was higher than usual for a recovery ride. Try slowing down your pace next time to stay in a relaxed zone.",
+                      ),
+                    if (latestAverageHeartrate <= previousAverageHeartrate &&
+                        double.parse(levelOfExertion) <= 5)
+                      _buildGoalRecommendation(
+                        "✅ Good",
+                        "Great job keeping your session light! Your recovery rides are staying within the ideal range.",
+                      ),
+                  ],
+                  if (goalType == "Weight Management") ...[
+                    if (latestWeight < previousWeight &&
+                        latestBodyFat < previousBodyFat)
+                      _buildGoalRecommendation(
+                        "✅ Good",
+                        "Great job! You're losing both weight and body fat. Keep up the consistency with your cycling sessions and nutrition.",
+                      ),
+                    if (latestWeight < previousWeight &&
+                        latestBodyFat >= previousBodyFat)
+                      _buildGoalRecommendation(
+                        "⚠️ Warning",
+                        "You're losing weight, but your body fat % isn’t dropping. Consider adding some strength training such as inclined cycling.",
+                      ),
+                    if (latestWeight > previousWeight &&
+                        latestBodyFat < previousBodyFat)
+                      _buildGoalRecommendation(
+                        "✅ Good",
+                        "You're building muscle while burning fat! This is a great sign of improved fitness.",
+                      ),
+                    if (latestWeight == previousWeight &&
+                        latestBodyFat < previousBodyFat)
+                      _buildGoalRecommendation(
+                        "✅ Good",
+                        "Your body fat % is going down while maintaining weight—this suggests you're replacing fat with muscle. Keep going!",
+                      ),
+                    if (latestWeight == previousWeight &&
+                        latestBodyFat > previousBodyFat)
+                      _buildGoalRecommendation(
+                        "⚠️ Warning",
+                        "Your weight is stable, but body fat % is rising. Review your nutrition—ensure you're burning more than you consume.",
+                      ),
+                  ],
+                  if (goalType == "Cycling Endurance") ...[
+                    if (latestDistance > previousDistance)
+                      _buildGoalRecommendation(
+                        "✅ Good",
+                        "Impressive ride today! Your endurance is improving—keep building on this momentum.",
+                      ),
+                    if (latestAverageSpeed < previousAverageSpeed)
+                      _buildGoalRecommendation(
+                        "⚠️ Warning",
+                        "Your pace was lower today. Try to maintain a steady rhythm to improve endurance.",
+                      ),
+                    if (latestAverageHeartrate > previousAverageHeartrate)
+                      _buildGoalRecommendation(
+                        "⚠️ Warning",
+                        "Your heart rate was higher than usual. Ensure you’re pacing yourself to sustain longer rides.",
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -379,21 +529,21 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (data['exertion_level'] != null)
+                        if (data['levelOfExertion'] != null)
                           Text(
-                            "Exertion Level: ${data['exertion_level'].toString()}/10",
+                            "Level of Exertion: ${data['levelOfExertion'].toString()}/10",
                             style: GoogleFonts.lato(
                                 fontSize: 16, color: Colors.black),
                           ),
-                        if (data['sleep'] != null)
+                        if (data['Hydration'] != null)
                           Text(
-                            "Sleep: ${data['sleep'].toString()} hours",
+                            "Hydration: ${data['Hydration'].toString()} liters",
                             style: GoogleFonts.lato(
                                 fontSize: 16, color: Colors.black),
                           ),
-                        if (data['water'] != null)
+                        if (data['average_heartrate'] != null)
                           Text(
-                            "Water: ${data['water'].toString()} liters",
+                            "Average Heartrate: ${data['average_heartrate'].toString()} bpm",
                             style: GoogleFonts.lato(
                                 fontSize: 16, color: Colors.black),
                           ),
@@ -412,12 +562,6 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                         if (data['distance'] != null)
                           Text(
                             "Distance: ${data['distance'].toString()} km",
-                            style: GoogleFonts.lato(
-                                fontSize: 16, color: Colors.black),
-                          ),
-                        if (data['WeightTraining'] != null)
-                          Text(
-                            "Weight Training: ${data['WeightTraining'].toString()}",
                             style: GoogleFonts.lato(
                                 fontSize: 16, color: Colors.black),
                           ),
