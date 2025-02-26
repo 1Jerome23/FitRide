@@ -57,58 +57,71 @@ class _StravaWebViewState extends State<StravaWebView> {
   String userAgent =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.163 Safari/537.36";
 
- @override
+
+@override
 void initState() {
   super.initState();
-  _controller = WebViewController()
-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-    ..setUserAgent(userAgent)
-    ..setNavigationDelegate(
-      NavigationDelegate(
-        onNavigationRequest: (NavigationRequest request) {
-          print("Navigating to: ${request.url}");
-          if (request.url.startsWith('https://fitride.uk/callback')) {
-            Uri uri = Uri.parse(request.url);
-            String? authCode = uri.queryParameters['code'];
-            if (authCode != null && !_isExchangingCode) {
-              print("Extracted Auth Code: $authCode");
-              _isExchangingCode = true; 
-              _exchangeAuthorizationCodeForTokens(authCode).then((success) {
+
+  _eraseCookies().then((_) {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(userAgent)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            print("Navigating to: ${request.url}");
+            if (request.url.startsWith('https://fitride.uk/callback')) {
+              Uri uri = Uri.parse(request.url);
+              String? authCode = uri.queryParameters['code'];
+              if (authCode != null && !_isExchangingCode) {
+                print("Extracted Auth Code: $authCode");
+                _isExchangingCode = true;
+                _exchangeAuthorizationCodeForTokens(authCode).then((success) {
+                  if (mounted) {
+                    Navigator.pop(context, {
+                      'success': success,
+                      'message': success
+                          ? 'Strava authentication successful!'
+                          : 'Failed to authenticate with Strava. Please try again.'
+                    });
+
+                    if (widget.onAuthComplete != null) {
+                      widget.onAuthComplete!(
+                        success,
+                        success
+                            ? 'Strava authentication successful!'
+                            : 'Failed to authenticate with Strava. Please try again.'
+                      );
+                    }
+                  }
+                });
+                return NavigationDecision.prevent;
+              } else {
+                print("Authorization failed: No valid code found.");
                 if (mounted) {
                   Navigator.pop(context, {
-                    'success': success,
-                    'message': success ? 'Strava authentication successful!' : 'Failed to authenticate with Strava. Please try again.'
+                    'success': false,
+                    'message': 'Authorization failed: No valid code found.'
                   });
-                  
+
                   if (widget.onAuthComplete != null) {
                     widget.onAuthComplete!(
-                      success,
-                      success ? 'Strava authentication successful!' : 'Failed to authenticate with Strava. Please try again.'
-                    );
+                        false, 'Authorization failed: No valid code found.');
                   }
-                }
-              });
-              return NavigationDecision.prevent; 
-            } else {
-              print("Authorization failed: No valid code found.");
-              if (mounted) {
-                Navigator.pop(context, {
-                  'success': false,
-                  'message': 'Authorization failed: No valid code found.'
-                });
-                
-                if (widget.onAuthComplete != null) {
-                  widget.onAuthComplete!(false, 'Authorization failed: No valid code found.');
                 }
               }
             }
-          }
-          return NavigationDecision.navigate;
-        },
-      ),
-    )
-    ..loadRequest(Uri.parse(widget.initialUrl));
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.initialUrl));
+
+    setState(() {}); // Trigger rebuild after initializing `_controller`
+  });
 }
+
+
 
   Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
     const String clientId = "146485";
@@ -171,10 +184,11 @@ void initState() {
     }
   }
 
-  Future<void> _eraseCookies() async{
-    WebViewCookieManager cookieManager = WebViewCookieManager();
-
-  }
+  Future<void> _eraseCookies() async {
+  final WebViewCookieManager cookieManager = WebViewCookieManager();
+  await cookieManager.clearCookies();
+  print("All WebView cookies erased. Strava login should now require fresh credentials.");
+}
 
 Future<void> _fetchStravaData(String userId, String accessToken) async {
     if (userId != null) {
