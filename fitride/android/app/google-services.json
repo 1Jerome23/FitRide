@@ -14,15 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "266186848908-uq3oemr5t04oaq86neoo14icisfldoeb.apps.googleusercontent.com",
+          "client_id": "266186848908-u6l44cs76u1tv7s2oqs889tue99f37s8.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.fitride",
-            "certificate_hash": "48684288615323b7e906ec44d91602b02e4029f2"
+            "certificate_hash": "b80e5173e59e9ff19fc372fb77f76cf979900a08"
           }
         },
         {
-          "client_id": "266186848908-m8kg6bgt4sp4e11g9mb4cqd00ho5pvrv.apps.googleusercontent.com",
+          "client_id": "266186848908-qhmvcueh8n3o85g6v4s5v2531ns2fph1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -35,7 +35,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "266186848908-m8kg6bgt4sp4e11g9mb4cqd00ho5pvrv.apps.googleusercontent.com",
+              "client_id": "266186848908-qhmvcueh8n3o85g6v4s5v2531ns2fph1.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

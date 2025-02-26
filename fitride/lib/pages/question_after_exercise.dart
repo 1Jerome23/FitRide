@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'home_page.dart'; 
+import 'home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
@@ -20,59 +20,94 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _hydrationController = TextEditingController();
   bool _isSubmitting = false;
 
+
+  Future<void> _updateStreakCount(String userId) async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
+
+    // Check if there is an existing streak document for this week
+    DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+        .collection('Streak')
+        .doc(userId)
+        .get();
+
+    bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
+
+    if (isNewWeek) {
+      // Create a new streak document for the current week
+      await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
+        'userId': userId,
+        'activityCount': 1,
+        'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
+        'startOfWeek': FieldValue.serverTimestamp(),
+        'endOfWeek': endOfWeek,
+      });
+    } else {
+      // Update the existing streak document
+      await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
+        'activityCount': FieldValue.increment(1),
+        'streak': snapshot.data()!['streak'],
+      });
+    }
+  }
+
   Future<void> _saveToFirestore() async {
-  if (_isSubmitting) return;  
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
+    if (_isSubmitting) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-  setState(() {
-    _isSubmitting = true; 
-  });
-
-  FocusScope.of(context).unfocus();
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print("User not logged in!");
     setState(() {
-      _isSubmitting = false;
+      _isSubmitting = true;
     });
-    return;
+
+    FocusScope.of(context).unfocus();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("User not logged in!");
+      setState(() {
+        _isSubmitting = false;
+      });
+      return;
+    }
+
+    try {
+      double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+
+      await FirebaseFirestore.instance.collection('after_exercise').add({
+        'userId': user.uid,
+        'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
+        'foodTaken': _foodController.text,
+        'estimatedCalories': estimatedCalories,
+        'hydration': int.tryParse(_hydrationController.text) ?? 0,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      await fetchWeatherData(user.uid);
+      await _updateStreakCount(user.uid);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Data saved successfully!")),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } catch (e) {
+      print("Error saving data: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to save data! Please try again.")),
+      );
+    } finally {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
+
+
   }
-
-  try {
-    double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
-
-    await FirebaseFirestore.instance.collection('after_exercise').add({
-      'userId': user.uid,  
-      'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
-      'foodTaken': _foodController.text,
-      'estimatedCalories': estimatedCalories,
-      'hydration': int.tryParse(_hydrationController.text) ?? 0,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-
-    await fetchWeatherData(user.uid);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Data saved successfully!")),
-    );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } catch (e) {
-    print("Error saving data: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Failed to save data! Please try again.")),
-    );
-  } finally {
-    setState(() {
-      _isSubmitting = false;  
-    });
-  }
-}
   Future<double> _getCaloriesFromUSDA(String foodInput) async {
     if (foodInput.isEmpty) return 0.0;
 
@@ -82,7 +117,7 @@ class _PostExerciseState extends State<PostExercise> {
       return 0.0;
     }
 
-    final RegExp regex = RegExp(r'(\d+)\s*(.*)'); 
+    final RegExp regex = RegExp(r'(\d+)\s*(.*)');
     int quantity = 1;
     String food = foodInput.trim();
 

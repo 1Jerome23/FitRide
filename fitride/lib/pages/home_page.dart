@@ -25,6 +25,7 @@ class ActivityData {
   ActivityData(this.month, this.distance);
 }
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+  int? _streakCount;
   int _selectedIndex = 0;
   double? temperature;
   double? humidity;
@@ -91,6 +92,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _getUserName();
     _loadStravaUserId();
     _loadRecentActivities();
+
+    // Fetch streak data
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      _fetchStreakData(userId).then((streakData) {
+        setState(() {
+          _streakCount = streakData?['streak'] ?? 0; // Default to 0 if no streak exists
+        });
+      });
+    }
   }
 
   List<Map<String, dynamic>> _recentActivities = [];
@@ -180,6 +191,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<Map<String, dynamic>?> _fetchStreakData(String userId) async {
+    try {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection('streaks') // Replace with PostExercise.STREAKS_COLLECTION_NAME if defined elsewhere
+          .doc(userId)
+          .get();
+
+      if (snapshot.exists) {
+        return snapshot.data() as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print('Error fetching streak data: $e');
+    }
+    return {'streak': 0}; // Default to 0 if no streak exists
   }
   Future<void> _loadStravaUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -515,7 +542,54 @@ Future<void> fetchWeatherData() async {
                   .fadeIn(duration: 600.ms, delay: 400.ms)
                   .slideY(begin: 0.1, end: 0)
                   .shimmer(delay: 1000.ms, duration: 1800.ms),
-                
+                SizedBox(height: 30),
+                Text(
+                  "Your Streak",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: Colors.black,
+                  ),
+                ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
+                SizedBox(height: 15),
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _streakCount != null
+                      ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.local_fire_department, color: Colors.orange, size: 30),
+                      SizedBox(width: 10),
+                      Text(
+                        _streakCount == 0
+                            ? "No active streak yet"
+                            : "Current Streak: $_streakCount weeks",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 18,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  )
+                      : Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xffFFA500),
+                    ),
+                  ),
+                ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
                   SizedBox(height: 30),
                   Text(
                     "Your Activity Progress",

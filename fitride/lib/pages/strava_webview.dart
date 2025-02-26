@@ -170,6 +170,11 @@ void initState() {
     }
   }
 
+  Future<void> _eraseCookies() async{
+    WebViewCookieManager cookieManager = WebViewCookieManager();
+
+  }
+
 Future<void> _fetchStravaData(String userId, String accessToken) async {
     if (userId != null) {
       try {
