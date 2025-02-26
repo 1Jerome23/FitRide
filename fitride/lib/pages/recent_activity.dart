@@ -29,6 +29,8 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
   String daysPerWeek = "-";
   String targetDistance = "-";
   String targetWeight = "-";
+  int age = 30; // Default age, can be fetched from Firestore or user input
+  int recommendedHeartRate = 0; // Calculated recommended heart rate
 
   // Variables for comparison
   double latestWeight = 0.0;
@@ -66,7 +68,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
       QuerySnapshot afterExerciseSnapshot = await FirebaseFirestore.instance
           .collection('after_exercise')
           .doc(userId)
-          .collection('dailyData')
+          .collection('logs') // Updated collection name
           .orderBy('timestamp', descending: true)
           .limit(10) // Limit to 10 entries
           .get();
@@ -75,7 +77,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
       QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
           .collection('activities')
           .doc(userId)
-          .collection('dailyData')
+          .collection('logs') // Updated collection name
           .orderBy('start_date', descending: true)
           .limit(10) // Limit to 10 entries
           .get();
@@ -91,6 +93,8 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
           daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "-";
           targetDistance = goalsDoc['targetDistance']?.toString() ?? "-";
           targetWeight = goalsDoc['targetWeight']?.toString() ?? "-";
+          age = goalsDoc['age'] ?? 30; // Fetch age from Firestore
+          recommendedHeartRate = 220 - age; // Calculate recommended heart rate
         });
       }
 
@@ -151,8 +155,8 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
       return;
     }
 
-    // Ensure there are at least 2 entries to compare
-    if (recentData.length < 2) {
+    // Only check for comparison if the goal is not "Leisure"
+    if (goalType != "Leisure" && recentData.length < 2) {
       setState(() {
         recommendation = "Insufficient data for comparison.";
         feedback = "Please add more data to generate recommendations.";
@@ -162,51 +166,60 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
 
     // Get the most recent and previous data
     var latestData = recentData[0];
-    var previousData = recentData[1];
+    var previousData = recentData.length > 1 ? recentData[1] : null;
 
     // Update class-level variables
     setState(() {
       latestWeight =
           double.tryParse(latestData['weight']?.toString() ?? "0.0") ?? 0.0;
-      previousWeight =
-          double.tryParse(previousData['weight']?.toString() ?? "0.0") ?? 0.0;
+      previousWeight = previousData != null
+          ? double.tryParse(previousData['weight']?.toString() ?? "0.0") ?? 0.0
+          : 0.0;
 
       latestBodyFat =
           double.tryParse(latestData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
-      previousBodyFat =
-          double.tryParse(previousData['bodyFat']?.toString() ?? "0.0") ?? 0.0;
+      previousBodyFat = previousData != null
+          ? double.tryParse(previousData['bodyFat']?.toString() ?? "0.0") ?? 0.0
+          : 0.0;
 
       latestDistance =
           double.tryParse(latestData['distance']?.toString() ?? "0.0") ?? 0.0;
-      previousDistance =
-          double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0;
+      previousDistance = previousData != null
+          ? double.tryParse(previousData['distance']?.toString() ?? "0.0") ?? 0.0
+          : 0.0;
 
       latestHydration =
           double.tryParse(latestData['Hydration']?.toString() ?? "0.0") ?? 0.0;
-      previousHydration =
-          double.tryParse(previousData['Hydration']?.toString() ?? "0.0") ??
-              0.0;
+      previousHydration = previousData != null
+          ? double.tryParse(previousData['Hydration']?.toString() ?? "0.0") ?? 0.0
+          : 0.0;
 
       latestCaloriesBurned =
           double.tryParse(latestData['calories_burned']?.toString() ?? "0.0") ??
               0.0;
-      previousCaloriesBurned = double.tryParse(
-              previousData['calories_burned']?.toString() ?? "0.0") ??
-          0.0;
+      previousCaloriesBurned = previousData != null
+          ? double.tryParse(
+                  previousData['calories_burned']?.toString() ?? "0.0") ??
+              0.0
+          : 0.0;
 
       latestAverageSpeed =
           double.tryParse(latestData['average_speed']?.toString() ?? "0.0") ??
               0.0;
-      previousAverageSpeed =
-          double.tryParse(previousData['average_speed']?.toString() ?? "0.0") ??
-              0.0;
+      previousAverageSpeed = previousData != null
+          ? double.tryParse(
+                  previousData['average_speed']?.toString() ?? "0.0") ??
+              0.0
+          : 0.0;
 
       latestAverageHeartrate = double.tryParse(
               latestData['average_heartrate']?.toString() ?? "0.0") ??
           0.0;
-      previousAverageHeartrate = double.tryParse(
-              previousData['average_heartrate']?.toString() ?? "0.0") ??
-          0.0;
+      previousAverageHeartrate = previousData != null
+          ? double.tryParse(
+                  previousData['average_heartrate']?.toString() ?? "0.0") ??
+              0.0
+          : 0.0;
     });
 
     // Generate recommendations based on goal type
@@ -229,14 +242,16 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
   }
 
   void _generateLeisureRecommendations() {
-    if (latestAverageHeartrate > previousAverageHeartrate &&
-        double.parse(levelOfExertion) > 5) {
+    int maxHeartRate = 220 - age;
+    double targetHeartRate = maxHeartRate * 0.6; // 60% of max heart rate for leisure
+
+    if (latestAverageHeartrate > targetHeartRate) {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-            "Your effort today was higher than usual for a recovery ride. Try slowing down your pace next time to stay in a relaxed zone.";
+            "Your heart rate was higher than the recommended range for a recovery ride. Aim for a heart rate below ${targetHeartRate.toStringAsFixed(0)} bpm.";
       });
-    } else if (latestAverageHeartrate <= previousAverageHeartrate &&
+    } else if (latestAverageHeartrate <= targetHeartRate &&
         double.parse(levelOfExertion) <= 5) {
       setState(() {
         recommendation = "✅ Good";
@@ -403,20 +418,18 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                     spreadRadius: 3,
                     blurRadius: 5,
                     offset: Offset(0, 3),
-                  )
-                ],
+              )],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (goalType == "Leisure") ...[
-                    if (latestAverageHeartrate > previousAverageHeartrate &&
-                        double.parse(levelOfExertion) > 5)
+                    if (latestAverageHeartrate > recommendedHeartRate)
                       _buildGoalRecommendation(
                         "⚠️ Warning",
-                        "Your effort today was higher than usual for a recovery ride. Try slowing down your pace next time to stay in a relaxed zone.",
+                        "Your heart rate was higher than the recommended range for a recovery ride. Aim for a heart rate below ${recommendedHeartRate.toStringAsFixed(0)} bpm.",
                       ),
-                    if (latestAverageHeartrate <= previousAverageHeartrate &&
+                    if (latestAverageHeartrate <= recommendedHeartRate &&
                         double.parse(levelOfExertion) <= 5)
                       _buildGoalRecommendation(
                         "✅ Good",
