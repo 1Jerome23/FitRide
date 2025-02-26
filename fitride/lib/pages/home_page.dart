@@ -208,12 +208,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
     return {'streak': 0}; // Default to 0 if no streak exists
   }
-  Future<void> _loadStravaUserId() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+Future<void> _loadStravaUserId() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? storedStravaUserId = prefs.getString('stravaUserId');
+
+  if (storedStravaUserId != null && int.tryParse(storedStravaUserId) != null) {
     setState(() {
-      _stravaUserId = prefs.getString('stravaUserId');
+      _stravaUserId = storedStravaUserId; // Use cached value
     });
+    return; // No need to query Firestore if we already have it
   }
+
+  // Fetch from Firestore if not in SharedPreferences
+  String? authUserId = FirebaseAuth.instance.currentUser?.uid;
+  if (authUserId != null) {
+    DocumentSnapshot userTokenDoc = await FirebaseFirestore.instance
+        .collection('user_tokens')
+        .doc(authUserId)
+        .get();
+
+    if (userTokenDoc.exists) {
+      String? fetchedStravaUserId = userTokenDoc.get('stravaUserId')?.toString();
+
+      if (fetchedStravaUserId != null && int.tryParse(fetchedStravaUserId) != null) {
+        await prefs.setString('stravaUserId', fetchedStravaUserId); // Cache it
+
+        setState(() {
+          _stravaUserId = fetchedStravaUserId;
+        });
+
+        print("Fetched Strava User ID from Firestore: $_stravaUserId");
+      } else {
+        print("Strava User ID not found in Firestore.");
+      }
+    } else {
+      print("No `user_tokens` document found for user.");
+    }
+  }
+}
+
   Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? fetchedUserName = prefs.getString('userName');

@@ -36,7 +36,7 @@ Future<String?> getStravaUserId() async {
           .get();
           
       if (snapshot.exists) {
-        stravaUserId = snapshot.get('strava_user_id');
+        stravaUserId = snapshot.get('stravaUserId');
         if (stravaUserId != null) {
           await prefs.setString('stravaUserId', stravaUserId);
           print("Retrieved Strava User ID from Firestore: $stravaUserId");
@@ -145,6 +145,7 @@ void initState() {
               .collection('user_tokens')
               .doc(userId)
               .set({
+            'stravaUserId': stravaUserId,
             'expires_at': expiresAt,
             'access_token': accessToken,
             'refresh_token': refreshToken,
