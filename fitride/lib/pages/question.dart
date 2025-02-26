@@ -7,7 +7,12 @@ import 'dart:async';
 import 'package:fitride/pages/home_page.dart';
 
 class QuestionPage extends StatefulWidget {
-  const QuestionPage({Key? key}) : super(key: key);
+  final int initialPage;
+  
+  const QuestionPage({
+    Key? key, 
+    this.initialPage = 0,
+  }) : super(key: key);
 
   @override
   State<QuestionPage> createState() => _QuestionPageState();
@@ -129,6 +134,14 @@ class _QuestionPageState extends State<QuestionPage>
   @override
   void initState() {
     super.initState();
+    _currentPage = widget.initialPage;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialPage > 0) {
+        _controller.jumpToPage(page: widget.initialPage);
+      }
+    });
+
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 1000),
@@ -236,14 +249,21 @@ class _QuestionPageState extends State<QuestionPage>
         'goalType': _selectedGoal,
       };
       
-      // Add goal-specific data
       if (_selectedGoal == 'Leisure') {
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
         goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'High Intensity Cycling') {
-        goalData['weight'] = weightController.text;
-        goalData['bodyWater'] = bodyWaterController.text;
-        goalData['bodyFat'] = bodyFatController.text;
+        Map<String, dynamic> bodyMetrics = {
+          'weight': weightController.text,
+          'bodyWater': bodyWaterController.text,
+          'bodyFat': bodyFatController.text,
+        };
+        
+        await FirebaseFirestore.instance
+            .collection('userData')
+            .doc(user.uid)
+            .set(bodyMetrics, SetOptions(merge: true));
+            
         goalData['targetWeight'] = targetWeightController.text;
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
         goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;

@@ -6,6 +6,7 @@ import 'recommendation.dart';
 import 'profile.dart';
 import 'login_register.dart';
 import 'package:intl/intl.dart';
+import 'question.dart';
 
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});
@@ -284,10 +285,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
             .doc(uid)
             .delete();
             
-        // Navigate to question page to set a new goal
+        // Navigate directly to the goals page (index 2)
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), // Replace with your question/onboarding page
+          MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
         );
       } catch (e) {
         print('Error resetting goal: $e');
@@ -864,10 +865,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                                 const SizedBox(height: 20),
                                 ElevatedButton(
                                   onPressed: () {
-                                    // Navigate to goal setting page
+                                    // Navigate directly to the goals page (index 2)
                                     Navigator.pushReplacement(
                                       context,
-                                      MaterialPageRoute(builder: (context) => HomePage()), // Replace with your goal setting page
+                                      MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
                                     );
                                   },
                                   style: ElevatedButton.styleFrom(
