@@ -94,7 +94,7 @@ class _HomePageState extends State<HomePage>
     _animationController.forward();
     fetchWeatherData();
     _getUserName();
-    _loadStravaUserId();
+    loadStravaUserId();
     _loadRecentActivities();
 
     // Fetch streak data
@@ -215,48 +215,65 @@ class _HomePageState extends State<HomePage>
     return {'streak': 0}; // Default to 0 if no streak exists
   }
 
-  Future<void> _loadStravaUserId() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? storedStravaUserId = prefs.getString('stravaUserId');
+Future<void> loadStravaUserId() async {
+  try {
+    FirebaseAuth auth = FirebaseAuth.instance;
+    FirebaseFirestore firestore = FirebaseFirestore.instance;
 
-    if (storedStravaUserId != null &&
-        int.tryParse(storedStravaUserId) != null) {
-      setState(() {
-        _stravaUserId = storedStravaUserId; // Use cached value
-      });
-      return; // No need to query Firestore if we already have it
+    User? user = auth.currentUser;
+    if (user == null) {
+      print("No authenticated user found.");
+      return;
     }
 
-    // Fetch from Firestore if not in SharedPreferences
-    String? authUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (authUserId != null) {
-      DocumentSnapshot userTokenDoc = await FirebaseFirestore.instance
-          .collection('user_tokens')
-          .doc(authUserId)
-          .get();
+    print("Fetching Strava User ID for UID: ${user.uid}");
 
-      if (userTokenDoc.exists) {
-        String? fetchedStravaUserId =
-            userTokenDoc.get('stravaUserId')?.toString();
+    // Get Strava User ID from user_tokens
+    QuerySnapshot userTokensSnapshot = await firestore
+        .collection('user_tokens')
+        .where("firebaseUid", isEqualTo: user.uid)
+        .get();
 
-        if (fetchedStravaUserId != null &&
-            int.tryParse(fetchedStravaUserId) != null) {
-          await prefs.setString(
-              'stravaUserId', fetchedStravaUserId); // Cache it
+    if (userTokensSnapshot.docs.isEmpty) {
+      print("No user_tokens document found for UID: ${user.uid}");
+      return;
+    }
 
-          setState(() {
-            _stravaUserId = fetchedStravaUserId;
-          });
+    String stravaUserIdString = userTokensSnapshot.docs.first["stravaUserId"];
+    print("Retrieved Strava User ID (String): $stravaUserIdString");
 
-          print("Fetched Strava User ID from Firestore: $_stravaUserId");
-        } else {
-          print("Strava User ID not found in Firestore.");
-        }
-      } else {
-        print("No `user_tokens` document found for user.");
+    // Convert to integer for Firestore query
+    int? stravaUserId = int.tryParse(stravaUserIdString);
+    if (stravaUserId == null) {
+      print("Error: Unable to convert Strava User ID to an integer.");
+      return;
+    }
+
+    print("Converted Strava User ID (Integer): $stravaUserId");
+
+    // Query activities where user_id (number) matches stravaUserId (integer)
+    QuerySnapshot activityQuery = await firestore
+        .collection('activities')
+        .where('user_id', isEqualTo: stravaUserId) // Now correctly using an integer
+        .get();
+
+    if (activityQuery.docs.isNotEmpty) {
+      print("✅ Found activity for Strava User ID: $stravaUserId");
+      for (var doc in activityQuery.docs) {
+        print("Activity Data: ${doc.data()}");
       }
+    } else {
+      print("⚠️ No activity found for Strava User ID: $stravaUserId");
     }
+
+  } catch (e) {
+    print("Error fetching Strava User ID: $e");
   }
+}
+
+
+
+
 
   Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();

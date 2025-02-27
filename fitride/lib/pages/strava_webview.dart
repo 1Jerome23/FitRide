@@ -123,66 +123,72 @@ void initState() {
 
 
 
-  Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
-    const String clientId = "146485";
-    const String clientSecret =
-        "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f"; 
+Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
+  const String clientId = "146485";
+  const String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f"; 
 
-    try {
-      final response = await http.post(
-        Uri.parse('https://www.strava.com/oauth/token'),
-        body: {
-          'client_id': clientId,
-          'client_secret': clientSecret,
-          'code': code,
-          'grant_type': 'authorization_code',
-        },
-      );
+  try {
+    final response = await http.post(
+      Uri.parse('https://www.strava.com/oauth/token'),
+      body: {
+        'client_id': clientId,
+        'client_secret': clientSecret,
+        'code': code,
+        'grant_type': 'authorization_code',
+      },
+    );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final String stravaUserId = data['athlete']['id'].toString();
-        final String expiresAt = data['expires_at'].toString();
-        final String accessToken = data['access_token'].toString();
-        final String refreshToken = data['refresh_token'].toString();
-        final String userId = data['athlete']['id'].toString();
-        print("Strava User ID: $stravaUserId");
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      final String stravaUserId = data['athlete']['id'].toString();
+      final String expiresAt = data['expires_at'].toString();
+      final String accessToken = data['access_token'].toString();
+      final String refreshToken = data['refresh_token'].toString();
 
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('stravaUserId', stravaUserId);
-        if (userId != null) {
-          await FirebaseFirestore.instance
-              .collection('user_tokens')
-              .doc(userId)
-              .set({
-            'stravaUserId': stravaUserId,
-            'expires_at': expiresAt,
-            'access_token': accessToken,
-            'refresh_token': refreshToken,
-          });
+      print("Strava User ID: $stravaUserId");
 
-          print('Tokens saved in Firestore');
-          await _fetchStravaData(userId, accessToken);
-          await _subscribeToStravaWebhook();
-          return true; 
-        } else {
-          print('User is not authenticated.');
-          return false;
-        }
-      } else {
-        print('Error exchanging authorization code: ${response.body}');
+      // Fetch the Firebase UID of the authenticated user
+      final String? firebaseUid = FirebaseAuth.instance.currentUser?.uid;
+
+      if (firebaseUid == null) {
+        print('User is not authenticated with Firebase.');
         return false;
       }
-    } catch (e) {
-      print('Error during token exchange: $e');
+
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('stravaUserId', stravaUserId);
+
+      // Store the Strava tokens along with Firebase UID in Firestore
+      await FirebaseFirestore.instance
+          .collection('user_tokens')
+          .doc(stravaUserId) // Use stravaUserId as the document ID
+          .set({
+        'firebaseUid': firebaseUid, // Store Firebase UID
+        'stravaUserId': stravaUserId,
+        'expires_at': expiresAt,
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+      }, SetOptions(merge: true)); // Merge to avoid overwriting existing data
+
+      print('Tokens saved in Firestore with Firebase UID: $firebaseUid');
+
+      await _fetchStravaData(stravaUserId, accessToken);
+      await _subscribeToStravaWebhook();
+      return true; 
+    } else {
+      print('Error exchanging authorization code: ${response.body}');
       return false;
-    } finally {
-      _isExchangingCode = false; 
     }
+  } catch (e) {
+    print('Error during token exchange: $e');
+    return false;
+  } finally {
+    _isExchangingCode = false; 
   }
+}
 
   Future<void> _eraseCookies() async {
   final WebViewCookieManager cookieManager = WebViewCookieManager();
