@@ -1,3 +1,4 @@
+import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +57,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => RecommendationPage()),
+          MaterialPageRoute(builder: (context) => RecentActivityPage()),
         );
         break;
       case 2:
@@ -763,7 +764,7 @@ Future<void> fetchWeatherData() async {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Recent Activity",
+                      "User Data Module",
                       style: TextStyle(
                         fontFamily: 'Fredoka-SemiBold',
                         fontSize: 22,
@@ -775,7 +776,7 @@ Future<void> fetchWeatherData() async {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => RecentActivityPage()),
+                              builder: (context) => MyApp()),
                         );
                       },
                       child: Container(
