@@ -1,3 +1,4 @@
+import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +60,7 @@ class _HomePageState extends State<HomePage>
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => RecommendationPage()),
+          MaterialPageRoute(builder: (context) => RecentActivityPage()),
         );
         break;
       case 2:
