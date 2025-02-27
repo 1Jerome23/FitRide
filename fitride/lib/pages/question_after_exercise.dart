@@ -20,37 +20,65 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _hydrationController = TextEditingController();
   bool _isSubmitting = false;
 
-
-  Future<void> _updateStreakCount(String userId) async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
-
-    // Check if there is an existing streak document for this week
+Future<int> _getDaysPerWeek(String userId) async {
+  try {
     DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
-        .collection('Streak')
+        .collection('goals')
         .doc(userId)
         .get();
 
-    bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
+    if (snapshot.exists && snapshot.data() != null) {
+      return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
+    }
+  } catch (e) {
+    print('Error fetching daysPerWeek: $e');
+  }
+  return 0; // Default to 0 if an error occurs or data is missing
+}
+  Future<void> _updateStreakCount(String userId) async {
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
 
-    if (isNewWeek) {
-      // Create a new streak document for the current week
-      await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
-        'userId': userId,
-        'activityCount': 1,
-        'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
-        'startOfWeek': FieldValue.serverTimestamp(),
-        'endOfWeek': endOfWeek,
+  // Fetch the required days per week for the user
+  int daysPerWeek = await _getDaysPerWeek(userId);
+
+  // Check if there is an existing streak document for this week
+  DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+      .collection('Streak')
+      .doc(userId)
+      .get();
+
+  bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
+
+  if (isNewWeek) {
+    // Create a new streak document for the current week
+    await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
+      'userId': userId,
+      'activityCount': 1,
+      'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
+      'startOfWeek': FieldValue.serverTimestamp(),
+      'endOfWeek': endOfWeek,
+    });
+  } else {
+    // Update the existing streak document
+    int currentActivityCount = snapshot.data()!['activityCount'] ?? 0;
+    int updatedActivityCount = currentActivityCount + 1;
+
+    if (updatedActivityCount >= daysPerWeek) {
+      // User has completed the required activities for the week
+      await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
+        'activityCount': updatedActivityCount,
+        'streak': FieldValue.increment(1), // Increment streak
       });
     } else {
-      // Update the existing streak document
+      // User has not yet completed the required activities for the week
       await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
-        'activityCount': FieldValue.increment(1),
-        'streak': snapshot.data()!['streak'],
+        'activityCount': updatedActivityCount,
       });
     }
   }
+}
 
   Future<void> _saveToFirestore() async {
     if (_isSubmitting) return;

@@ -13,18 +13,22 @@ import 'recommendation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
+
 //please work push
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
 }
+
 class ActivityData {
   final String month;
-  final double distance; 
+  final double distance;
 
   ActivityData(this.month, this.distance);
 }
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   int? _streakCount;
   int _selectedIndex = 0;
   double? temperature;
@@ -40,7 +44,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   String? _stravaUserId;
-
 
   void _onItemTapped(int index) {
     setState(() {
@@ -98,7 +101,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (userId != null) {
       _fetchStreakData(userId).then((streakData) {
         setState(() {
-          _streakCount = streakData?['streak'] ?? 0; // Default to 0 if no streak exists
+          _streakCount =
+              streakData?['streak'] ?? 0; // Default to 0 if no streak exists
         });
       });
     }
@@ -111,7 +115,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() {
       _loadingActivities = true;
     });
-    
+
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
@@ -121,14 +125,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             .where('app_id', isEqualTo: uid)
             .limit(1)
             .get();
-        
+
         if (athleteQuerySnapshot.docs.isNotEmpty) {
           final athleteDoc = athleteQuerySnapshot.docs.first;
           final athleteId = athleteDoc.id;
-          
+
           // Convert the document ID to a number if needed
           final userIdNumber = int.tryParse(athleteId);
-          
+
           if (userIdNumber != null) {
             // Simplified query that doesn't require a composite index
             final activitiesSnapshot = await FirebaseFirestore.instance
@@ -136,12 +140,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 .where('user_id', isEqualTo: userIdNumber)
                 .limit(10) // Get a few more so we can sort them client-side
                 .get();
-            
+
             List<Map<String, dynamic>> activities = [];
             for (var doc in activitiesSnapshot.docs) {
               activities.add(doc.data() as Map<String, dynamic>);
             }
-            
+
             // Sort activities client-side by start_date if it exists
             activities.sort((a, b) {
               var aDate = a['start_date'];
@@ -154,12 +158,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               // Convert to string for comparison if not timestamp
               return bDate.toString().compareTo(aDate.toString());
             });
-            
+
             // Take only the first 3 after sorting
             if (activities.length > 3) {
               activities = activities.sublist(0, 3);
             }
-            
+
             setState(() {
               _recentActivities = activities;
               _loadingActivities = false;
@@ -195,57 +199,63 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<Map<String, dynamic>?> _fetchStreakData(String userId) async {
     try {
-      DocumentSnapshot snapshot = await FirebaseFirestore.instance
-          .collection('streaks') // Replace with PostExercise.STREAKS_COLLECTION_NAME if defined elsewhere
+      DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore
+          .instance
+          .collection('Streak')
           .doc(userId)
           .get();
 
       if (snapshot.exists) {
-        return snapshot.data() as Map<String, dynamic>;
+        return snapshot.data()!;
       }
     } catch (e) {
       print('Error fetching streak data: $e');
     }
     return {'streak': 0}; // Default to 0 if no streak exists
   }
-Future<void> _loadStravaUserId() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? storedStravaUserId = prefs.getString('stravaUserId');
 
-  if (storedStravaUserId != null && int.tryParse(storedStravaUserId) != null) {
-    setState(() {
-      _stravaUserId = storedStravaUserId; // Use cached value
-    });
-    return; // No need to query Firestore if we already have it
-  }
+  Future<void> _loadStravaUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedStravaUserId = prefs.getString('stravaUserId');
 
-  // Fetch from Firestore if not in SharedPreferences
-  String? authUserId = FirebaseAuth.instance.currentUser?.uid;
-  if (authUserId != null) {
-    DocumentSnapshot userTokenDoc = await FirebaseFirestore.instance
-        .collection('user_tokens')
-        .doc(authUserId)
-        .get();
+    if (storedStravaUserId != null &&
+        int.tryParse(storedStravaUserId) != null) {
+      setState(() {
+        _stravaUserId = storedStravaUserId; // Use cached value
+      });
+      return; // No need to query Firestore if we already have it
+    }
 
-    if (userTokenDoc.exists) {
-      String? fetchedStravaUserId = userTokenDoc.get('stravaUserId')?.toString();
+    // Fetch from Firestore if not in SharedPreferences
+    String? authUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (authUserId != null) {
+      DocumentSnapshot userTokenDoc = await FirebaseFirestore.instance
+          .collection('user_tokens')
+          .doc(authUserId)
+          .get();
 
-      if (fetchedStravaUserId != null && int.tryParse(fetchedStravaUserId) != null) {
-        await prefs.setString('stravaUserId', fetchedStravaUserId); // Cache it
+      if (userTokenDoc.exists) {
+        String? fetchedStravaUserId =
+            userTokenDoc.get('stravaUserId')?.toString();
 
-        setState(() {
-          _stravaUserId = fetchedStravaUserId;
-        });
+        if (fetchedStravaUserId != null &&
+            int.tryParse(fetchedStravaUserId) != null) {
+          await prefs.setString(
+              'stravaUserId', fetchedStravaUserId); // Cache it
 
-        print("Fetched Strava User ID from Firestore: $_stravaUserId");
+          setState(() {
+            _stravaUserId = fetchedStravaUserId;
+          });
+
+          print("Fetched Strava User ID from Firestore: $_stravaUserId");
+        } else {
+          print("Strava User ID not found in Firestore.");
+        }
       } else {
-        print("Strava User ID not found in Firestore.");
+        print("No `user_tokens` document found for user.");
       }
-    } else {
-      print("No `user_tokens` document found for user.");
     }
   }
-}
 
   Future<void> _getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -267,108 +277,111 @@ Future<void> _loadStravaUserId() async {
     );
   }
 
-Future<void> fetchWeatherData() async {
-  geo.Position? position;
+  Future<void> fetchWeatherData() async {
+    geo.Position? position;
 
-  try {
-    // Ensure location services are enabled
-    bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      debugPrint("Location services are disabled.");
-      return;
-    }
+    try {
+      // Ensure location services are enabled
+      bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint("Location services are disabled.");
+        return;
+      }
 
-    // Check & request permission
-    geo.LocationPermission permission = await geo.Geolocator.checkPermission();
-    if (permission == geo.LocationPermission.deniedForever) {
-      debugPrint("Location permission is denied permanently.");
-      return;
-    }
-    if (permission == geo.LocationPermission.denied) {
-      permission = await geo.Geolocator.requestPermission();
+      // Check & request permission
+      geo.LocationPermission permission =
+          await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.deniedForever) {
+        debugPrint("Location permission is denied permanently.");
+        return;
+      }
       if (permission == geo.LocationPermission.denied) {
-        debugPrint("Location permission is denied.");
-        return;
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) {
+          debugPrint("Location permission is denied.");
+          return;
+        }
       }
+
+      // Get current position using geo.geolocation
+      position = await geo.Geolocator.getCurrentPosition(
+          desiredAccuracy: geo.LocationAccuracy.high);
+    } catch (e) {
+      debugPrint('Error fetching location: $e');
+      return;
     }
 
-    // Get current position using geo.geolocation
-    position = await geo.Geolocator.getCurrentPosition(
-        desiredAccuracy: geo.LocationAccuracy.high);
-  } catch (e) {
-    debugPrint('Error fetching location: $e');
-    return;
-  }
+    final latitude = position.latitude;
+    final longitude = position.longitude;
 
-  final latitude = position.latitude;
-  final longitude = position.longitude;
+    try {
+      // Fetch weather data
+      final weatherResponse = await http.get(Uri.parse(
+          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
 
-  try {
-    // Fetch weather data
-    final weatherResponse = await http.get(Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
+      if (weatherResponse.statusCode == 200) {
+        final data = json.decode(weatherResponse.body);
+        final currentWeather = data['current_weather'];
+        final hourly = data['hourly'];
 
-    if (weatherResponse.statusCode == 200) {
-      final data = json.decode(weatherResponse.body);
-      final currentWeather = data['current_weather'];
-      final hourly = data['hourly'];
+        if (currentWeather == null || hourly == null) {
+          debugPrint("Weather API response is missing expected data.");
+          return;
+        }
 
-      if (currentWeather == null || hourly == null) {
-        debugPrint("Weather API response is missing expected data.");
-        return;
+        final weatherTemp = currentWeather['temperature'];
+        final weatherHumidity = hourly['relative_humidity_2m'] != null &&
+                hourly['relative_humidity_2m'].isNotEmpty
+            ? (hourly['relative_humidity_2m'][0] as num).toDouble()
+            : 0.0;
+
+        if (mounted) {
+          setState(() {
+            temperature = (weatherTemp as num).toDouble();
+            humidity = weatherHumidity;
+            weatherImage =
+                _getWeatherImage(currentWeather['weathercode'].toString());
+          });
+        }
+      } else {
+        debugPrint('Failed to fetch temperature and humidity.');
       }
-
-      final weatherTemp = currentWeather['temperature'];
-      final weatherHumidity = hourly['relative_humidity_2m'] != null &&
-              hourly['relative_humidity_2m'].isNotEmpty
-          ? (hourly['relative_humidity_2m'][0] as num).toDouble()
-          : 0.0;
-
-      if (mounted) {
-        setState(() {
-          temperature = (weatherTemp as num).toDouble();
-          humidity = weatherHumidity;
-          weatherImage = _getWeatherImage(currentWeather['weathercode'].toString());
-        });
-      }
-    } else {
-      debugPrint('Failed to fetch temperature and humidity.');
+    } catch (e) {
+      debugPrint('Error fetching temperature and humidity: $e');
     }
-  } catch (e) {
-    debugPrint('Error fetching temperature and humidity: $e');
-  }
 
-  try {
-    // Fetch air quality data
-    final airQualityResponse = await http.get(Uri.parse(
-        'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
+    try {
+      // Fetch air quality data
+      final airQualityResponse = await http.get(Uri.parse(
+          'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$latitude&longitude=$longitude&hourly=pm2_5'));
 
-    if (airQualityResponse.statusCode == 200) {
-      final data = json.decode(airQualityResponse.body);
-      final hourlyData = data['hourly'];
+      if (airQualityResponse.statusCode == 200) {
+        final data = json.decode(airQualityResponse.body);
+        final hourlyData = data['hourly'];
 
-      if (hourlyData == null || !hourlyData.containsKey('pm2_5')) {
-        debugPrint("Air Quality API response is missing expected data.");
-        return;
+        if (hourlyData == null || !hourlyData.containsKey('pm2_5')) {
+          debugPrint("Air Quality API response is missing expected data.");
+          return;
+        }
+
+        final airQualityPM25 = List<dynamic>.from(hourlyData['pm2_5']);
+        final pmValue = airQualityPM25.isNotEmpty
+            ? (airQualityPM25[0] as num).toDouble()
+            : 0.0;
+
+        if (mounted) {
+          setState(() {
+            pm2_5 = pmValue;
+            airQualityStatus = _evaluateAirQuality(pm2_5);
+          });
+        }
+      } else {
+        debugPrint('Failed to fetch air quality.');
       }
-
-      final airQualityPM25 = List<dynamic>.from(hourlyData['pm2_5']);
-      final pmValue = airQualityPM25.isNotEmpty ? (airQualityPM25[0] as num).toDouble() : 0.0;
-
-      if (mounted) {
-        setState(() {
-          pm2_5 = pmValue;
-          airQualityStatus = _evaluateAirQuality(pm2_5);
-        });
-      }
-    } else {
-      debugPrint('Failed to fetch air quality.');
+    } catch (e) {
+      debugPrint('Error fetching air quality: $e');
     }
-  } catch (e) {
-    debugPrint('Error fetching air quality: $e');
   }
-}
-
 
   String _getWeatherImage(String? condition) {
     switch (condition) {
@@ -410,219 +423,234 @@ Future<void> fetchWeatherData() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.grey[900],
-        elevation: 0,
-        title: const Text(
-          "FitRide",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            color: Color(0xffFFA500),
-            fontSize: 22,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: GestureDetector(
-              onTap: _logout,
-              child: Image.asset(
-                'assets/logobike.png',
-                height: 25,
-              ),
+        backgroundColor: Color(0xFFF8F9FA),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.grey[900],
+          elevation: 0,
+          title: const Text(
+            "FitRide",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              color: Color(0xffFFA500),
+              fontSize: 22,
             ),
           ),
-        ],
-      ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Hello, Cyclist!",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 28,
-                    color: Colors.black,
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slide(begin: Offset(0, -0.1), end: Offset.zero),
-                Text(
-                  "Glad to see you! Let’s make today’s ride a great one. Hop on and ride!",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontFamily: "Inter",
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 300.ms).slide(begin: Offset(0, -0.1), end: Offset.zero),
-                SizedBox(height: 25),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: GestureDetector(
+                onTap: _logout,
+                child: Image.asset(
+                  'assets/logobike.png',
+                  height: 25,
+                ),
+              ),
+            ),
+          ],
+        ),
+        body: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SingleChildScrollView(
+            physics: BouncingScrollPhysics(),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Hello, Cyclist!",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 28,
+                      color: Colors.black,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms, delay: 200.ms)
+                      .slide(begin: Offset(0, -0.1), end: Offset.zero),
+                  Text(
+                    "Glad to see you! Let’s make today’s ride a great one. Hop on and ride!",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontFamily: "Inter",
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms, delay: 300.ms)
+                      .slide(begin: Offset(0, -0.1), end: Offset.zero),
+                  SizedBox(height: 25),
 
-                // Weather Section
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xffFFA500).withOpacity(0.9),
-                        Color(0xffFFA500).withOpacity(0.7),
+                  // Weather Section
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xffFFA500).withOpacity(0.9),
+                          Color(0xffFFA500).withOpacity(0.7),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 2,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Today's Weather",
-                          style: TextStyle(
-                            fontFamily: 'Fredoka-SemiBold',
-                            fontSize: 22,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                                color: Colors.black.withOpacity(0.3),
-                              ),
-                            ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Today's Weather",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 22,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(0, 2),
+                                  blurRadius: 4,
+                                  color: Colors.black.withOpacity(0.3),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 24),
-                        if (temperature != null)
-                          Image.asset(
-                            weatherImage,
-                            height: 120,
-                          ).animate().scale(delay: 400.ms, duration: 800.ms, curve: Curves.elasticOut),
-                        SizedBox(height: 20),
-                        if (temperature != null)
+                          SizedBox(height: 24),
+                          if (temperature != null)
+                            Image.asset(
+                              weatherImage,
+                              height: 120,
+                            ).animate().scale(
+                                delay: 400.ms,
+                                duration: 800.ms,
+                                curve: Curves.elasticOut),
+                          SizedBox(height: 20),
+                          if (temperature != null)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "${temperature!.toStringAsFixed(1)}",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 50,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(0, 4),
+                                        blurRadius: 8,
+                                        color: Colors.black.withOpacity(0.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  "°C",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 24,
+                                    color: Colors.white.withOpacity(0.8),
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                        color: Colors.black.withOpacity(0.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ).animate().fadeIn(duration: 800.ms, delay: 500.ms),
+                          SizedBox(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "${temperature!.toStringAsFixed(1)}",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 50,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      offset: Offset(0, 4),
-                                      blurRadius: 8,
-                                      color: Colors.black.withOpacity(0.3),
-                                    ),
-                                  ],
+                              if (humidity != null)
+                                _weatherInfoItem(
+                                  Icons.water_drop_outlined,
+                                  "${humidity!.toStringAsFixed(1)}%",
+                                  "Humidity",
+                                  Colors.blue,
                                 ),
+                              SizedBox(width: 30),
+                              _weatherInfoItem(
+                                Icons.air,
+                                airQualityStatus,
+                                "Air Quality",
+                                _getAirQualityColor(airQualityStatus),
                               ),
+                            ],
+                          ).animate().fadeIn(duration: 800.ms, delay: 600.ms),
+                        ],
+                      ),
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms, delay: 400.ms)
+                      .slideY(begin: 0.1, end: 0)
+                      .shimmer(delay: 1000.ms, duration: 1800.ms),
+                  SizedBox(height: 30),
+                  Text(
+                    "Your Streak",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 22,
+                      color: Colors.black,
+                    ),
+                  ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
+                  SizedBox(height: 15),
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 2,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _streakCount != null
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.local_fire_department,
+                                  color: Colors.orange, size: 30),
+                              SizedBox(width: 10),
                               Text(
-                                "°C",
+                                _streakCount == 0
+                                    ? "No active streak yet"
+                                    : "Current Streak: $_streakCount weeks",
                                 style: TextStyle(
                                   fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 24,
-                                  color: Colors.white.withOpacity(0.8),
-                                  shadows: [
-                                    Shadow(
-                                      offset: Offset(0, 2),
-                                      blurRadius: 4,
-                                      color: Colors.black.withOpacity(0.3),
-                                    ),
-                                  ],
+                                  fontSize: 18,
+                                  color: Colors.black,
                                 ),
                               ),
                             ],
-                          ).animate().fadeIn(duration: 800.ms, delay: 500.ms),
-                        SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (humidity != null)
-                              _weatherInfoItem(
-                                Icons.water_drop_outlined,
-                                "${humidity!.toStringAsFixed(1)}%",
-                                "Humidity",
-                                Colors.blue,
-                              ),
-                            SizedBox(width: 30),
-                            _weatherInfoItem(
-                              Icons.air,
-                              airQualityStatus,
-                              "Air Quality",
-                              _getAirQualityColor(airQualityStatus),
+                          )
+                        : Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xffFFA500),
                             ),
-                          ],
-                        ).animate().fadeIn(duration: 800.ms, delay: 600.ms),
-                      ],
-                    ),
-                  ),
-                ).animate()
-                  .fadeIn(duration: 600.ms, delay: 400.ms)
-                  .slideY(begin: 0.1, end: 0)
-                  .shimmer(delay: 1000.ms, duration: 1800.ms),
-                SizedBox(height: 30),
-                Text(
-                  "Your Streak",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: Colors.black,
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
-                SizedBox(height: 15),
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: _streakCount != null
-                      ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.local_fire_department, color: Colors.orange, size: 30),
-                      SizedBox(width: 10),
-                      Text(
-                        _streakCount == 0
-                            ? "No active streak yet"
-                            : "Current Streak: $_streakCount weeks",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 18,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
+                          ),
                   )
-                      : Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xffFFA500),
-                    ),
-                  ),
-                ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
+                      .animate()
+                      .fadeIn(duration: 600.ms, delay: 700.ms)
+                      .slideY(begin: 0.1, end: 0),
                   SizedBox(height: 30),
                   Text(
                     "Your Activity Progress",
@@ -651,11 +679,15 @@ Future<void> fetchWeatherData() async {
                     child: FutureBuilder<QuerySnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('activities')
-                          .where('user_id', isEqualTo: _stravaUserId != null ? int.tryParse(_stravaUserId!) : null)
+                          .where('user_id',
+                              isEqualTo: _stravaUserId != null
+                                  ? int.tryParse(_stravaUserId!)
+                                  : null)
                           .orderBy('start_date', descending: false)
                           .get(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return Center(
                             child: CircularProgressIndicator(
                               color: Color(0xffFFA500),
@@ -667,7 +699,8 @@ Future<void> fetchWeatherData() async {
                           return Center(
                             child: Text(
                               "Error fetching data",
-                              style: TextStyle(color: Colors.red, fontFamily: "Inter"),
+                              style: TextStyle(
+                                  color: Colors.red, fontFamily: "Inter"),
                             ),
                           );
                         }
@@ -699,7 +732,9 @@ Future<void> fetchWeatherData() async {
                         List<ActivityData> activityData = [];
                         for (var doc in snapshot.data!.docs) {
                           var data = doc.data() as Map<String, dynamic>;
-                          double distance = double.tryParse(data['distance'].toString()) ?? 0.0;
+                          double distance =
+                              double.tryParse(data['distance'].toString()) ??
+                                  0.0;
                           Timestamp? timestamp = data['start_date'];
                           DateTime date = timestamp?.toDate() ?? DateTime.now();
 
@@ -718,21 +753,24 @@ Future<void> fetchWeatherData() async {
                             primaryXAxis: CategoryAxis(
                               title: AxisTitle(
                                 text: 'Month',
-                                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                textStyle: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                               labelStyle: TextStyle(fontSize: 14),
                             ),
                             primaryYAxis: NumericAxis(
                               title: AxisTitle(
                                 text: 'Distance (km)',
-                                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                textStyle: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                               labelFormat: '{value} km',
                               labelStyle: TextStyle(fontSize: 14),
                             ),
                             title: ChartTitle(
                               text: 'Monthly Distance Traveled',
-                              textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              textStyle: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             legend: Legend(
                               isVisible: true,
@@ -744,10 +782,15 @@ Future<void> fetchWeatherData() async {
                               LineSeries<ActivityData, String>(
                                 name: 'Distance',
                                 dataSource: activityData,
-                                xValueMapper: (ActivityData data, _) => data.month,
-                                yValueMapper: (ActivityData data, _) => data.distance,
-                                dataLabelSettings: DataLabelSettings(isVisible: true, textStyle: TextStyle(fontSize: 14)),
-                                markerSettings: MarkerSettings(isVisible: true, height: 8, width: 8),
+                                xValueMapper: (ActivityData data, _) =>
+                                    data.month,
+                                yValueMapper: (ActivityData data, _) =>
+                                    data.distance,
+                                dataLabelSettings: DataLabelSettings(
+                                    isVisible: true,
+                                    textStyle: TextStyle(fontSize: 14)),
+                                markerSettings: MarkerSettings(
+                                    isVisible: true, height: 8, width: 8),
                                 width: 4, // Thicker line for better visibility
                                 color: Color(0xffFFA500),
                               ),
@@ -756,253 +799,263 @@ Future<void> fetchWeatherData() async {
                         ).animate().fadeIn(duration: 800.ms, delay: 700.ms);
                       },
                     ),
-                  ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
-                SizedBox(height: 30),
+                  )
+                      .animate()
+                      .fadeIn(duration: 600.ms, delay: 700.ms)
+                      .slideY(begin: 0.1, end: 0),
+                  SizedBox(height: 30),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Recent Activity",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 22,
-                        color: Colors.black,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => RecentActivityPage()),
-                        );
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Color(0xffFFA500).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Recent Activity",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 22,
+                          color: Colors.black,
                         ),
-                        child: Row(
-                          children: [
-                            Text(
-                              "View All",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xffFFA500),
-                                fontFamily: "Inter",
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => RecentActivityPage()),
+                          );
+                        },
+                        child: Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFFA500).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                "View All",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xffFFA500),
+                                  fontFamily: "Inter",
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 4),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              color: Color(0xffFFA500),
-                              size: 14,
-                            ),
-                          ],
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Color(0xffFFA500),
+                                size: 14,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ).animate().fadeIn(duration: 600.ms, delay: 800.ms),
-                SizedBox(height: 15),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 2,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
                       ),
                     ],
-                  ),
-                  child: _loadingActivities
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(
-                              color: Color(0xffFFA500),
+                  ).animate().fadeIn(duration: 600.ms, delay: 800.ms),
+                  SizedBox(height: 15),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 2,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _loadingActivities
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(
+                                color: Color(0xffFFA500),
+                              ),
                             ),
-                          ),
-                        )
-                      : _recentActivities.isEmpty
-                        ? ListView.builder(
-                            physics: NeverScrollableScrollPhysics(),
-                            shrinkWrap: true,
-                            itemCount: 1,
-                            itemBuilder: (context, index) {
-                              return _buildActivityItem(
-                                "No recent activity",
-                                "Record your first ride to see it here!",
-                                "00:00",
-                                Icons.directions_bike_outlined,
-                              );
-                            },
                           )
-                        : ListView.separated(
-                            physics: NeverScrollableScrollPhysics(),
-                            shrinkWrap: true,
-                            itemCount: _recentActivities.length,
-                            separatorBuilder: (context, index) => Divider(
-                              height: 1,
-                              color: Colors.grey[200],
-                            ),
-                            itemBuilder: (context, index) {
-                              final activity = _recentActivities[index];
-                              
-                              // Extract activity details
-                              final name = activity['name'] ?? 'Cycling Activity';
-                              final type = activity['type'] ?? 'Ride';
-                              
-                              // Format distance - correctly handle the string format "10.00"
-                              String distanceStr = '0 km';
-                              if (activity['distance'] != null) {
-                                try {
-                                  // Parse the string distance directly
-                                  final distance = double.tryParse(activity['distance'].toString()) ?? 0.0;
-                                  
-                                  // The distance seems to already be in km format with 2 decimal places
-                                  distanceStr = '${distance.toStringAsFixed(1)} km';
-                                } catch (e) {
-                                  print('Error parsing distance: $e');
-                                  distanceStr = '0 km';
-                                }
-                              }
-                              
-                              return _buildActivityItem(
-                                name,
-                                type,
-                                distanceStr,
-                                Icons.directions_bike_outlined,
-                              );
-                            },
-                          ),
+                        : _recentActivities.isEmpty
+                            ? ListView.builder(
+                                physics: NeverScrollableScrollPhysics(),
+                                shrinkWrap: true,
+                                itemCount: 1,
+                                itemBuilder: (context, index) {
+                                  return _buildActivityItem(
+                                    "No recent activity",
+                                    "Record your first ride to see it here!",
+                                    "00:00",
+                                    Icons.directions_bike_outlined,
+                                  );
+                                },
+                              )
+                            : ListView.separated(
+                                physics: NeverScrollableScrollPhysics(),
+                                shrinkWrap: true,
+                                itemCount: _recentActivities.length,
+                                separatorBuilder: (context, index) => Divider(
+                                  height: 1,
+                                  color: Colors.grey[200],
+                                ),
+                                itemBuilder: (context, index) {
+                                  final activity = _recentActivities[index];
+
+                                  // Extract activity details
+                                  final name =
+                                      activity['name'] ?? 'Cycling Activity';
+                                  final type = activity['type'] ?? 'Ride';
+
+                                  // Format distance - correctly handle the string format "10.00"
+                                  String distanceStr = '0 km';
+                                  if (activity['distance'] != null) {
+                                    try {
+                                      // Parse the string distance directly
+                                      final distance = double.tryParse(
+                                              activity['distance']
+                                                  .toString()) ??
+                                          0.0;
+
+                                      // The distance seems to already be in km format with 2 decimal places
+                                      distanceStr =
+                                          '${distance.toStringAsFixed(1)} km';
+                                    } catch (e) {
+                                      print('Error parsing distance: $e');
+                                      distanceStr = '0 km';
+                                    }
+                                  }
+
+                                  return _buildActivityItem(
+                                    name,
+                                    type,
+                                    distanceStr,
+                                    Icons.directions_bike_outlined,
+                                  );
+                                },
+                              ),
+                  ),
+                  SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 0,
+                blurRadius: 10,
+                offset: Offset(0, -3),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: Colors.grey[900],
+              currentIndex: _selectedIndex,
+              selectedItemColor: Color(0xffFFA500),
+              unselectedItemColor: Colors.grey[400],
+              selectedLabelStyle: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontFamily: "Inter",
+              ),
+              unselectedLabelStyle: TextStyle(
+                fontSize: 12,
+                fontFamily: "Inter",
+              ),
+              type: BottomNavigationBarType.fixed,
+              elevation: 0,
+              onTap: _onItemTapped,
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Home',
                 ),
-                SizedBox(height: 20),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.insights_rounded),
+                  label: 'Insights',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.track_changes_rounded),
+                  label: 'Goals',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_rounded),
+                  label: 'Profile',
+                ),
               ],
             ),
           ),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 0,
-              blurRadius: 10,
-              offset: Offset(0, -3),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+        ));
+  }
+
+  Widget _weatherInfoItem(
+      IconData icon, String value, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                offset: Offset(0, 2),
+                blurRadius: 4,
+                color: Colors.black.withOpacity(0.2),
+              ),
+            ],
           ),
-          child: BottomNavigationBar(
-            backgroundColor: Colors.grey[900],
-            currentIndex: _selectedIndex,
-            selectedItemColor: Color(0xffFFA500),
-            unselectedItemColor: Colors.grey[400],
-            selectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              fontFamily: "Inter",
-            ),
-            unselectedLabelStyle: TextStyle(
-              fontSize: 12,
-              fontFamily: "Inter",
-            ),
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            onTap: _onItemTapped,
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_rounded),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.insights_rounded),
-                label: 'Insights',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.track_changes_rounded),
-                label: 'Goals',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_rounded),
-                label: 'Profile',
+          child: Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            shadows: [
+              Shadow(
+                offset: Offset(0, 2),
+                blurRadius: 4,
+                color: Colors.black.withOpacity(0.3),
               ),
             ],
           ),
         ),
-      )
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.white.withOpacity(0.8),
+            shadows: [
+              Shadow(
+                offset: Offset(0, 1),
+                blurRadius: 2,
+                color: Colors.black.withOpacity(0.2),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _weatherInfoItem(IconData icon, String value, String label, Color color) {
-  return Column(
-    children: [
-      Container(
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              offset: Offset(0, 2),
-              blurRadius: 4,
-              color: Colors.black.withOpacity(0.2),
-            ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          color: color,
-          size: 24,
-        ),
-      ),
-      SizedBox(height: 8),
-      Text(
-        value,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-          shadows: [
-            Shadow(
-              offset: Offset(0, 2),
-              blurRadius: 4,
-              color: Colors.black.withOpacity(0.3),
-            ),
-          ],
-        ),
-      ),
-      Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.white.withOpacity(0.8),
-          shadows: [
-            Shadow(
-              offset: Offset(0, 1),
-              blurRadius: 2,
-              color: Colors.black.withOpacity(0.2),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-  Widget _buildActivityItem(String title, String subtitle, String time, IconData icon) {
+  Widget _buildActivityItem(
+      String title, String subtitle, String time, IconData icon) {
     return ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       leading: Container(
