@@ -810,7 +810,7 @@ class _HomePageState extends State<HomePage>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "Recent Activity",
+                        "User Data Module",
                         style: TextStyle(
                           fontFamily: 'Fredoka-SemiBold',
                           fontSize: 22,
@@ -822,7 +822,7 @@ class _HomePageState extends State<HomePage>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => RecentActivityPage()),
+                                builder: (context) => MyApp()),
                           );
                         },
                         child: Container(

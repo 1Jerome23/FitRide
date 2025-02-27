@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_core/firebase_core.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:table_calendar/table_calendar.dart'; 
+import 'package:table_calendar/table_calendar.dart';
 import 'home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); 
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -31,17 +31,24 @@ class FitRidePage extends StatefulWidget {
 class _FitRidePageState extends State<FitRidePage> {
   late List<Map<String, String>> dates;
   late String selectedDate;
-  String weight = "-";
-  String bodyFat = "-";
-  String bodyWater = "-";
-  String foodTaken = "-";
-  String hydration = "-";
-  String levelofExertion = "-";
-  String averageHeartrate = "-";
-  String averageSpeed = "-";
-  String caloriesBurned = "-";
-  String distance = "-";
-  String type = "-";
+  String weight = "0";
+  String bodyFat = "0";
+  String bodyWater = "0";
+  String hydration = "0";
+  String levelOfExertion = "0";
+  String averageHeartrate = "0";
+  String averageSpeed = "0";
+  String caloriesBurned = "0";
+  String distance = "0";
+  String sessionDuration = "0";
+  String daysPerWeek = "0";
+  String targetDistance = "0";
+  String targetWeight = "0";
+  String targetDuration = "0";
+  String goalType = "-";
+  String currentLevel = "0";
+  String healthCondition = "-";
+  String height = "0";
   bool showAllData = false;
 
   CalendarFormat _calendarFormat = CalendarFormat.month;
@@ -53,7 +60,7 @@ class _FitRidePageState extends State<FitRidePage> {
     super.initState();
     dates = _generateDateList();
     selectedDate =
-        "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
+    "${DateFormat.E().format(DateTime.now())} ${DateFormat.d().format(DateTime.now())}";
     _selectedDay = _focusedDay;
     _fetchUserData();
   }
@@ -66,8 +73,7 @@ class _FitRidePageState extends State<FitRidePage> {
       dateList.add({
         "day": DateFormat.E().format(date),
         "date": DateFormat.d().format(date),
-        "fullDate": DateFormat('yyyy-MM-dd')
-            .format(date),
+        "fullDate": DateFormat('yyyy-MM-dd').format(date),
       });
     }
     return dateList;
@@ -82,19 +88,26 @@ class _FitRidePageState extends State<FitRidePage> {
 
       String uid = user.uid;
       String fullDate = dates.firstWhere(
-        (date) => selectedDate == "${date['day']} ${date['date']}",
+            (date) => selectedDate == "${date['day']} ${date['date']}",
       )['fullDate']!;
 
-      // Fetch data from User Questionnaire collection
-      DocumentSnapshot userQuestionnaireDoc = await FirebaseFirestore.instance
-          .collection('User Questionnaire')
+      // Fetch data from goals collection
+      DocumentSnapshot goalsDoc = await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(uid)
+          .get();
+
+      // Fetch data from userData collection
+      DocumentSnapshot userDataDoc = await FirebaseFirestore.instance
+          .collection('userData')
           .doc(uid)
           .get();
 
       // Fetch data from after_exercise collection for the selected date
       DocumentSnapshot afterExerciseDoc = await FirebaseFirestore.instance
-          .doc(uid)
           .collection('after_exercise')
+          .doc(uid)
+          .collection('logs')
           .doc(fullDate)
           .get();
 
@@ -102,97 +115,71 @@ class _FitRidePageState extends State<FitRidePage> {
       DocumentSnapshot activitiesDoc = await FirebaseFirestore.instance
           .collection('activities')
           .doc(uid)
-          .collection('after_exercise')
+          .collection('logs')
           .doc(fullDate)
           .get();
 
-      if (userQuestionnaireDoc.exists) {
+      if (goalsDoc.exists) {
         setState(() {
-          weight = userQuestionnaireDoc['weight']?.toString() ?? "-";
-          bodyFat = userQuestionnaireDoc['bodyFat']?.toString() ?? "-";
-          bodyWater = userQuestionnaireDoc['bodyWater']?.toString() ?? "-";
+          goalType = goalsDoc['goalType'] ?? "-";
+          currentLevel = goalsDoc['currentLevel'] ?? "0";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
+          targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
+          targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
+          targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
         });
-      } else {
+      }
+
+      if (userDataDoc.exists) {
         setState(() {
-          weight = "No data found";
-          bodyFat = "No data found";
-          bodyWater = "No data found";
+          weight = userDataDoc['weight']?.toString() ?? "0";
+          bodyFat = userDataDoc['bodyFat']?.toString() ?? "0";
+          bodyWater = userDataDoc['bodyWater']?.toString() ?? "0";
+          healthCondition = userDataDoc['healthCondition'] ?? "-";
+          height = userDataDoc['height']?.toString() ?? "0";
         });
       }
 
       if (afterExerciseDoc.exists) {
         setState(() {
-          foodTaken = afterExerciseDoc['foodTaken']?.toString() ?? "-";
-          hydration = afterExerciseDoc['hydration']?.toString() ?? "-";
-          levelofExertion =
-              afterExerciseDoc['levelofExertion']?.toString() ?? "-";
-        });
-      } else {
-        setState(() {
-          foodTaken = "No data found";
-          hydration = "No data found";
-          levelofExertion = "No data found";
+          hydration = afterExerciseDoc['Hydration']?.toString() ?? "0";
+          levelOfExertion = afterExerciseDoc['levelOfExertion']?.toString() ?? "0";
         });
       }
 
       if (activitiesDoc.exists) {
         setState(() {
-          averageHeartrate =
-              activitiesDoc['average_heartrate']?.toString() ?? "-";
-          averageSpeed = activitiesDoc['average_speed']?.toString() ?? "-";
-          caloriesBurned = activitiesDoc['calories_burned']?.toString() ?? "-";
-          distance = activitiesDoc['distance']?.toString() ?? "-";
-          type = activitiesDoc['type']?.toString() ?? "-";
-        });
-      } else {
-        setState(() {
-          averageHeartrate = "No data found";
-          averageSpeed = "No data found";
-          caloriesBurned = "No data found";
-          distance = "No data found";
-          type = "No data found";
+          averageHeartrate = activitiesDoc['average_heartrate']?.toString() ?? "0";
+          averageSpeed = activitiesDoc['average_speed']?.toString() ?? "0";
+          caloriesBurned = activitiesDoc['calories_burned']?.toString() ?? "0";
+          distance = activitiesDoc['distance']?.toString() ?? "0";
         });
       }
     } catch (e) {
-      setState(() {
-        weight = "No data found";
-        bodyFat = "No data found";
-        bodyWater = "No data found";
-        foodTaken = "No data found";
-        hydration = "No data found";
-        levelofExertion = "No data found";
-        averageHeartrate = "No data found";
-        averageSpeed = "No data found";
-        caloriesBurned = "No data found";
-        distance = "No data found";
-        type = "No data found";
-      });
       print("Error fetching user data: $e");
     }
   }
 
   void _showEditDialog() {
-    TextEditingController weightController =
-        TextEditingController(text: weight);
-    TextEditingController bodyFatController =
-        TextEditingController(text: bodyFat);
-    TextEditingController bodyWaterController =
-        TextEditingController(text: bodyWater);
-    TextEditingController foodTakenController =
-        TextEditingController(text: foodTaken);
-    TextEditingController hydrationController =
-        TextEditingController(text: hydration);
-    TextEditingController exertionController =
-        TextEditingController(text: levelofExertion);
-    TextEditingController heartrateController =
-        TextEditingController(text: averageHeartrate);
-    TextEditingController speedController =
-        TextEditingController(text: averageSpeed);
-    TextEditingController caloriesController =
-        TextEditingController(text: caloriesBurned);
-    TextEditingController distanceController =
-        TextEditingController(text: distance);
-    TextEditingController typeController = TextEditingController(text: type);
+    TextEditingController weightController = TextEditingController(text: weight);
+    TextEditingController bodyFatController = TextEditingController(text: bodyFat);
+    TextEditingController bodyWaterController = TextEditingController(text: bodyWater);
+    TextEditingController hydrationController = TextEditingController(text: hydration);
+    TextEditingController exertionController = TextEditingController(text: levelOfExertion);
+    TextEditingController heartrateController = TextEditingController(text: averageHeartrate);
+    TextEditingController speedController = TextEditingController(text: averageSpeed);
+    TextEditingController caloriesController = TextEditingController(text: caloriesBurned);
+    TextEditingController distanceController = TextEditingController(text: distance);
+    TextEditingController sessionDurationController = TextEditingController(text: sessionDuration);
+    TextEditingController daysPerWeekController = TextEditingController(text: daysPerWeek);
+    TextEditingController targetDistanceController = TextEditingController(text: targetDistance);
+    TextEditingController targetWeightController = TextEditingController(text: targetWeight);
+    TextEditingController targetDurationController = TextEditingController(text: targetDuration);
+    TextEditingController goalTypeController = TextEditingController(text: goalType);
+    TextEditingController currentLevelController = TextEditingController(text: currentLevel);
+    TextEditingController healthConditionController = TextEditingController(text: healthCondition);
+    TextEditingController heightController = TextEditingController(text: height);
 
     showDialog(
       context: context,
@@ -210,14 +197,21 @@ class _FitRidePageState extends State<FitRidePage> {
                 _buildEditField("Weight (kg)", weightController),
                 _buildEditField("Body Fat (%)", bodyFatController),
                 _buildEditField("Body Water (%)", bodyWaterController),
-                _buildEditField("Food Taken", foodTakenController),
                 _buildEditField("Hydration (liters)", hydrationController),
                 _buildEditField("Level of Exertion (1-10)", exertionController),
                 _buildEditField("Average Heartrate (bpm)", heartrateController),
                 _buildEditField("Average Speed (km/h)", speedController),
-                _buildEditField("Calories Burned", caloriesController),
+                _buildEditField("Calories Burned (kcal)", caloriesController),
                 _buildEditField("Distance (km)", distanceController),
-                _buildEditField("Type", typeController),
+                _buildEditField("Session Duration (mins)", sessionDurationController),
+                _buildEditField("Days Per Week", daysPerWeekController),
+                _buildEditField("Target Distance (km)", targetDistanceController),
+                _buildEditField("Target Weight (kg)", targetWeightController),
+                _buildEditField("Target Duration (mins)", targetDurationController),
+                _buildEditField("Goal Type", goalTypeController),
+                _buildEditField("Current Level", currentLevelController),
+                _buildEditField("Health Condition", healthConditionController),
+                _buildEditField("Height (cm)", heightController),
               ],
             ),
           ),
@@ -232,11 +226,8 @@ class _FitRidePageState extends State<FitRidePage> {
             TextButton(
               onPressed: () async {
                 // Validate exertion level
-                final exertionLevelValue =
-                    int.tryParse(exertionController.text);
-                if (exertionLevelValue == null ||
-                    exertionLevelValue < 1 ||
-                    exertionLevelValue > 10) {
+                final exertionLevelValue = int.tryParse(exertionController.text);
+                if (exertionLevelValue == null || exertionLevelValue < 1 || exertionLevelValue > 10) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Exertion level must be between 1 and 10.'),
@@ -251,30 +242,45 @@ class _FitRidePageState extends State<FitRidePage> {
                 if (user != null) {
                   String uid = user.uid;
                   String fullDate = dates.firstWhere(
-                    (date) => selectedDate == "${date['day']} ${date['date']}",
+                        (date) => selectedDate == "${date['day']} ${date['date']}",
                   )['fullDate']!;
 
                   try {
-                    // Update User Questionnaire collection
+                    // Update goals collection
                     await FirebaseFirestore.instance
-                        .collection('User Questionnaire')
+                        .collection('goals')
+                        .doc(uid)
+                        .set({
+                      'goalType': goalTypeController.text,
+                      'currentLevel': currentLevelController.text,
+                      'sessionDuration': int.tryParse(sessionDurationController.text),
+                      'daysPerWeek': int.tryParse(daysPerWeekController.text),
+                      'targetDistance': double.tryParse(targetDistanceController.text),
+                      'targetWeight': double.tryParse(targetWeightController.text),
+                      'targetDuration': int.tryParse(targetDurationController.text),
+                    });
+
+                    // Update userData collection
+                    await FirebaseFirestore.instance
+                        .collection('userData')
                         .doc(uid)
                         .set({
                       'weight': double.tryParse(weightController.text),
                       'bodyFat': double.tryParse(bodyFatController.text),
                       'bodyWater': double.tryParse(bodyWaterController.text),
+                      'healthCondition': healthConditionController.text,
+                      'height': double.tryParse(heightController.text),
                     });
 
                     // Update after_exercise collection
                     await FirebaseFirestore.instance
                         .collection('after_exercise')
                         .doc(uid)
-                        .collection('dailyData')
+                        .collection('logs')
                         .doc(fullDate)
                         .set({
-                      'foodTaken': foodTakenController.text,
-                      'hydration': double.tryParse(hydrationController.text),
-                      'levelofExertion': exertionLevelValue,
+                      'Hydration': double.tryParse(hydrationController.text),
+                      'levelOfExertion': exertionLevelValue,
                       'timestamp': FieldValue.serverTimestamp(),
                     });
 
@@ -282,18 +288,14 @@ class _FitRidePageState extends State<FitRidePage> {
                     await FirebaseFirestore.instance
                         .collection('activities')
                         .doc(uid)
-                        .collection('dailyData')
+                        .collection('logs')
                         .doc(fullDate)
                         .set({
-                      'average_heartrate':
-                          double.tryParse(heartrateController.text),
+                      'average_heartrate': double.tryParse(heartrateController.text),
                       'average_speed': double.tryParse(speedController.text),
-                      'calories_burned':
-                          double.tryParse(caloriesController.text),
+                      'calories_burned': double.tryParse(caloriesController.text),
                       'distance': double.tryParse(distanceController.text),
-                      'type': typeController.text,
-                      'start_date': DateTime.now()
-                          .toIso8601String(), // Automatically set the date
+                      'start_date': DateTime.now().toIso8601String(),
                     });
 
                     // Update local state
@@ -301,14 +303,21 @@ class _FitRidePageState extends State<FitRidePage> {
                       weight = weightController.text;
                       bodyFat = bodyFatController.text;
                       bodyWater = bodyWaterController.text;
-                      foodTaken = foodTakenController.text;
                       hydration = hydrationController.text;
-                      levelofExertion = exertionController.text;
+                      levelOfExertion = exertionController.text;
                       averageHeartrate = heartrateController.text;
                       averageSpeed = speedController.text;
                       caloriesBurned = caloriesController.text;
                       distance = distanceController.text;
-                      type = typeController.text;
+                      sessionDuration = sessionDurationController.text;
+                      daysPerWeek = daysPerWeekController.text;
+                      targetDistance = targetDistanceController.text;
+                      targetWeight = targetWeightController.text;
+                      targetDuration = targetDurationController.text;
+                      goalType = goalTypeController.text;
+                      currentLevel = currentLevelController.text;
+                      healthCondition = healthConditionController.text;
+                      height = heightController.text;
                     });
 
                     Navigator.pop(context);
@@ -432,9 +441,9 @@ class _FitRidePageState extends State<FitRidePage> {
                           formatButtonVisible: false, // Hide format button
                           titleTextStyle: TextStyle(color: Colors.orange),
                           leftChevronIcon:
-                              Icon(Icons.chevron_left, color: Colors.orange),
+                          Icon(Icons.chevron_left, color: Colors.orange),
                           rightChevronIcon:
-                              Icon(Icons.chevron_right, color: Colors.orange),
+                          Icon(Icons.chevron_right, color: Colors.orange),
                         ),
                       ),
                     ),
@@ -500,18 +509,21 @@ class _FitRidePageState extends State<FitRidePage> {
                             _buildDataRow("Body Fat", "$bodyFat %"),
                             _buildDataRow("Body Water", "$bodyWater %"),
                             if (showAllData) ...[
-                              _buildDataRow("Food Taken", foodTaken),
                               _buildDataRow("Hydration", "$hydration liters"),
-                              _buildDataRow(
-                                  "Level of Exertion", levelofExertion),
-                              _buildDataRow(
-                                  "Average Heartrate", "$averageHeartrate bpm"),
-                              _buildDataRow(
-                                  "Average Speed", "$averageSpeed km/h"),
-                              _buildDataRow(
-                                  "Calories Burned", "$caloriesBurned kcal"),
+                              _buildDataRow("Level of Exertion", levelOfExertion),
+                              _buildDataRow("Average Heartrate", "$averageHeartrate bpm"),
+                              _buildDataRow("Average Speed", "$averageSpeed km/h"),
+                              _buildDataRow("Calories Burned", "$caloriesBurned kcal"),
                               _buildDataRow("Distance", "$distance km"),
-                              _buildDataRow("Type", type),
+                              _buildDataRow("Session Duration", "$sessionDuration mins"),
+                              _buildDataRow("Days Per Week", daysPerWeek),
+                              _buildDataRow("Target Distance", "$targetDistance km"),
+                              _buildDataRow("Target Weight", "$targetWeight kg"),
+                              _buildDataRow("Target Duration", "$targetDuration mins"),
+                              _buildDataRow("Goal Type", goalType),
+                              _buildDataRow("Current Level", currentLevel),
+                              _buildDataRow("Health Condition", healthCondition),
+                              _buildDataRow("Height", "$height cm"),
                             ],
                           ],
                         ),
