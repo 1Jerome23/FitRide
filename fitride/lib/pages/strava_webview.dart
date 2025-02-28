@@ -176,7 +176,7 @@ Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
       print('Tokens saved in Firestore with Firebase UID: $firebaseUid');
 
       await _fetchStravaData(stravaUserId, accessToken);
-      await _subscribeToStravaWebhook();
+      //await _subscribeToStravaWebhook();
       return true; 
     } else {
       print('Error exchanging authorization code: ${response.body}');
@@ -258,7 +258,7 @@ Future<void> _fetchStravaData(String userId, String accessToken) async {
     }
   }
 
-Future<void> _subscribeToStravaWebhook() async {
+/*Future<void> _subscribeToStravaWebhook() async {
   final String clientId = "146485";
   final String clientSecret = "6e8f87ec4856b0793c009aaf3dc17ff9a941f50f";
   final String callbackUrl = 'https://fitride.uk/webhook'; 
@@ -294,7 +294,7 @@ Future<void> _subscribeToStravaWebhook() async {
   } catch (e) {
     print('Error during webhook subscription: $e');
   }
-}
+}*/
 
   @override
   Widget build(BuildContext context) {
