@@ -18,6 +18,9 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _exertionController = TextEditingController();
   final TextEditingController _foodController = TextEditingController();
   final TextEditingController _hydrationController = TextEditingController();
+  final TextEditingController _currentLevelController = TextEditingController();
+  String goalType = "-";
+
   bool _isSubmitting = false;
 
 Future<int> _getDaysPerWeek(String userId) async {
@@ -26,7 +29,10 @@ Future<int> _getDaysPerWeek(String userId) async {
         .collection('goals')
         .doc(userId)
         .get();
-
+     DocumentSnapshot goalsDoc = await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(userId)
+          .get();
     if (snapshot.exists && snapshot.data() != null) {
       return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
     }
@@ -109,6 +115,7 @@ Future<int> _getDaysPerWeek(String userId) async {
         'foodTaken': _foodController.text,
         'estimatedCalories': estimatedCalories,
         'hydration': int.tryParse(_hydrationController.text) ?? 0,
+        'currentLevel': _currentLevelController.text,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -251,6 +258,20 @@ Future<int> _getDaysPerWeek(String userId) async {
                   if (value == null || value.isEmpty) return "Required";
                   final numValue = int.tryParse(value);
                   if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
+                  return null;
+                },
+              ),
+              if (goalType == "Leisure")
+              _buildTextInput(
+                label: "How do you feel after your exercise (1-10)",
+                controller: _hydrationController,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return "Required";
+                  final numValue = int.tryParse(value);
+                  if (numValue == null || numValue < 1 || numValue > 10) {
+                    return "Enter a number between 1-10";
+                  }
                   return null;
                 },
               ),
