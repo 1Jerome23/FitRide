@@ -10,6 +10,7 @@ import 'package:fitride/globals.dart';
 import 'dart:developer';
 import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:fitride/pages/welcome.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,7 +123,7 @@ class _MainApp extends StatelessWidget {
         ),
         initialRoute: '/',
         routes: {
-          '/': (context) => LoginPage(),
+          '/': (context) => WelcomePage(),
           '/questionnaire': (context) => QuestionPage(),
           '/homepage': (context) => WidgetTree(),
           '/recommendation': (context) => PostExercise(),
