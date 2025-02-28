@@ -395,7 +395,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                         latestBodyFat >= previousBodyFat)
                       _buildGoalRecommendation(
                         "⚠️ Warning",
-                        "You're losing weight, but your body fat % isn’t dropping. Consider adding some strength training such as inclined cycling.",
+                        "You're losing weight, but your body fat % isnt dropping. Consider adding some strength training such as inclined cycling.",
                       ),
                     if (latestWeight > previousWeight &&
                         latestBodyFat < previousBodyFat)
@@ -441,7 +441,7 @@ class _RecentActivityPageState extends State<RecentActivityPage> {
                     if (double.parse(distance) > double.parse(targetDistance))
                       _buildGoalRecommendation(
                         "✅ Good",
-                        "Great job! You've exceeded your target distance of $targetDistance km. Keep pushing your limits!",
+                        "Great job! You've exceeded your target distance of $targetDistance km. Keep pushing your limits'!!",
                       ),
                     if (double.parse(distance) < double.parse(targetDistance))
                       _buildGoalRecommendation(
