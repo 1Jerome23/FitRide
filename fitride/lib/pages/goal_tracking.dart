@@ -91,62 +91,50 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     setState(() {
       _isLoading = true;
     });
-    
+
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
-        // 1. Get the goal data
-        final goalDoc = await FirebaseFirestore.instance
+        // Query the goals collection for the most recent goal with matching uid
+        QuerySnapshot goalsQuery = await FirebaseFirestore.instance
             .collection('goals')
-            .doc(uid)
+            .where('uid', isEqualTo: uid)
+            .orderBy('timestamp', descending: true) // Sort by timestamp in descending order
+            .limit(1) // Limit to the most recent document
             .get();
-            
-        if (goalDoc.exists) {
-          final goalData = goalDoc.data();
-          
+
+        if (goalsQuery.docs.isNotEmpty) {
+          DocumentSnapshot goalDoc = goalsQuery.docs.first; // Get the first (most recent) document
+          final goalData = goalDoc.data() as Map<String, dynamic>;
+
           // Query athletes collection
           final athleteQuerySnapshot = await FirebaseFirestore.instance
               .collection('athletes')
               .where('app_id', isEqualTo: uid)
               .limit(1)
               .get();
-          
+
           bool hasActivity = false;
-          
+
           if (athleteQuerySnapshot.docs.isNotEmpty) {
             final athleteDoc = athleteQuerySnapshot.docs.first;
             final athleteId = athleteDoc.id;
-            
-            // Important: Convert the document ID to a number if that's what user_id expects
+
+            // Convert the document ID to a number if that's what user_id expects
             final userIdNumber = int.tryParse(athleteId);
-            
-            print("Athlete Document ID: $athleteId");
-            print("Converted User ID Number: $userIdNumber");
-            
+
             if (userIdNumber != null) {
               // Query activities using the number
               final activitiesSnapshot = await FirebaseFirestore.instance
                   .collection('activities')
                   .where('user_id', isEqualTo: userIdNumber)
                   .get();
-              
+
               // Check if any activities were found
               hasActivity = activitiesSnapshot.docs.isNotEmpty;
-              
-              print("Activities found: $hasActivity");
-              if (hasActivity) {
-                activitiesSnapshot.docs.forEach((doc) {
-                  print("Activity Document: ${doc.id}");
-                  print("Activity Data: ${doc.data()}");
-                });
-              }
-            } else {
-              print("Could not convert athlete ID to number");
             }
-          } else {
-            print("No matching athlete found");
           }
-          
+
           setState(() {
             userGoal = goalData;
             _hasActivityAfterGoal = hasActivity;
@@ -171,7 +159,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       });
     }
   }
-
   void _showChangeGoalConfirmation() {
     showDialog(
       context: context,
@@ -274,26 +261,22 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       },
     );
   }
-
   Future<void> _resetUserGoal() async {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
-        // Delete current goal
-        await FirebaseFirestore.instance
-            .collection('goals')
-            .doc(uid)
-            .delete();
-            
-        // Navigate directly to the goals page (index 2)
-        Navigator.pushReplacement(
+        // Navigate to the QuestionPage to set a new goal
+        await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
         );
+
+        // Reload the user's goal after returning from the QuestionPage
+        _loadUserGoal();
       } catch (e) {
         print('Error resetting goal: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to reset goal. Please try again.'))
+          const SnackBar(content: Text('Failed to reset goal. Please try again.')),
         );
       }
     }
