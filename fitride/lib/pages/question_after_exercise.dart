@@ -11,6 +11,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class PostExercise extends StatefulWidget {
   @override
   _PostExerciseState createState() => _PostExerciseState();
+  
 }
 
 class _PostExerciseState extends State<PostExercise> {
@@ -23,6 +24,17 @@ class _PostExerciseState extends State<PostExercise> {
 
   bool _isSubmitting = false;
 
+@override
+void initState() {
+  super.initState();
+  print("🔄 Initializing PostExercise widget");
+  // Call getUserGoal immediately and add a callback for when it completes
+  getUserGoal().then((_) {
+    print("✅ getUserGoal completed, goalType is now: $goalType");
+    // Force a rebuild of the widget after goal is fetched
+    if (mounted) setState(() {});
+  });
+}
 Future<int> _getDaysPerWeek(String userId) async {
   try {
     DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
@@ -37,29 +49,41 @@ Future<int> _getDaysPerWeek(String userId) async {
   }
   return 0; // Default to 0 if an error occurs or data is missing
 }
-Future<Map<String, dynamic>?> getUserGoal(String userId, String goalType) async {
-  print("Fetching goal for userId: $userId, goalType: $goalType");
+Future<void> getUserGoal() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    print("❌ No authenticated user.");
+    return;
+  }
+
+  print("🔍 Fetching goal for userId: ${user.uid}");
 
   try {
-    QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
+    // Get goal directly using the Firebase UID
+    DocumentSnapshot<Map<String, dynamic>> goalDoc = await FirebaseFirestore.instance
         .collection('goals')
-        .where('uid', isEqualTo: userId)
-        .where('goalType', isEqualTo: goalType)
+        .doc(user.uid)  // Using Firebase UID directly
         .get();
 
-    print("Documents found: ${querySnapshot.docs.length}");
+    if (goalDoc.exists && goalDoc.data() != null) {
+      var goalData = goalDoc.data()!;
+      print("🏆 Goal Data: $goalData");
 
-    if (querySnapshot.docs.isNotEmpty) {
-      var goalData = querySnapshot.docs.first.data();
-      print("Goal Data: $goalData");
-      return goalData;
+      setState(() {
+        goalType = goalData['goalType'] ?? "-"; // Update state
+      });
+
+      print("✅ Updated goalType: $goalType");
     } else {
-      print("No matching goal found.");
-      return null;
+      print("⚠️ No goal found for user ID: ${user.uid}");
+      
+      // Optionally set a default if you want this field to show anyway
+      setState(() {
+        goalType = "Leisure"; // Set default to make the field appear
+      });
     }
   } catch (e) {
-    print("Error fetching user goal: $e");
-    return null;
+    print("❌ Error fetching user goal: $e");
   }
 }
 
@@ -273,20 +297,28 @@ Future<Map<String, dynamic>?> getUserGoal(String userId, String goalType) async 
                 controller: _foodController,
                 validator: (value) => value == null || value.isEmpty ? "Required" : null,
               ),
-              if (goalType == "Leisure")
-              _buildTextInput(
-                label: "How do you feel after your exercise (1-10)",
-                controller: _hydrationController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  final numValue = int.tryParse(value);
-                  if (numValue == null || numValue < 1 || numValue > 10) {
-                    return "Enter a number between 1-10";
-                  }
-                  return null;
-                },
-              ),
+              Builder(builder: (context) {
+              print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
+              if (goalType == "Leisure") {
+                print("✅ Condition matched, should show the field");
+                return _buildTextInput(
+                  label: "How do you feel after your exercise (1-10)",
+                  controller: _hydrationController,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return "Required";
+                    final numValue = int.tryParse(value);
+                    if (numValue == null || numValue < 1 || numValue > 10) {
+                      return "Enter a number between 1-10";
+                    }
+                    return null;
+                  },
+                );
+              } else {
+                print("❌ Condition not matched, field should be hidden");
+                return SizedBox.shrink(); // Return an empty widget if not Leisure
+              }
+            }),
               SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _saveToFirestore,
