@@ -49,11 +49,8 @@ class _QuestionPageState extends State<QuestionPage>
   final TextEditingController targetDistanceController = TextEditingController();
   final TextEditingController targetDurationController = TextEditingController();
 
-  int _selectedIndex = 3;
-  bool _isLoading = true;
   String name = "Loading...";
   String email = "Loading...";
-  String? _imagePath;
   
   late AnimationController _animationController;
   late Animation<double> _opacityAnimation;
@@ -1272,7 +1269,7 @@ class _QuestionPageState extends State<QuestionPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "How long will each cycling session last?",
+                "How long would you like to cycle in week?",
                 style: TextStyle(
                   fontFamily: "Inter",
                   fontSize: 15,
@@ -1749,7 +1746,7 @@ class _QuestionPageState extends State<QuestionPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "How long will each cycling session last?",
+                "How long do you want to cycle in a week?",
                 style: TextStyle(
                   fontFamily: "Inter",
                   fontSize: 15,
@@ -1865,7 +1862,7 @@ class _QuestionPageState extends State<QuestionPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "What is your target cycling distance per session?",
+                "What is your target cycling distance?",
                 style: TextStyle(
                   fontFamily: "Inter",
                   fontSize: 15,
@@ -1943,7 +1940,7 @@ class _QuestionPageState extends State<QuestionPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "How long do you aim to cycle per session?",
+                "What is the maximum time you want to complete this distance in?",
                 style: TextStyle(
                   fontFamily: "Inter",
                   fontSize: 15,
