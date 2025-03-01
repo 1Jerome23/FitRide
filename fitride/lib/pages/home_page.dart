@@ -657,9 +657,7 @@ Future<void> loadStravaUserId() async {
                         ),
                       ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
                       SizedBox(height: 15),
-                      // Find this section in your code that handles the chart rendering
-// and replace it with this more impressive design
-Container(
+                      Container(
   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
   decoration: BoxDecoration(
     gradient: LinearGradient(
@@ -753,9 +751,12 @@ Container(
               Timestamp? timestamp = data['start_date'];
               DateTime date = timestamp?.toDate() ?? DateTime.now();
 
+              // Format month for display
+              String monthLabel = DateFormat('MMM').format(date);
+              
               activityData.add(
                 ActivityData(
-                  DateFormat('MMM').format(date),
+                  monthLabel, // This will be displayed on the x-axis
                   distance,
                 ),
               );
@@ -815,7 +816,7 @@ Container(
                   ),
                 ),
                 Container(
-                  height: 200, 
+                  height: 200, // Compact height
                   width: double.infinity,
                   child: SfCartesianChart(
                     margin: EdgeInsets.zero,
@@ -826,10 +827,13 @@ Container(
                       labelStyle: TextStyle(
                         color: Colors.grey[700],
                         fontFamily: 'Inter',
-                        fontSize: 10,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
                       majorTickLines: MajorTickLines(size: 0),
                       labelIntersectAction: AxisLabelIntersectAction.hide,
+                      interval: 1, // Ensure all months are shown
+                      labelRotation: 0, // Keep labels horizontal
                     ),
                     primaryYAxis: NumericAxis(
                       majorGridLines: MajorGridLines(
@@ -857,12 +861,13 @@ Container(
                     ),
                     legend: Legend(isVisible: false),
                     series: <ChartSeries>[
+                      // Area Series with gradient
                       AreaSeries<ActivityData, String>(
                         dataSource: activityData,
                         xValueMapper: (ActivityData data, _) => data.month,
                         yValueMapper: (ActivityData data, _) => data.distance,
                         borderColor: Color(0xffFFA500),
-                        borderWidth: 0, 
+                        borderWidth: 0, // No border for area
                         gradient: LinearGradient(
                           colors: [
                             Color(0xffFFA500).withOpacity(0.5),
@@ -873,11 +878,12 @@ Container(
                         ),
                         animationDuration: 1200,
                       ),
+                      // Main line series - THICKER now
                       SplineSeries<ActivityData, String>(
                         dataSource: activityData,
                         xValueMapper: (ActivityData data, _) => data.month,
                         yValueMapper: (ActivityData data, _) => data.distance,
-                        width: 7,
+                        width: 5, // Much thicker line
                         color: Color(0xffFFA500),
                         animationDuration: 1500,
                         markerSettings: MarkerSettings(
@@ -916,22 +922,35 @@ Container(
                  ).then(delay: 300.ms)
                  .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.2)),
                 
+                // Small legend at the bottom
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        height: 3,
-                        width: 20,
-                        decoration: BoxDecoration(
-                          color: Color(0xffFFA500),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            height: 3,
+                            width: 20,
+                            decoration: BoxDecoration(
+                              color: Color(0xffFFA500),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            "Distance (km)",
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 10,
+                              fontFamily: "Inter",
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 6),
                       Text(
-                        "Distance (km)",
+                        "Months",
                         style: TextStyle(
                           color: Colors.grey[700],
                           fontSize: 10,

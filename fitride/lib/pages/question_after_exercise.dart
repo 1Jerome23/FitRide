@@ -7,11 +7,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class PostExercise extends StatefulWidget {
   @override
   _PostExerciseState createState() => _PostExerciseState();
-  
 }
 
 class _PostExerciseState extends State<PostExercise> {
@@ -21,117 +21,117 @@ class _PostExerciseState extends State<PostExercise> {
   final TextEditingController _hydrationController = TextEditingController();
   final TextEditingController _currentLevelController = TextEditingController();
   String goalType = "-";
-
   bool _isSubmitting = false;
 
-@override
-void initState() {
-  super.initState();
-  print("🔄 Initializing PostExercise widget");
-  // Call getUserGoal immediately and add a callback for when it completes
-  getUserGoal().then((_) {
-    print("✅ getUserGoal completed, goalType is now: $goalType");
-    // Force a rebuild of the widget after goal is fetched
-    if (mounted) setState(() {});
-  });
-}
-Future<int> _getDaysPerWeek(String userId) async {
-  try {
-    DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
-        .collection('goals')
-        .doc(userId)
-        .get();
-    if (snapshot.exists && snapshot.data() != null) {
-      return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
+  @override
+  void initState() {
+    super.initState();
+    print("🔄 Initializing PostExercise widget");
+    // Call getUserGoal immediately and add a callback for when it completes
+    getUserGoal().then((_) {
+      print("✅ getUserGoal completed, goalType is now: $goalType");
+      // Force a rebuild of the widget after goal is fetched
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<int> _getDaysPerWeek(String userId) async {
+    try {
+      DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(userId)
+          .get();
+      if (snapshot.exists && snapshot.data() != null) {
+        return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
+      }
+    } catch (e) {
+      print('Error fetching daysPerWeek: $e');
     }
-  } catch (e) {
-    print('Error fetching daysPerWeek: $e');
-  }
-  return 0; // Default to 0 if an error occurs or data is missing
-}
-Future<void> getUserGoal() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print("❌ No authenticated user.");
-    return;
+    return 0; // Default to 0 if an error occurs or data is missing
   }
 
-  print("🔍 Fetching goal for userId: ${user.uid}");
-
-  try {
-    // Get goal directly using the Firebase UID
-    DocumentSnapshot<Map<String, dynamic>> goalDoc = await FirebaseFirestore.instance
-        .collection('goals')
-        .doc(user.uid)  // Using Firebase UID directly
-        .get();
-
-    if (goalDoc.exists && goalDoc.data() != null) {
-      var goalData = goalDoc.data()!;
-      print("🏆 Goal Data: $goalData");
-
-      setState(() {
-        goalType = goalData['goalType'] ?? "-"; // Update state
-      });
-
-      print("✅ Updated goalType: $goalType");
-    } else {
-      print("⚠️ No goal found for user ID: ${user.uid}");
-      
-      // Optionally set a default if you want this field to show anyway
-      setState(() {
-        goalType = "Leisure"; // Set default to make the field appear
-      });
+  Future<void> getUserGoal() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("❌ No authenticated user.");
+      return;
     }
-  } catch (e) {
-    print("❌ Error fetching user goal: $e");
-  }
-}
 
+    print("🔍 Fetching goal for userId: ${user.uid}");
+
+    try {
+      // Get goal directly using the Firebase UID
+      DocumentSnapshot<Map<String, dynamic>> goalDoc = await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(user.uid)  // Using Firebase UID directly
+          .get();
+
+      if (goalDoc.exists && goalDoc.data() != null) {
+        var goalData = goalDoc.data()!;
+        print("🏆 Goal Data: $goalData");
+
+        setState(() {
+          goalType = goalData['goalType'] ?? "-"; // Update state
+        });
+
+        print("✅ Updated goalType: $goalType");
+      } else {
+        print("⚠️ No goal found for user ID: ${user.uid}");
+        
+        // Optionally set a default if you want this field to show anyway
+        setState(() {
+          goalType = "Leisure"; // Set default to make the field appear
+        });
+      }
+    } catch (e) {
+      print("❌ Error fetching user goal: $e");
+    }
+  }
 
   Future<void> _updateStreakCount(String userId) async {
-  final now = DateTime.now();
-  final startOfDay = DateTime(now.year, now.month, now.day);
-  final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
 
-  // Fetch the required days per week for the user
-  int daysPerWeek = await _getDaysPerWeek(userId);
+    // Fetch the required days per week for the user
+    int daysPerWeek = await _getDaysPerWeek(userId);
 
-  // Check if there is an existing streak document for this week
-  DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
-      .collection('Streak')
-      .doc(userId)
-      .get();
+    // Check if there is an existing streak document for this week
+    DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+        .collection('Streak')
+        .doc(userId)
+        .get();
 
-  bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
+    bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
 
-  if (isNewWeek) {
-    // Create a new streak document for the current week
-    await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
-      'userId': userId,
-      'activityCount': 1,
-      'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
-      'startOfWeek': FieldValue.serverTimestamp(),
-      'endOfWeek': endOfWeek,
-    });
-  } else {
-    // Update the existing streak document
-    int currentActivityCount = snapshot.data()!['activityCount'] ?? 0;
-    int updatedActivityCount = currentActivityCount + 1;
-
-    if (updatedActivityCount >= daysPerWeek) {
-      // User has completed the required activities for the week
-      await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
-        'activityCount': updatedActivityCount,
-        'streak': FieldValue.increment(1), // Increment streak
+    if (isNewWeek) {
+      // Create a new streak document for the current week
+      await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
+        'userId': userId,
+        'activityCount': 1,
+        'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
+        'startOfWeek': FieldValue.serverTimestamp(),
+        'endOfWeek': endOfWeek,
       });
     } else {
-      // User has not yet completed the required activities for the week
-      await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
-        'activityCount': updatedActivityCount,
-      });
+      // Update the existing streak document
+      int currentActivityCount = snapshot.data()!['activityCount'] ?? 0;
+      int updatedActivityCount = currentActivityCount + 1;
+
+      if (updatedActivityCount >= daysPerWeek) {
+        // User has completed the required activities for the week
+        await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
+          'activityCount': updatedActivityCount,
+          'streak': FieldValue.increment(1), // Increment streak
+        });
+      } else {
+        // User has not yet completed the required activities for the week
+        await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
+          'activityCount': updatedActivityCount,
+        });
+      }
     }
   }
-}
 
   Future<void> _saveToFirestore() async {
     if (_isSubmitting) return;
@@ -170,7 +170,13 @@ Future<void> getUserGoal() async {
       await _updateStreakCount(user.uid);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Data saved successfully!")),
+        SnackBar(
+          content: Text("Data saved successfully!"),
+          backgroundColor: Color(0xffFFA500),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
       );
 
       Navigator.pushReplacement(
@@ -180,16 +186,21 @@ Future<void> getUserGoal() async {
     } catch (e) {
       print("Error saving data: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save data! Please try again.")),
+        SnackBar(
+          content: Text("Failed to save data! Please try again."),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
       );
     } finally {
       setState(() {
         _isSubmitting = false;
       });
     }
-
-
   }
+
   Future<double> _getCaloriesFromUSDA(String foodInput) async {
     if (foodInput.isEmpty) return 0.0;
 
@@ -238,7 +249,6 @@ Future<void> getUserGoal() async {
     }
   }
 
-
   Future<void> fetchWeatherData(String userId) async {
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
@@ -268,101 +278,228 @@ Future<void> getUserGoal() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
         title: Text(
-          "Post Exercise Form",
-          style: GoogleFonts.roboto(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+          "Post Exercise Summary",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            color: Color(0xffFFA500),
+            fontSize: 22,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, color: Color(0xffFFA500)),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              _buildTextInput(
-                label: "Level of exertion (1-10)",
-                controller: _exertionController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  final numValue = int.tryParse(value);
-                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
-                  return null;
-                },
-              ),
-              _buildTextInput(
-                label: "Food taken today",
-                controller: _foodController,
-                validator: (value) => value == null || value.isEmpty ? "Required" : null,
-              ),
-              Builder(builder: (context) {
-              print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
-              if (goalType == "Leisure") {
-                print("✅ Condition matched, should show the field");
-                return _buildTextInput(
-                  label: "How do you feel after your exercise (1-10)",
-                  controller: _hydrationController,
+        physics: BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "How was your ride?",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 24,
+                    color: Colors.black87,
+                  ),
+                ).animate().fadeIn(duration: 400.ms, delay: 100.ms).slideY(begin: -0.1, end: 0),
+                
+                SizedBox(height: 6),
+                
+                Text(
+                  "Let us know about your cycling experience today",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: -0.1, end: 0),
+                
+                SizedBox(height: 30),
+                
+                _buildInputField(
+                  label: "Level of Exertion",
+                  hintText: "Rate from 1-10 how hard you worked",
+                  controller: _exertionController,
+                  icon: Icons.fitness_center,
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return "Required";
+                    if (value == null || value.isEmpty) return "Please enter your exertion level";
                     final numValue = int.tryParse(value);
-                    if (numValue == null || numValue < 1 || numValue > 10) {
+                    if (numValue == null || numValue < 1 || numValue > 10) 
                       return "Enter a number between 1-10";
-                    }
                     return null;
                   },
-                );
-              } else {
-                print("❌ Condition not matched, field should be hidden");
-                return SizedBox.shrink(); // Return an empty widget if not Leisure
-              }
-            }),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _saveToFirestore,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                  textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  delay: 300,
                 ),
-                child: _isSubmitting
-                    ? CircularProgressIndicator(color: Colors.white)
-                    : Text("Submit", style: TextStyle(color: Colors.white)),
-              ),
-            ],
+                
+                SizedBox(height: 20),
+                
+                _buildInputField(
+                  label: "Food Intake",
+                  hintText: "What did you eat today?",
+                  controller: _foodController,
+                  icon: Icons.restaurant_menu,
+                  validator: (value) => value == null || value.isEmpty 
+                      ? "Please enter what you ate" 
+                      : null,
+                  delay: 400,
+                ),
+                
+                SizedBox(height: 20),
+                
+                Builder(builder: (context) {
+                  print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
+                  if (goalType == "Leisure") {
+                    print("✅ Condition matched, should show the field");
+                    return _buildInputField(
+                      label: "Post-Ride Feeling",
+                      hintText: "Rate from 1-10 how you feel now",
+                      controller: _hydrationController,
+                      icon: Icons.mood,
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return "Please rate how you feel";
+                        final numValue = int.tryParse(value);
+                        if (numValue == null || numValue < 1 || numValue > 10) {
+                          return "Enter a number between 1-10";
+                        }
+                        return null;
+                      },
+                      delay: 500,
+                    );
+                  } else {
+                    print("❌ Condition not matched, field should be hidden");
+                    return SizedBox.shrink(); // Return an empty widget if not Leisure
+                  }
+                }),
+                
+                SizedBox(height: 40),
+                
+                Center(
+                  child: Container(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _saveToFirestore,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xffFFA500),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: _isSubmitting
+                          ? SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : Text(
+                              "Submit",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 600.ms).scale(begin: Offset(0.95, 0.95)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTextInput({
+  Widget _buildInputField({
     required String label,
+    required String hintText,
     required TextEditingController controller,
+    required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    int delay = 0,
   }) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 8.0),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: TextStyle(color: Colors.black),
-        validator: validator,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          border: InputBorder.none,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 16,
+            color: Colors.black87,
+          ),
         ),
-      ),
-    );
+        SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 15,
+              color: Colors.black87,
+            ),
+            validator: validator,
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.grey[400],
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: Color(0xffFFA500),
+                size: 22,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              filled: true,
+              fillColor: Colors.white,
+              errorStyle: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: Colors.red[700],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 400.ms, delay: delay.ms).slideY(begin: 0.1, end: 0);
   }
 }
