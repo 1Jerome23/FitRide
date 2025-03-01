@@ -212,37 +212,39 @@ class _HomePageState extends State<HomePage>
     } catch (e) {
       print('Error fetching streak data: $e');
     }
-    return {'streak': 0}; // Default to 0 if no streak exists
+    return {'streak': 0}; 
   }
 
 Future<void> loadStravaUserId() async {
   try {
     FirebaseAuth auth = FirebaseAuth.instance;
-    FirebaseFirestore firestore = FirebaseFirestore.instance;
-
     User? user = auth.currentUser;
+    
     if (user == null) {
       print("No authenticated user found.");
       return;
     }
 
-    print("Fetching Strava User ID for UID: ${user.uid}");
+    print("Fetching Strava User ID from athletes for UID: ${user.uid}");
 
-    // Get Strava User ID from user_tokens
-    QuerySnapshot userTokensSnapshot = await firestore
-        .collection('user_tokens')
-        .where("firebaseUid", isEqualTo: user.uid)
+    QuerySnapshot athleteSnapshot = await FirebaseFirestore.instance
+        .collection('athletes')
+        .where("app_id", isEqualTo: user.uid) 
+        .limit(1)
         .get();
 
-    if (userTokensSnapshot.docs.isEmpty) {
-      print("No user_tokens document found for UID: ${user.uid}");
+    if (athleteSnapshot.docs.isEmpty) {
+      print("No athlete document found for UID: ${user.uid}");
       return;
     }
 
-    String stravaUserIdString = userTokensSnapshot.docs.first["stravaUserId"];
+    String stravaUserIdString = athleteSnapshot.docs.first.id;
     print("Retrieved Strava User ID (String): $stravaUserIdString");
 
-    // Convert to integer for Firestore query
+    setState(() {
+      _stravaUserId = stravaUserIdString;
+    });
+
     int? stravaUserId = int.tryParse(stravaUserIdString);
     if (stravaUserId == null) {
       print("Error: Unable to convert Strava User ID to an integer.");
@@ -251,28 +253,12 @@ Future<void> loadStravaUserId() async {
 
     print("Converted Strava User ID (Integer): $stravaUserId");
 
-    // Query activities where user_id (number) matches stravaUserId (integer)
-    QuerySnapshot activityQuery = await firestore
-        .collection('activities')
-        .where('user_id', isEqualTo: stravaUserId) // Now correctly using an integer
-        .get();
-
-    if (activityQuery.docs.isNotEmpty) {
-      print("✅ Found activity for Strava User ID: $stravaUserId");
-      for (var doc in activityQuery.docs) {
-        print("Activity Data: ${doc.data()}");
-      }
-    } else {
-      print("⚠️ No activity found for Strava User ID: $stravaUserId");
-    }
+    _loadRecentActivities();
 
   } catch (e) {
     print("Error fetching Strava User ID: $e");
   }
 }
-
-
-
 
 
   Future<void> _getUserName() async {
@@ -299,14 +285,12 @@ Future<void> loadStravaUserId() async {
     geo.Position? position;
 
     try {
-      // Ensure location services are enabled
       bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         debugPrint("Location services are disabled.");
         return;
       }
 
-      // Check & request permission
       geo.LocationPermission permission =
           await geo.Geolocator.checkPermission();
       if (permission == geo.LocationPermission.deniedForever) {
@@ -321,7 +305,6 @@ Future<void> loadStravaUserId() async {
         }
       }
 
-      // Get current position using geo.geolocation
       position = await geo.Geolocator.getCurrentPosition(
           desiredAccuracy: geo.LocationAccuracy.high);
     } catch (e) {
@@ -697,10 +680,9 @@ Future<void> loadStravaUserId() async {
                     child: FutureBuilder<QuerySnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('activities')
-                          .where('user_id',
-                              isEqualTo: _stravaUserId != null
-                                  ? int.tryParse(_stravaUserId!)
-                                  : null)
+                          .where('user_id', isEqualTo: _stravaUserId != null
+                                ? int.tryParse(_stravaUserId!)
+                                : null)
                           .orderBy('start_date', descending: false)
                           .get(),
                       builder: (context, snapshot) {

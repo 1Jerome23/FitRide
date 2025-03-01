@@ -29,10 +29,6 @@ Future<int> _getDaysPerWeek(String userId) async {
         .collection('goals')
         .doc(userId)
         .get();
-     DocumentSnapshot goalsDoc = await FirebaseFirestore.instance
-          .collection('goals')
-          .doc(userId)
-          .get();
     if (snapshot.exists && snapshot.data() != null) {
       return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
     }
@@ -41,6 +37,33 @@ Future<int> _getDaysPerWeek(String userId) async {
   }
   return 0; // Default to 0 if an error occurs or data is missing
 }
+Future<Map<String, dynamic>?> getUserGoal(String userId, String goalType) async {
+  print("Fetching goal for userId: $userId, goalType: $goalType");
+
+  try {
+    QuerySnapshot<Map<String, dynamic>> querySnapshot = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .where('goalType', isEqualTo: goalType)
+        .get();
+
+    print("Documents found: ${querySnapshot.docs.length}");
+
+    if (querySnapshot.docs.isNotEmpty) {
+      var goalData = querySnapshot.docs.first.data();
+      print("Goal Data: $goalData");
+      return goalData;
+    } else {
+      print("No matching goal found.");
+      return null;
+    }
+  } catch (e) {
+    print("Error fetching user goal: $e");
+    return null;
+  }
+}
+
+
   Future<void> _updateStreakCount(String userId) async {
   final now = DateTime.now();
   final startOfDay = DateTime(now.year, now.month, now.day);
@@ -249,17 +272,6 @@ Future<int> _getDaysPerWeek(String userId) async {
                 label: "Food taken today",
                 controller: _foodController,
                 validator: (value) => value == null || value.isEmpty ? "Required" : null,
-              ),
-              _buildTextInput(
-                label: "Hydration (bottles of water 1-10)",
-                controller: _hydrationController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Required";
-                  final numValue = int.tryParse(value);
-                  if (numValue == null || numValue < 1 || numValue > 10) return "Enter a number between 1-10";
-                  return null;
-                },
               ),
               if (goalType == "Leisure")
               _buildTextInput(
