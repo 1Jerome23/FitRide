@@ -652,157 +652,168 @@ Future<void> loadStravaUserId() async {
                       .animate()
                       .fadeIn(duration: 600.ms, delay: 700.ms)
                       .slideY(begin: 0.1, end: 0),
-                  SizedBox(height: 30),
-                  Text(
-                    "Your Activity Progress",
-                    style: TextStyle(
-                      fontFamily: 'Fredoka-SemiBold',
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
-                  SizedBox(height: 15),
-                  Container(
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.15),
-                          spreadRadius: 4,
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
+                      SizedBox(height: 30),
+                      Text(
+                        "Your Activity Progress",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
-                      ],
-                    ),
-                    child: FutureBuilder<QuerySnapshot>(
-                      future: FirebaseFirestore.instance
-                          .collection('activities')
-                          .where('user_id', isEqualTo: _stravaUserId != null
-                                ? int.tryParse(_stravaUserId!)
-                                : null)
-                          .orderBy('start_date', descending: false)
-                          .get(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xffFFA500),
+                      ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
+                      SizedBox(height: 15),
+                      Container(
+                        padding: EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.15),
+                              spreadRadius: 4,
+                              blurRadius: 12,
+                              offset: Offset(0, 6),
                             ),
-                          );
-                        }
-                        if (snapshot.hasError) {
-                          print("Firestore Error: ${snapshot.error}");
-                          return Center(
-                            child: Text(
-                              "Error fetching data",
-                              style: TextStyle(
-                                  color: Colors.red, fontFamily: "Inter"),
-                            ),
-                          );
-                        }
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          print("No activities found for user: $_stravaUserId");
-                          return Center(
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: Colors.orange,
-                                  size: 50,
+                          ],
+                        ),
+                        child: _stravaUserId == null
+                            ? Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.link_off, color: Colors.red, size: 50),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      "No Strava account connected",
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 18,
+                                        fontFamily: "Inter",
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(height: 10),
-                                Text(
-                                  "No activity data available",
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 18,
-                                    fontFamily: "Inter",
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
+                              )
+                            : FutureBuilder<QuerySnapshot>(
+                                future: FirebaseFirestore.instance
+                                    .collection('activities')
+                                    .where('user_id', isEqualTo: int.tryParse(_stravaUserId!))
+                                    .orderBy('start_date', descending: false)
+                                    .get(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xffFFA500),
+                                      ),
+                                    );
+                                  }
+                                  if (snapshot.hasError) {
+                                    print("Firestore Error: ${snapshot.error}");
+                                    return Center(
+                                      child: Text(
+                                        "Error fetching data",
+                                        style: TextStyle(
+                                            color: Colors.red, fontFamily: "Inter"),
+                                      ),
+                                    );
+                                  }
+                                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                                    print("No activities found for user: $_stravaUserId");
+                                    return Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            Icons.warning_amber_rounded,
+                                            color: Colors.orange,
+                                            size: 50,
+                                          ),
+                                          SizedBox(height: 10),
+                                          Text(
+                                            "No activity data available",
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 18,
+                                              fontFamily: "Inter",
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
 
-                        // Parse Firestore data into chart points
-                        List<ActivityData> activityData = [];
-                        for (var doc in snapshot.data!.docs) {
-                          var data = doc.data() as Map<String, dynamic>;
-                          double distance =
-                              double.tryParse(data['distance'].toString()) ??
-                                  0.0;
-                          Timestamp? timestamp = data['start_date'];
-                          DateTime date = timestamp?.toDate() ?? DateTime.now();
+                                  // Parse Firestore data into chart points
+                                  List<ActivityData> activityData = [];
+                                  for (var doc in snapshot.data!.docs) {
+                                    var data = doc.data() as Map<String, dynamic>;
+                                    double distance =
+                                        double.tryParse(data['distance'].toString()) ?? 0.0;
+                                    Timestamp? timestamp = data['start_date'];
+                                    DateTime date = timestamp?.toDate() ?? DateTime.now();
 
-                          activityData.add(
-                            ActivityData(
-                              DateFormat('MMM').format(date),
-                              distance,
-                            ),
-                          );
-                        }
+                                    activityData.add(
+                                      ActivityData(
+                                        DateFormat('MMM').format(date),
+                                        distance,
+                                      ),
+                                    );
+                                  }
 
-                        return SizedBox(
-                          width: double.infinity,
-                          height: 300, // Increased height for better visibility
-                          child: SfCartesianChart(
-                            primaryXAxis: CategoryAxis(
-                              title: AxisTitle(
-                                text: 'Month',
-                                textStyle: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
+                                  return SizedBox(
+                                    width: double.infinity,
+                                    height: 300, // Increased height for better visibility
+                                    child: SfCartesianChart(
+                                      primaryXAxis: CategoryAxis(
+                                        title: AxisTitle(
+                                          text: 'Month',
+                                          textStyle: TextStyle(
+                                              fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                        labelStyle: TextStyle(fontSize: 14),
+                                      ),
+                                      primaryYAxis: NumericAxis(
+                                        title: AxisTitle(
+                                          text: 'Distance (km)',
+                                          textStyle: TextStyle(
+                                              fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                        labelFormat: '{value} km',
+                                        labelStyle: TextStyle(fontSize: 14),
+                                      ),
+                                      title: ChartTitle(
+                                        text: 'Monthly Distance Traveled',
+                                        textStyle: TextStyle(
+                                            fontSize: 18, fontWeight: FontWeight.bold),
+                                      ),
+                                      legend: Legend(
+                                        isVisible: true,
+                                        position: LegendPosition.bottom,
+                                        textStyle: TextStyle(fontSize: 14),
+                                      ),
+                                      tooltipBehavior: TooltipBehavior(enable: true),
+                                      series: [
+                                        LineSeries<ActivityData, String>(
+                                          name: 'Distance',
+                                          dataSource: activityData,
+                                          xValueMapper: (ActivityData data, _) =>
+                                              data.month,
+                                          yValueMapper: (ActivityData data, _) =>
+                                              data.distance,
+                                          dataLabelSettings: DataLabelSettings(
+                                              isVisible: true,
+                                              textStyle: TextStyle(fontSize: 14)),
+                                          markerSettings: MarkerSettings(
+                                              isVisible: true, height: 8, width: 8),
+                                          width: 4, // Thicker line for better visibility
+                                          color: Color(0xffFFA500),
+                                        ),
+                                      ],
+                                    ),
+                                  ).animate().fadeIn(duration: 800.ms, delay: 700.ms);
+                                },
                               ),
-                              labelStyle: TextStyle(fontSize: 14),
-                            ),
-                            primaryYAxis: NumericAxis(
-                              title: AxisTitle(
-                                text: 'Distance (km)',
-                                textStyle: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              labelFormat: '{value} km',
-                              labelStyle: TextStyle(fontSize: 14),
-                            ),
-                            title: ChartTitle(
-                              text: 'Monthly Distance Traveled',
-                              textStyle: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            legend: Legend(
-                              isVisible: true,
-                              position: LegendPosition.bottom,
-                              textStyle: TextStyle(fontSize: 14),
-                            ),
-                            tooltipBehavior: TooltipBehavior(enable: true),
-                            series: [
-                              LineSeries<ActivityData, String>(
-                                name: 'Distance',
-                                dataSource: activityData,
-                                xValueMapper: (ActivityData data, _) =>
-                                    data.month,
-                                yValueMapper: (ActivityData data, _) =>
-                                    data.distance,
-                                dataLabelSettings: DataLabelSettings(
-                                    isVisible: true,
-                                    textStyle: TextStyle(fontSize: 14)),
-                                markerSettings: MarkerSettings(
-                                    isVisible: true, height: 8, width: 8),
-                                width: 4, // Thicker line for better visibility
-                                color: Color(0xffFFA500),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(duration: 800.ms, delay: 700.ms);
-                      },
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 600.ms, delay: 700.ms)
-                      .slideY(begin: 0.1, end: 0),
+                      ).animate().fadeIn(duration: 600.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
+
                   SizedBox(height: 30),
 
                   Row(
