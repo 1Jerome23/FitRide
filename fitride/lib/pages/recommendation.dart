@@ -97,6 +97,22 @@ class _RecommendationPageState extends State<RecommendationPage> {
         });
       }
 
+        QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
+            .collection('activities')
+            .where('user_id', isEqualTo: userId)
+            .orderBy('start_date', descending: true)
+            .limit(1)
+            .get();
+
+        if (activitiesQuery.docs.isNotEmpty) {
+          DocumentSnapshot userDataDoc = activitiesQuery.docs.first;
+          setState(() {
+            distance = (userDataDoc['distance'] is num) 
+                ? userDataDoc['distance'].toDouble() // Ensure it's a double
+                : double.tryParse(userDataDoc['distance']?.toString() ?? '30') ?? 30.0;
+          });
+        }
+
       // Fetch the most recent document from userData collection where uid matches userId
       QuerySnapshot userDataQuery = await FirebaseFirestore.instance
           .collection('userData')
@@ -150,6 +166,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 "userId": data['userId'],
               });
         }
+        print("Print recent data, $recentData");
       } else {
         print("No documents found in after_exercise for user $userId");
       }
@@ -339,6 +356,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     print("Latest distance: $latestDistance");
     print("Previous distance: $previousDistance");
     print("Latest speed: $latestAverageSpeed");
+    
     if (latestDistance > previousDistance &&
         latestDistance > 0 &&
         previousDistance > 0) {
