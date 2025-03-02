@@ -18,6 +18,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   String? userId = FirebaseAuth.instance.currentUser?.uid;
   List<Map<String, dynamic>> recentData = [];
+  List<Map<String, dynamic>> activityData = [];
   String recommendation = "Loading...";
   String feedback = "";
   bool showAllLogs = false;
@@ -73,7 +74,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .collection('goals')
           .where('uid', isEqualTo: userId)
           .orderBy('timestamp',
-          descending: true) // Sort by timestamp in descending order
+              descending: true) // Sort by timestamp in descending order
           .limit(1) // Limit to the most recent document
           .get();
 
@@ -97,28 +98,40 @@ class _RecommendationPageState extends State<RecommendationPage> {
         });
       }
 
-        QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
-            .collection('activities')
-            .where('user_id', isEqualTo: userId)
-            .orderBy('start_date', descending: true)
-            .limit(1)
-            .get();
+      QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: userId)
+          .orderBy('start_date', descending: true)
+          .limit(10)
+          .get();
+      if (activitiesQuery.docs.isNotEmpty) {
+        for (var doc in activitiesQuery.docs) {
+          var data = doc.data() as Map<String, dynamic>;
 
-        if (activitiesQuery.docs.isNotEmpty) {
-          DocumentSnapshot userDataDoc = activitiesQuery.docs.first;
-          setState(() {
-            distance = (userDataDoc['distance'] is num) 
-                ? userDataDoc['distance'].toDouble() // Ensure it's a double
-                : double.tryParse(userDataDoc['distance']?.toString() ?? '30') ?? 30.0;
+          // Add data to the recentData list
+          activityData.add({
+            "documentId": doc.id,
+            "average_heartrate": data['average_heartrate'],
+            "average_speed": data['average_speed'],
+            "calories_burned": data['calories_burned'],
+            "distance": data['distance'],
+            "elapsed_time": data['elapsed_time'],
+            "name": data['name'],
+            "start_date": data['start_date'],
+            "type": data['type'],
+            "uid": data['uid'],
           });
         }
+      } else {
+        print("No documents found in activities for user $userId");
+      }
 
       // Fetch the most recent document from userData collection where uid matches userId
       QuerySnapshot userDataQuery = await FirebaseFirestore.instance
           .collection('userData')
           .where('uid', isEqualTo: userId)
           .orderBy('timestamp',
-          descending: true) // Sort by timestamp in descending order
+              descending: true) // Sort by timestamp in descending order
           .limit(1) // Limit to the most recent document
           .get();
 
@@ -129,9 +142,15 @@ class _RecommendationPageState extends State<RecommendationPage> {
           age = int.tryParse(userDataDoc['age']?.toString() ?? '30') ?? 30;
           healthCondition = userDataDoc['healthCondition'] ?? "-";
           height = userDataDoc['height']?.toString() ?? "0";
-          weight = userDataDoc.data().toString().contains('weight') ? userDataDoc['weight']?.toString() ?? "0" : "0";
-          bodyFat = userDataDoc.data().toString().contains('bodyFat') ? userDataDoc['bodyFat']?.toString() ?? "0" : "0";
-          bodyWater = userDataDoc.data().toString().contains('bodyWater') ? userDataDoc['bodyWater']?.toString() ?? "0" : "0";
+          weight = userDataDoc.data().toString().contains('weight')
+              ? userDataDoc['weight']?.toString() ?? "0"
+              : "0";
+          bodyFat = userDataDoc.data().toString().contains('bodyFat')
+              ? userDataDoc['bodyFat']?.toString() ?? "0"
+              : "0";
+          bodyWater = userDataDoc.data().toString().contains('bodyWater')
+              ? userDataDoc['bodyWater']?.toString() ?? "0"
+              : "0";
           recommendedHeartRate = 220 - age; // Calculate recommended heart rate
         });
       }
@@ -140,37 +159,37 @@ class _RecommendationPageState extends State<RecommendationPage> {
       print("User ID: $userId");
       print("Goal type from fetch: $goalType");
       if (goalType != "Leisure") {
-      print("Attempting to fetch after_exercise data...");
-      QuerySnapshot goalSnapshot = await FirebaseFirestore.instance
-          .collection('after_exercise')
-          .where('userId', isEqualTo: userId)
-          .orderBy('timestamp', descending: true)
-          .limit(10)
-          .get();
+        print("Attempting to fetch after_exercise data...");
+        QuerySnapshot goalSnapshot = await FirebaseFirestore.instance
+            .collection('after_exercise')
+            .where('userId', isEqualTo: userId)
+            .orderBy('timestamp', descending: true)
+            .limit(10)
+            .get();
 
-      print("Query completed. Document count: ${goalSnapshot.docs.length}");
-      
+        print("Query completed. Document count: ${goalSnapshot.docs.length}");
+
         if (goalSnapshot.docs.isNotEmpty) {
-            for (var doc in goalSnapshot.docs) {
-              var data = doc.data() as Map<String, dynamic>;
+          for (var doc in goalSnapshot.docs) {
+            var data = doc.data() as Map<String, dynamic>;
 
-              // Add data to the recentData list
-              recentData.add({
-                "documentId": doc.id,
-                "currentLevel": data['currentLevel'],
-                "estimatedCalories": data['estimatedCalories'],
-                "foodTaken": data['foodTaken'],
-                "hydration": data['hydration'],
-                "levelOfExertion": data['levelOfExertion'],
-                "timestamp": data['timestamp'],
-                "userId": data['userId'],
-              });
+            // Add data to the recentData list
+            recentData.add({
+              "documentId": doc.id,
+              "currentLevel": data['currentLevel'],
+              "estimatedCalories": data['estimatedCalories'],
+              "foodTaken": data['foodTaken'],
+              "hydration": data['hydration'],
+              "levelOfExertion": data['levelOfExertion'],
+              "timestamp": data['timestamp'],
+              "userId": data['userId'],
+            });
+          }
+          print("Print recent data, $recentData");
+        } else {
+          print("No documents found in after_exercise for user $userId");
         }
-        print("Print recent data, $recentData");
-      } else {
-        print("No documents found in after_exercise for user $userId");
       }
-    }
 
       // Generate recommendations based on the fetched data
       _generateRecommendation();
@@ -183,11 +202,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   void _generateRecommendation() {
-
-      print("Starting recommendation generation");
-      print("Goal type: $goalType");
-      print("Recent data count: ${recentData.length}");
-    if (recentData.isEmpty) {
+    print("Starting recommendation generation");
+    print("Goal type: $goalType");
+    print("Recent data count: ${recentData.length}");
+    if (recentData.isEmpty && activityData.isEmpty) {
       setState(() {
         recommendation = "No data available.";
       });
@@ -201,41 +219,61 @@ class _RecommendationPageState extends State<RecommendationPage> {
         feedback = "Please add more data to generate recommendations.";
       });
       return;
+    } else if (goalType != "Leisure"){
+      // Get the most recent and previous data
+      var latestData = recentData[0];
+      var previousData = recentData.length > 1 ? recentData[1] : null;
+      var latestActivityData = activityData[0];
+      var previousActivityData = activityData.length > 1 ? activityData[1] : null;
+      // Update class-level variables
+      setState(() {
+        latestWeight = safeParseDouble(latestData['weight']);
+        previousWeight =
+        previousData != null ? safeParseDouble(previousData['weight']) : 0.0;
+
+        latestBodyFat = safeParseDouble(latestData['bodyFat']);
+        previousBodyFat =
+        previousData != null ? safeParseDouble(previousData['bodyFat']) : 0.0;
+
+        latestDistance = safeParseDouble(latestActivityData['distance']);
+        previousDistance = previousActivityData != null
+            ? safeParseDouble(previousActivityData['distance'])
+            : 0.0;
+
+        latestCaloriesBurned =
+            safeParseDouble(latestActivityData['calories_burned']);
+        previousCaloriesBurned = previousActivityData != null
+            ? safeParseDouble(previousActivityData['calories_burned'])
+            : 0.0;
+
+        latestAverageSpeed = safeParseDouble(latestActivityData['average_speed']);
+        previousAverageSpeed = previousActivityData != null
+            ? safeParseDouble(previousActivityData['average_speed'])
+            : 0.0;
+
+        latestAverageHeartrate =
+            safeParseDouble(latestActivityData['average_heartrate']);
+        print(latestAverageHeartrate);
+        previousAverageHeartrate = previousActivityData != null
+            ? safeParseDouble(previousActivityData['average_heartrate'])
+            : 0.0;
+      });
+    } else {
+      // Get the most recent and previous data
+      var latestActivityData = activityData[0];
+      // Update class-level variables
+      setState(() {
+        latestDistance = safeParseDouble(latestActivityData['distance']);
+        latestCaloriesBurned =
+            safeParseDouble(latestActivityData['calories_burned']);
+        latestAverageSpeed = safeParseDouble(latestActivityData['average_speed']);
+        latestAverageHeartrate =
+            safeParseDouble(latestActivityData['average_heartrate']);
+        print(latestAverageHeartrate);
+
+      });
     }
 
-    // Get the most recent and previous data
-    var latestData = recentData[0];
-    var previousData = recentData.length > 1 ? recentData[1] : null;
-    // Update class-level variables
-    setState(() {
-      latestWeight = safeParseDouble(latestData['weight']);
-      previousWeight =
-      previousData != null ? safeParseDouble(previousData['weight']) : 0.0;
-
-      latestBodyFat = safeParseDouble(latestData['bodyFat']);
-      previousBodyFat =
-      previousData != null ? safeParseDouble(previousData['bodyFat']) : 0.0;
-
-      latestDistance = safeParseDouble(latestData['distance']);
-      previousDistance = previousData != null
-          ? safeParseDouble(previousData['distance'])
-          : 0.0;
-
-      latestCaloriesBurned = safeParseDouble(latestData['calories_burned']);
-      previousCaloriesBurned = previousData != null
-          ? safeParseDouble(previousData['calories_burned'])
-          : 0.0;
-
-      latestAverageSpeed = safeParseDouble(latestData['average_speed']);
-      previousAverageSpeed = previousData != null
-          ? safeParseDouble(previousData['average_speed'])
-          : 0.0;
-
-      latestAverageHeartrate = safeParseDouble(latestData['average_heartrate']);
-      previousAverageHeartrate = previousData != null
-          ? safeParseDouble(previousData['average_heartrate'])
-          : 0.0;
-    });
 
     // Generate recommendations based on goal type
     switch (goalType) {
@@ -262,13 +300,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
         maxHeartRate * 0.6; // 60% of max heart rate for leisure
 
     double latestHeartRate = safeParseDouble(latestAverageHeartrate);
+    print(latestHeartRate);
     double latestExertion = safeParseDouble(levelOfExertion);
 
     if (latestHeartRate > targetHeartRate && latestHeartRate > 0) {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-        "Your heart rate was higher than the recommended range for a recovery ride. Aim for a heart rate below ${targetHeartRate.toStringAsFixed(0)} bpm.";
+            "Your heart rate was higher than the recommended range for a recovery ride. Aim for a heart rate below ${targetHeartRate.toStringAsFixed(0)} bpm.";
       });
     } else if (latestHeartRate <= targetHeartRate &&
         latestExertion <= 5 &&
@@ -277,7 +316,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "✅ Good";
         feedback =
-        "Great job keeping your session light! Your recovery rides are staying within the ideal range.";
+            "Great job keeping your session light! Your recovery rides are staying within the ideal range.";
       });
     } else {
       setState(() {
@@ -297,7 +336,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "✅ Good";
         feedback =
-        "Great job! You're losing both weight and body fat. Keep up the consistency with your cycling sessions and nutrition.";
+            "Great job! You're losing both weight and body fat. Keep up the consistency with your cycling sessions and nutrition.";
       });
     } else if (latestWeight < previousWeight &&
         latestBodyFat >= previousBodyFat &&
@@ -308,7 +347,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-        "You're losing weight, but your body fat % isn’t dropping. Consider adding some strength training such as inclined cycling.";
+            "You're losing weight, but your body fat % isn’t dropping. Consider adding some strength training such as inclined cycling.";
       });
     } else if (latestWeight > previousWeight &&
         latestBodyFat < previousBodyFat &&
@@ -319,7 +358,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "✅ Good";
         feedback =
-        "You're building muscle while burning fat! This is a great sign of improved fitness.";
+            "You're building muscle while burning fat! This is a great sign of improved fitness.";
       });
     } else if (latestWeight == previousWeight &&
         latestBodyFat < previousBodyFat &&
@@ -330,7 +369,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "✅ Good";
         feedback =
-        "Your body fat % is going down while maintaining weight—this suggests you're replacing fat with muscle. Keep going!";
+            "Your body fat % is going down while maintaining weight—this suggests you're replacing fat with muscle. Keep going!";
       });
     } else if (latestWeight == previousWeight &&
         latestBodyFat > previousBodyFat &&
@@ -341,7 +380,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-        "Your weight is stable, but body fat % is rising. Review your nutrition—ensure you're burning more than you consume.";
+            "Your weight is stable, but body fat % is rising. Review your nutrition—ensure you're burning more than you consume.";
       });
     } else {
       setState(() {
@@ -356,14 +395,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
     print("Latest distance: $latestDistance");
     print("Previous distance: $previousDistance");
     print("Latest speed: $latestAverageSpeed");
-    
+
     if (latestDistance > previousDistance &&
         latestDistance > 0 &&
         previousDistance > 0) {
       setState(() {
         recommendation = "✅ Good";
         feedback =
-        "Impressive ride today! Your endurance is improving—keep building on this momentum.";
+            "Impressive ride today! Your endurance is improving—keep building on this momentum.";
       });
     } else if (latestAverageSpeed < previousAverageSpeed &&
         latestAverageSpeed > 0 &&
@@ -371,7 +410,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-        "Your pace was lower today. Try to maintain a steady rhythm to improve endurance.";
+            "Your pace was lower today. Try to maintain a steady rhythm to improve endurance.";
       });
     } else if (latestAverageHeartrate > previousAverageHeartrate &&
         latestAverageHeartrate > 0 &&
@@ -379,7 +418,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       setState(() {
         recommendation = "⚠️ Warning";
         feedback =
-        "Your heart rate was higher than usual. Ensure you’re pacing yourself to sustain longer rides.";
+            "Your heart rate was higher than usual. Ensure you’re pacing yourself to sustain longer rides.";
       });
     } else {
       setState(() {
@@ -393,6 +432,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -538,7 +578,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                         "You're below your target distance of $targetDistance km. Try to increase your distance gradually.",
                       ),
                     if (double.parse(distance) ==
-                        double.parse(targetDistance) &&
+                            double.parse(targetDistance) &&
                         double.parse(distance) != 0)
                       _buildGoalRecommendation(
                         "✅ Good",
@@ -572,7 +612,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     child: Text(
                       showAllLogs ? "Hide All" : "View All",
                       style:
-                      GoogleFonts.lato(fontSize: 16, color: Colors.orange),
+                          GoogleFonts.lato(fontSize: 16, color: Colors.orange),
                     ),
                   ),
               ],
