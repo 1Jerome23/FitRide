@@ -35,17 +35,20 @@ class _PostExerciseState extends State<PostExercise> {
     });
   }
 
+
   Future<int> _getDaysPerWeek(String userId) async {
-    try {
-      DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
-          .collection('goals')
-          .doc(userId)
-          .get();
-      if (snapshot.exists && snapshot.data() != null) {
-        return snapshot.data()!['daysPerWeek'] ?? 0; // Default to 0 if not set
-      }
-    } catch (e) {
-      print('Error fetching daysPerWeek: $e');
+    QuerySnapshot goalsQuery = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp',
+        descending: true) // Sort by timestamp in descending order
+        .limit(1) // Limit to the most recent document
+        .get();
+
+    if (goalsQuery.docs.isNotEmpty) {
+      DocumentSnapshot goalsDoc =
+          goalsQuery.docs.first; // Get the first (most recent) document
+        return goalsDoc['daysPerWeek'] ?? 0; // Default to 0 if not set
     }
     return 0; // Default to 0 if an error occurs or data is missing
   }
@@ -60,18 +63,22 @@ class _PostExerciseState extends State<PostExercise> {
     print("🔍 Fetching goal for userId: ${user.uid}");
 
     try {
-      // Get goal directly using the Firebase UID
-      DocumentSnapshot<Map<String, dynamic>> goalDoc = await FirebaseFirestore.instance
+      // Fetch the most recent document from goals collection where uid matches userId
+      QuerySnapshot goalsQuery = await FirebaseFirestore.instance
           .collection('goals')
-          .doc(user.uid)  // Using Firebase UID directly
+          .where('uid', isEqualTo: user.uid)
+          .orderBy('timestamp',
+          descending: true) // Sort by timestamp in descending order
+          .limit(1) // Limit to the most recent document
           .get();
 
-      if (goalDoc.exists && goalDoc.data() != null) {
-        var goalData = goalDoc.data()!;
-        print("🏆 Goal Data: $goalData");
+      if (goalsQuery.docs.isNotEmpty) {
+        DocumentSnapshot goalsDoc =
+            goalsQuery.docs.first; // Get the first (most recent) document
+        print("🏆 Goal Data: $goalsDoc");
 
         setState(() {
-          goalType = goalData['goalType'] ?? "-"; // Update state
+          goalType = goalsDoc['goalType'] ?? "-"; // Update state
         });
 
         print("✅ Updated goalType: $goalType");
