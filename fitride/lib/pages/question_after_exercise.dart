@@ -362,33 +362,33 @@ class _PostExerciseState extends State<PostExercise> {
                   delay: 400,
                 ),
                 
-                SizedBox(height: 20),
+                // SizedBox(height: 20),
                 
-                Builder(builder: (context) {
-                  print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
-                  if (goalType == "Leisure") {
-                    print("✅ Condition matched, should show the field");
-                    return _buildInputField(
-                      label: "Post-Ride Feeling",
-                      hintText: "Rate from 1-10 how you feel now",
-                      controller: _hydrationController,
-                      icon: Icons.mood,
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return "Please rate how you feel";
-                        final numValue = int.tryParse(value);
-                        if (numValue == null || numValue < 1 || numValue > 10) {
-                          return "Enter a number between 1-10";
-                        }
-                        return null;
-                      },
-                      delay: 500,
-                    );
-                  } else {
-                    print("❌ Condition not matched, field should be hidden");
-                    return SizedBox.shrink(); // Return an empty widget if not Leisure
-                  }
-                }),
+                // Builder(builder: (context) {
+                //   print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
+                //   if (goalType == "Leisure") {
+                //     print("✅ Condition matched, should show the field");
+                //     return _buildInputField(
+                //       label: "Post-Ride Feeling",
+                //       hintText: "Rate from 1-10 how you feel now",
+                //       controller: _hydrationController,
+                //       icon: Icons.mood,
+                //       keyboardType: TextInputType.number,
+                //       validator: (value) {
+                //         if (value == null || value.isEmpty) return "Please rate how you feel";
+                //         final numValue = int.tryParse(value);
+                //         if (numValue == null || numValue < 1 || numValue > 10) {
+                //           return "Enter a number between 1-10";
+                //         }
+                //         return null;
+                //       },
+                //       delay: 500,
+                //     );
+                //   } else {
+                //     print("❌ Condition not matched, field should be hidden");
+                //     return SizedBox.shrink(); // Return an empty widget if not Leisure
+                //   }
+                // }),
                 
                 SizedBox(height: 40),
                 

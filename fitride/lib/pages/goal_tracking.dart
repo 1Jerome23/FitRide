@@ -127,7 +127,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         // Query all goals for the current user and order by timestamp in descending order
         QuerySnapshot goalsSnapshot = await FirebaseFirestore.instance
             .collection('goals')
-            .where('userId', isEqualTo: uid)
+            .where('uid', isEqualTo: uid)
             .orderBy('timestamp', descending: true)
             .get();
 
