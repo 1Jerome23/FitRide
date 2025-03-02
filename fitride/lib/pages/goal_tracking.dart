@@ -139,35 +139,212 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
           Map<String, dynamic>? goalData = mostRecentGoalDoc.data() as Map<String, dynamic>?;
 
           print("Most recent goal data: $goalData");
+          if (goalData!['goalType'] == 'High Intensity Cycling') {
+            try {
+              final userDataDoc = await FirebaseFirestore.instance
+                  .collection('userData')
+                  .doc(uid)
+                  .get();
 
-          if (goalData != null) {
-            // Parse the timestamp into a readable format
-            Timestamp timestamp = goalData['timestamp'];
-            DateTime goalTimestamp = timestamp.toDate();
-            String formattedTimestamp = DateFormat.yMMMMd().add_jm().format(goalTimestamp);
-            print("Most recent goal timestamp: $formattedTimestamp");
+              if (userDataDoc.exists) {
+                final userData = userDataDoc.data();
+                print("User data found: $userData");
 
-            // Process the goal data as needed
-            setState(() {
-              userGoal = goalData;
-              _isLoading = false;
-            });
-          } else {
-            print("No valid goal data found.");
-            setState(() {
-              userGoal = null;
-              _isLoading = false;
-            });
+                var weightValue = userData!['weight'];
+                if (weightValue != null) {
+                  if (weightValue is int) {
+                    _currentUserWeight = weightValue.toDouble();
+                  } else if (weightValue is double) {
+                    _currentUserWeight = weightValue;
+                  } else if (weightValue is String) {
+                    _currentUserWeight = double.tryParse(weightValue) ?? 0.0;
+                  }
+                }
+                print("Current user weight: $_currentUserWeight");
+              } else {
+                print("No userData document found for current weight");
+              }
+            } catch (e) {
+              print("Error fetching user data: $e");
+            }
           }
+
+          final athleteQuerySnapshot = await FirebaseFirestore.instance
+              .collection('athletes')
+              .where('app_id', isEqualTo: uid)
+              .limit(1)
+              .get();
+
+          bool hasActivity = false;
+          _uniqueDays.clear();
+
+          print("Athlete documents found: ${athleteQuerySnapshot.docs.length}");
+
+          if (athleteQuerySnapshot.docs.isNotEmpty) {
+            final athleteDoc = athleteQuerySnapshot.docs.first;
+            final athleteId = athleteDoc.id;
+
+            int? userIdNumber;
+
+            userIdNumber = int.tryParse(athleteId);
+
+            if (userIdNumber == null && athleteDoc.data().containsKey('user_id')) {
+              userIdNumber = athleteDoc.data()['user_id'] as int?;
+            }
+
+            if (userIdNumber == null) {
+              final numericPart = RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
+              userIdNumber = numericPart != null ? int.tryParse(numericPart) : null;
+            }
+
+            print("Athlete Document ID: $athleteId");
+            print("Converted User ID Number: $userIdNumber");
+
+            if (userIdNumber != null) {
+              final allActivitiesSnapshot = await FirebaseFirestore.instance
+                  .collection('activities')
+                  .where('user_id', isEqualTo: userIdNumber)
+                  .get();
+
+              print("Activities found: ${allActivitiesSnapshot.docs.length}");
+
+              hasActivity = allActivitiesSnapshot.docs.isNotEmpty;
+
+              if (hasActivity) {
+                if (goalData['goalType'] == 'Endurance') {
+                  print("Processing activities for Endurance goal");
+
+                  _bestDistance = 0;
+                  _bestDistanceDate = null;
+                  _bestDistanceActivity = null;
+                  _latestActivity = null;
+                  _latestActivityDate = null;
+                  _latestDistance = 0;
+
+                  // Sort activities by date (newest first)
+                  final sortedActivities = allActivitiesSnapshot.docs.map((doc) => doc.data()).toList()
+                    ..sort((a, b) {
+                      final dateA = (a['start_date'] as Timestamp).toDate();
+                      final dateB = (b['start_date'] as Timestamp).toDate();
+                      return dateB.compareTo(dateA); // Newest first
+                    });
+
+                  if (sortedActivities.isNotEmpty) {
+                    _latestActivity = sortedActivities.first;
+                    _latestActivityDate = (_latestActivity!['start_date'] as Timestamp).toDate();
+
+                    var latestDistanceValue = _latestActivity!['distance'];
+                    if (latestDistanceValue is int) {
+                      _latestDistance = latestDistanceValue.toDouble();
+                    } else if (latestDistanceValue is double) {
+                      _latestDistance = latestDistanceValue;
+                    } else if (latestDistanceValue is String) {
+                      _latestDistance = double.tryParse(latestDistanceValue) ?? 0.0;
+                    }
+
+                    print("Latest activity date: ${_latestActivityDate}");
+                    print("Latest distance: $_latestDistance");
+                  }
+
+                  for (final activityData in allActivitiesSnapshot.docs) {
+                    final data = activityData.data();
+
+                    double distance = 0.0;
+                    if (data['distance'] != null) {
+                      var distanceValue = data['distance'];
+                      if (distanceValue is int) {
+                        distance = distanceValue.toDouble();
+                      } else if (distanceValue is double) {
+                        distance = distanceValue;
+                      } else if (distanceValue is String) {
+                        distance = double.tryParse(distanceValue) ?? 0.0;
+                      }
+                    }
+
+                    // If this activity has a better distance, save it as the best
+                    if (distance > _bestDistance) {
+                      _bestDistance = distance;
+                      _bestDistanceDate = (data['start_date'] as Timestamp).toDate();
+                      _bestDistanceActivity = data;
+                      print("New best distance: $_bestDistance on ${_bestDistanceDate}");
+                    }
+                  }
+                }
+
+                final weeklyActivitiesSnapshot = await FirebaseFirestore.instance
+                    .collection('activities')
+                    .where('user_id', isEqualTo: userIdNumber)
+                    .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(_weekStartDate))
+                    .where('start_date', isLessThanOrEqualTo: Timestamp.fromDate(_weekEndDate))
+                    .get();
+
+                print("Weekly activities found: ${weeklyActivitiesSnapshot.docs.length}");
+
+                double totalDuration = 0;
+                double totalDistance = 0;
+
+                _weeklyActivities = weeklyActivitiesSnapshot.docs.map((doc) {
+                  final data = doc.data();
+
+                  DateTime activityDate = (data['start_date'] as Timestamp).toDate();
+                  String dayKey = DateFormat('yyyy-MM-dd').format(activityDate);
+                  _uniqueDays.add(dayKey);
+
+                  double duration = 0.0;
+                  var timeValue = data['elapsed_time'];
+                  if (timeValue is int) {
+                    duration = timeValue.toDouble();
+                  } else if (timeValue is double) {
+                    duration = timeValue;
+                  } else if (timeValue is String) {
+                    duration = double.tryParse(timeValue) ?? 0.0;
+                  }
+
+                  duration = duration / 60.0;
+                  totalDuration += duration;
+
+
+                  if (data['distance'] != null) {
+                    double distance = 0.0;
+                    var distanceValue = data['distance'];
+                    if (distanceValue is int) {
+                      distance = distanceValue.toDouble();
+                    } else if (distanceValue is double) {
+                      distance = distanceValue;
+                    } else if (distanceValue is String) {
+                      distance = double.tryParse(distanceValue) ?? 0.0;
+                    }
+                    totalDistance += distance;
+                  }
+
+                  return data;
+                }).toList();
+
+                _weeklyDaysProgress = _uniqueDays.length.toDouble();
+                _totalWeeklyDuration = totalDuration;
+                _averageSessionDuration = _weeklyActivities.isEmpty ? 0 : totalDuration / _weeklyActivities.length;
+                _totalWeeklyDistance = totalDistance;
+              }
+            }
+          } else {
+            print("No matching athlete found, but goal exists");
+          }
+
+          setState(() {
+            userGoal = goalData;
+            _hasActivityAfterGoal = hasActivity;
+            _isLoading = false;
+          });
         } else {
-          print("No goals found for the user.");
+          print("No goal found in the goals collection");
           setState(() {
             userGoal = null;
+            _hasActivityAfterGoal = false;
             _isLoading = false;
           });
         }
       } catch (e) {
-        print('Error loading goals: $e');
+        print('Error loading goal and activities: $e');
         setState(() {
           _isLoading = false;
         });
