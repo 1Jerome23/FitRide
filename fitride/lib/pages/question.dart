@@ -271,7 +271,7 @@ class _QuestionPageState extends State<QuestionPage>
 
       await FirebaseFirestore.instance
           .collection('goals')
-          .doc(user.uid) 
+          .doc()
           .set(goalData, SetOptions(merge: true)); 
 
       _controller.animateToPage(
