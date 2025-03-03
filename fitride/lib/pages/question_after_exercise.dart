@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -18,8 +17,7 @@ class _PostExerciseState extends State<PostExercise> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _exertionController = TextEditingController();
   final TextEditingController _foodController = TextEditingController();
-  final TextEditingController _hydrationController = TextEditingController();
-  final TextEditingController _currentLevelController = TextEditingController();
+
   String goalType = "-";
   bool _isSubmitting = false;
 
@@ -140,73 +138,85 @@ class _PostExerciseState extends State<PostExercise> {
     }
   }
 
-  Future<void> _saveToFirestore() async {
-    if (_isSubmitting) return;
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+Future<void> _saveToFirestore() async {
+  if (_isSubmitting) return;
+  if (!_formKey.currentState!.validate()) {
+    print("❌ Form validation failed.");
+    return;
+  }
 
+  setState(() {
+    _isSubmitting = true;
+  });
+
+  FocusScope.of(context).unfocus();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    print("❌ User not logged in!");
     setState(() {
-      _isSubmitting = true;
+      _isSubmitting = false;
+    });
+    return;
+  }
+
+  try {
+    print("Fetching estimated calories...");
+    double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+    
+    // Debugging output before Firestore write
+    print("🔥 Saving the following data to Firestore:");
+    print("User ID: ${user.uid}");
+    print("Level of Exertion: ${_exertionController.text}");
+    print("Food Taken: ${_foodController.text}");
+    print("Estimated Calories: $estimatedCalories");
+
+    await FirebaseFirestore.instance.collection('after_exercise').add({
+      'userId': user.uid,
+      'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
+      'foodTaken': _foodController.text.isNotEmpty ? _foodController.text : null,
+      'estimatedCalories': estimatedCalories,
+      'timestamp': FieldValue.serverTimestamp(),
     });
 
-    FocusScope.of(context).unfocus();
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print("User not logged in!");
-      setState(() {
-        _isSubmitting = false;
-      });
-      return;
-    }
+    print("✅ Data saved successfully!");
 
-    try {
-      double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
+    await fetchWeatherData(user.uid);
+    await _updateStreakCount(user.uid);
 
-      await FirebaseFirestore.instance.collection('after_exercise').add({
-        'userId': user.uid,
-        'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
-        'foodTaken': _foodController.text,
-        'estimatedCalories': estimatedCalories,
-        'hydration': int.tryParse(_hydrationController.text) ?? 0,
-        'currentLevel': _currentLevelController.text,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Data saved successfully!"),
+        backgroundColor: Color(0xffFFA500),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
 
-      await fetchWeatherData(user.uid);
-      await _updateStreakCount(user.uid);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } catch (e, stacktrace) {
+    print("❌ Error saving data: $e");
+    print("📜 Stacktrace: $stacktrace");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Data saved successfully!"),
-          backgroundColor: Color(0xffFFA500),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } catch (e) {
-      print("Error saving data: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to save data! Please try again."),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      );
-    } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Failed to save data! Please try again."),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  } finally {
+    setState(() {
+      _isSubmitting = false;
+    });
   }
+}
+
 
   Future<double> _getCaloriesFromUSDA(String foodInput) async {
     if (foodInput.isEmpty) return 0.0;
@@ -349,47 +359,23 @@ class _PostExerciseState extends State<PostExercise> {
                   delay: 300,
                 ),
                 
-                SizedBox(height: 20),
-                
-                _buildInputField(
-                  label: "Food Intake",
-                  hintText: "What did you eat today?",
-                  controller: _foodController,
-                  icon: Icons.restaurant_menu,
-                  validator: (value) => value == null || value.isEmpty 
-                      ? "Please enter what you ate" 
-                      : null,
-                  delay: 400,
-                ),
-                
-                // SizedBox(height: 20),
-                
-                // Builder(builder: (context) {
-                //   print("🔍 Checking condition: goalType == 'Leisure' (${goalType == 'Leisure'})");
-                //   if (goalType == "Leisure") {
-                //     print("✅ Condition matched, should show the field");
-                //     return _buildInputField(
-                //       label: "Post-Ride Feeling",
-                //       hintText: "Rate from 1-10 how you feel now",
-                //       controller: _hydrationController,
-                //       icon: Icons.mood,
-                //       keyboardType: TextInputType.number,
-                //       validator: (value) {
-                //         if (value == null || value.isEmpty) return "Please rate how you feel";
-                //         final numValue = int.tryParse(value);
-                //         if (numValue == null || numValue < 1 || numValue > 10) {
-                //           return "Enter a number between 1-10";
-                //         }
-                //         return null;
-                //       },
-                //       delay: 500,
-                //     );
-                //   } else {
-                //     print("❌ Condition not matched, field should be hidden");
-                //     return SizedBox.shrink(); // Return an empty widget if not Leisure
-                //   }
-                // }),
-                
+                if (goalType == "High Intensity Cycling") 
+                  SizedBox(height: 20),
+
+                if (goalType == "High Intensity Cycling") 
+                  _buildInputField(
+                    label: "Food Intake",
+                    hintText: "What did you eat today?",
+                    controller: _foodController,
+                    icon: Icons.restaurant_menu,
+                    validator: (value) {
+                      if (goalType == "High Intensity Cycling" && (value == null || value.isEmpty)) {
+                        return "Please enter what you ate";
+                      }
+                      return null;
+                    },
+                    delay: 400,
+                  ),
                 SizedBox(height: 40),
                 
                 Center(
