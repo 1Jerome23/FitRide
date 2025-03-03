@@ -25,27 +25,22 @@ class _QuestionPageState extends State<QuestionPage>
   bool _stravaAuthSuccessful = false;
   String? _selectedGoal;
   
-  // User data controllers
   final TextEditingController ageController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   String? _healthCondition;
   
-  // Additional health condition questions
   String? _weatherCondition;
   String? _heartRateLimit;
   String? _maxDuration;
   
-  // Weight loss goal controllers
   final TextEditingController weightController = TextEditingController();
   final TextEditingController basalMetabolicRateController = TextEditingController();
   final TextEditingController bodyFatController = TextEditingController();
   final TextEditingController targetWeightController = TextEditingController();
   
-  // Leisure goal controllers
   final TextEditingController daysPerWeekController = TextEditingController();
   final TextEditingController sessionDurationController = TextEditingController();
   
-  // Endurance goal controllers
   final TextEditingController targetDistanceController = TextEditingController();
   final TextEditingController targetDurationController = TextEditingController();
 
@@ -690,7 +685,6 @@ class _QuestionPageState extends State<QuestionPage>
                         ],
                       ),
                       
-                      // Additional health questions that appear when a health condition is selected
                       if (_healthCondition != null && _healthCondition != 'None') ...[
                         SizedBox(height: 15),
                         Text(

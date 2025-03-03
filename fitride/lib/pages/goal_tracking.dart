@@ -7,6 +7,8 @@ import 'profile.dart';
 import 'login_register.dart';
 import 'package:intl/intl.dart';
 import 'question.dart';
+import 'dart:math';
+import 'package:confetti/confetti.dart';
 
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});
@@ -22,6 +24,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   bool _hasActivityAfterGoal = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late ConfettiController _confettiController;
+  bool _hasShownCompletionDialog = false;
 
   List<Map<String, dynamic>> _weeklyActivities = [];
   double _weeklyDaysProgress = 0;
@@ -77,6 +81,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
     _weekStartDate = _getWeekStartDate();
     _weekEndDate = _getWeekEndDate();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 5));
 
     Future.delayed(Duration(milliseconds: 500), () {
       _loadUserGoalAndActivities();
@@ -99,6 +104,30 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadUserGoalAndActivities();
+    
+    Future.delayed(Duration(milliseconds: 1500), () {
+      if (userGoal != null) {
+        if (userGoal!['goalType'] == 'Endurance') {
+          _checkEnduranceGoalCompletion();
+        } else if (userGoal!['goalType'] == 'High Intensity Cycling') {
+          _checkHighIntensityCyclingGoalCompletion();
+        }
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(GoalTrackingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    Future.delayed(Duration(milliseconds: 1000), () {
+      if (userGoal != null) {
+        if (userGoal!['goalType'] == 'Endurance') {
+          _checkEnduranceGoalCompletion();
+        } else if (userGoal!['goalType'] == 'High Intensity Cycling') {
+          _checkHighIntensityCyclingGoalCompletion();
+        }
+      }
+    });
   }
 
   @override
@@ -106,6 +135,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     _updateWeightController.dispose();
     _updateBodyFatController.dispose();
     _animationController.dispose();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -148,7 +178,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   
 
   Future<void> _loadUserGoalAndActivities() async {
-
     _weekStartDate = _getWeekStartDate();
     _weekEndDate = _getWeekEndDate();
 
@@ -365,6 +394,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                 _totalWeeklyDuration = totalDuration;
                 _averageSessionDuration = _weeklyActivities.isEmpty ? 0 : totalDuration / _weeklyActivities.length;
                 _totalWeeklyDistance = totalDistance;
+                _checkEnduranceGoalCompletion();
               }
             }
           } else {
@@ -375,6 +405,16 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
             userGoal = goalData;
             _hasActivityAfterGoal = hasActivity;
             _isLoading = false;
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (userGoal != null) {
+                if (userGoal!['goalType'] == 'Endurance') {
+                  _checkEnduranceGoalCompletion();
+                } else if (userGoal!['goalType'] == 'High Intensity Cycling') {
+                  _checkHighIntensityCyclingGoalCompletion();
+                }
+              }
+            });
           });
         } else {
           print("No goal found in the goals collection");
@@ -396,6 +436,731 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         _isLoading = false;
       });
     }
+  }
+
+  void _checkEnduranceGoalCompletion() {
+    print("⭐ Checking endurance goal completion...");
+    
+    if (userGoal == null) {
+      print("No user goal found");
+      return;
+    }
+    
+    if (userGoal!['goalType'] != 'Endurance') {
+      print("Not an endurance goal: ${userGoal!['goalType']}");
+      return;
+    }
+    
+    if (_hasShownCompletionDialog) {
+      print("Dialog already shown this session");
+      return;
+    }
+    
+    double targetDistance = 0;
+    var distanceValue = userGoal!['targetDistance'];
+    if (distanceValue is int) {
+      targetDistance = distanceValue.toDouble();
+    } else if (distanceValue is double) {
+      targetDistance = distanceValue;
+    } else if (distanceValue is String) {
+      targetDistance = double.tryParse(distanceValue) ?? 0;
+    }
+    
+    double targetDuration = 0;
+    if (userGoal!.containsKey('sessionDuration')) {
+      var durationValue = userGoal!['sessionDuration'];
+      if (durationValue is int) {
+        targetDuration = durationValue.toDouble();
+      } else if (durationValue is double) {
+        targetDuration = durationValue;
+      } else if (durationValue is String) { 
+        targetDuration = double.tryParse(durationValue) ?? 0.0;
+      }
+    }
+    
+    bool isDistanceComplete = _bestDistance >= targetDistance;
+    bool isDurationComplete = _bestDistanceActivity != null && 
+        _getBestActivityDuration() >= targetDuration;
+    
+    print("Goal completion status:");
+    print("⭐ Best distance: $_bestDistance, Target: $targetDistance, Complete: $isDistanceComplete");
+    print("⭐ Best duration: ${_getBestActivityDuration()}, Target: $targetDuration, Complete: $isDurationComplete");
+    
+    if (isDistanceComplete && isDurationComplete) {
+      print("⭐⭐⭐ GOAL COMPLETED! Showing celebration dialog!");
+      _hasShownCompletionDialog = true;
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showGoalCompletionDialog();
+      });
+    } else {
+      print("Not all conditions are met for goal completion");
+    }
+  }
+
+  void _checkHighIntensityCyclingGoalCompletion() {
+    print("⭐ Checking high intensity cycling goal completion...");
+    
+    if (userGoal == null) {
+      print("No user goal found");
+      return;
+    }
+    
+    if (userGoal!['goalType'] != 'High Intensity Cycling') {
+      print("Not a high intensity cycling goal: ${userGoal!['goalType']}");
+      return;
+    }
+    
+    if (_hasShownCompletionDialog) {
+      print("Dialog already shown this session");
+      return;
+    }
+    
+    double targetWeight = 0;
+    var targetWeightValue = userGoal!['targetWeight'];
+    if (targetWeightValue is int) {
+      targetWeight = targetWeightValue.toDouble();
+    } else if (targetWeightValue is double) {
+      targetWeight = targetWeightValue;
+    } else if (targetWeightValue is String) {
+      targetWeight = double.tryParse(targetWeightValue) ?? 0;
+    }
+    
+    bool isWeightGoalComplete = _currentUserWeight > 0 && _currentUserWeight <= targetWeight;
+    
+    print("Weight goal completion status:");
+    print("⭐ Current weight: $_currentUserWeight, Target: $targetWeight, Complete: $isWeightGoalComplete");
+    
+    if (isWeightGoalComplete) {
+      print("⭐⭐⭐ WEIGHT GOAL COMPLETED! Showing celebration dialog!");
+      _hasShownCompletionDialog = true;
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showWeightGoalCompletionDialog();
+      });
+    } else {
+      print("Weight goal not yet achieved");
+    }
+  }
+
+  void _showWeightGoalCompletionDialog() {
+    if (!mounted) {
+      print("Widget not mounted, can't show dialog");
+      return;
+    }
+    
+    try {
+      _confettiController.play();
+      
+      showGeneralDialog(
+        context: context,
+        barrierDismissible: false,
+        transitionDuration: Duration(milliseconds: 300),
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          return ScaleTransition(
+            scale: Tween<double>(begin: 0.5, end: 1.0).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.elasticOut,
+              ),
+            ),
+            child: child,
+          );
+        },
+        pageBuilder: (BuildContext context, Animation animation, Animation secondaryAnimation) {
+          return Material(
+            type: MaterialType.transparency,
+            child: Center(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 20),
+                height: MediaQuery.of(context).size.height * 0.75,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: ConfettiWidget(
+                          confettiController: _confettiController,
+                          blastDirectionality: BlastDirectionality.explosive,
+                          particleDrag: 0.05,
+                          emissionFrequency: 0.05,
+                          numberOfParticles: 20,
+                          gravity: 0.2,
+                          shouldLoop: false,
+                          colors: const [
+                            Colors.green,
+                            Colors.blue,
+                            Colors.pink,
+                            Colors.orange,
+                            Colors.purple,
+                            Colors.yellow,
+                          ],
+                        ),
+                      ),
+                      
+                      Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(vertical: 30),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.green, Colors.teal],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Image.asset(
+                                  'assets/trophy.png',
+                                  width: 100,
+                                  height: 100,
+                                ),
+                                SizedBox(height: 16),
+                                Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.center, 
+                                    children: [
+                                      Text(
+                                        "TARGET WEIGHT ACHIEVED!",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontFamily: 'Fredoka-SemiBold',
+                                          fontSize: 28,
+                                          color: Colors.yellow,
+                                          letterSpacing: 1.2,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(2, 2), 
+                                              blurRadius: 4.0, 
+                                              color: Colors.black.withOpacity(0.5),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  "Congratulations on your weight loss success!",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Your Weight Loss Journey",
+                                    style: TextStyle(
+                                      fontFamily: 'Fredoka-SemiBold',
+                                      fontSize: 20,
+                                      color: primaryBlack,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  
+                                  Container(
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.green.shade200,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "Weight Goal Achieved!",
+                                          style: TextStyle(
+                                            fontFamily: 'Fredoka-SemiBold',
+                                            fontSize: 16,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "Current Weight: ${_currentUserWeight.toStringAsFixed(1)} kg",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 14,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "Target Weight: ${targetWeight.toStringAsFixed(1)} kg",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 14,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 16),
+                                        Center(
+                                          child: Text(
+                                            "Through consistent high intensity cycling and dedication to your fitness routine, you've successfully reached your target weight. This is a significant achievement that demonstrates your commitment to a healthier lifestyle.",
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 14,
+                                              color: primaryBlack,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  SizedBox(height: 24),
+                                  
+                                  Container(
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.blue.shade200,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Your Cycling Stats",
+                                          style: TextStyle(
+                                            fontFamily: 'Fredoka-SemiBold',
+                                            fontSize: 16,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "Weekly Cycling Days: ${_weeklyDaysProgress.toStringAsFixed(0)} days",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 14,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "Weekly Cycling Duration: ${_totalWeeklyDuration.toStringAsFixed(0)} minutes",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 14,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "Total Distance This Week: ${_totalWeeklyDistance.toStringAsFixed(1)} km",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 14,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  SizedBox(height: 24),
+                                  
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      "What's Next?",
+                                      style: TextStyle(
+                                        fontFamily: 'Fredoka-SemiBold',
+                                        fontSize: 18,
+                                        color: primaryBlack,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    "Maintaining your weight is just as important as losing it. Consider setting a maintenance goal to keep your healthy habits going, or challenge yourself with a new fitness target.",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: primaryGray,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          // Button
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(20),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                "Set New Goal",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ).catchError((error) {
+        print("Error showing dialog: $error");
+      });
+    } catch (e) {
+      print("Exception during dialog: $e");
+    }
+  }
+
+  void _showGoalCompletionDialog() {
+    _confettiController.play();
+    
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      transitionDuration: Duration(milliseconds: 300),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.5, end: 1.0).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.elasticOut,
+            ),
+          ),
+          child: child,
+        );
+      },
+      pageBuilder: (BuildContext context, Animation animation, Animation secondaryAnimation) {
+        return Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 20),
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ConfettiWidget(
+                        confettiController: _confettiController,
+                        blastDirectionality: BlastDirectionality.explosive,
+                        particleDrag: 0.05,
+                        emissionFrequency: 0.05,
+                        numberOfParticles: 20,
+                        gravity: 0.2,
+                        shouldLoop: false,
+                        colors: const [
+                          Colors.green,
+                          Colors.blue,
+                          Colors.pink,
+                          Colors.orange,
+                          Colors.purple,
+                          Colors.yellow,
+                        ],
+                      ),
+                    ),
+                    
+                    Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(vertical: 30),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [primaryOrange, const Color.fromARGB(255, 248, 149, 69)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Image.asset(
+                                'assets/trophy.png',
+                                width: 100,
+                                height: 100,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "GOAL COMPLETED!",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-Bold',
+                                  fontSize: 28,
+                                  color: Colors.yellow,
+                                  letterSpacing: 1.2,
+                                  shadows: [
+                                    Shadow(
+                                      offset: Offset(2, 2), 
+                                      blurRadius: 4.0, 
+                                      color: Colors.black.withOpacity(0.5),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                "Congratulations on your achievement!",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-Regular',
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Center(
+                                  child: Text(
+                                    "Your Endurance Journey",
+                                    style: TextStyle(
+                                      fontFamily: 'Fredoka-SemiBold',
+                                      fontSize: 20,
+                                      color: primaryBlack,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                
+                                // Best performance details
+                                Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min, 
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              "Best Performance",
+                                              style: TextStyle(
+                                                fontFamily: 'Fredoka-SemiBold',
+                                                fontSize: 16,
+                                                color: primaryBlack,
+                                              ),
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              "Distance: ${_bestDistance.toStringAsFixed(1)} km",
+                                              style: TextStyle(
+                                                fontFamily: 'Inter',
+                                                fontSize: 14,
+                                                color: primaryBlack,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              "Duration: ${_getBestActivityDuration().toStringAsFixed(1)} minutes",
+                                              style: TextStyle(
+                                                fontFamily: 'Inter',
+                                                fontSize: 14,
+                                                color: primaryBlack,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              "Date: ${_bestDistanceDate != null ? DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : 'N/A'}",
+                                              style: TextStyle(
+                                                fontFamily: 'Inter',
+                                                fontSize: 14,
+                                                color: primaryBlack,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                
+                                SizedBox(height: 24),
+                                
+                                // Achievement details
+                                Container(
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.orange.shade200,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "You've successfully reached your target distance of ${userGoal!['targetDistance']} km and completed it within your target duration of ${userGoal!['targetDuration']} minutes.",
+                                            textAlign: TextAlign.center, 
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 14,
+                                              color: primaryBlack,
+                                            ),
+                                          ),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            "This achievement shows your dedication to cycling and your endurance capabilities. Keep pushing your limits!",
+                                            textAlign: TextAlign.center, 
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 14,
+                                              color: primaryBlack,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                SizedBox(height: 24),
+                                
+                                Text(
+                                  "What's Next?",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 18,
+                                    color: primaryBlack,
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  "Set a new goal to continue your cycling journey. Challenge yourself with a longer distance or shorter duration to improve your performance even further.",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: primaryGray,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(20),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryOrange,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              "Set New Goal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showChangeGoalConfirmation() {
@@ -505,11 +1270,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
-        await FirebaseFirestore.instance //delete goal
-            .collection('goals')
-            .doc(uid)
-            .delete();
-
         // Navigate directly to the goals page (index 2)
         Navigator.pushReplacement(
           context,
@@ -522,6 +1282,242 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         );
       }
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchGoalHistory() async {
+    List<Map<String, dynamic>> goalHistory = [];
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (uid != null) {
+      try {
+        QuerySnapshot goalsSnapshot = await FirebaseFirestore.instance
+            .collection('goals')
+            .where('uid', isEqualTo: uid)
+            .orderBy('timestamp', descending: true)
+            .get();
+        
+        goalHistory = goalsSnapshot.docs.map((doc) {
+          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        
+      } catch (e) {
+        print('Error fetching goal history: $e');
+      }
+    }
+    
+    return goalHistory;
+  }
+
+  void _showGoalHistoryDialog() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _fetchGoalHistory(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text(
+                  "Goal History",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: primaryBlack,
+                  ),
+                ),
+                content: SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
+                    ),
+                  ),
+                ),
+              );
+            } else if (snapshot.hasError) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text(
+                  "Goal History",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: primaryBlack,
+                  ),
+                ),
+                content: Text(
+                  "Error loading goals: ${snapshot.error}",
+                  style: TextStyle(color: Colors.red),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Close"),
+                  ),
+                ],
+              );
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text(
+                  "Goal History",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: primaryBlack,
+                  ),
+                ),
+                content: const Text("No goal history found."),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text("Close"),
+                  ),
+                ],
+              );
+            } else {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text(
+                  "Goal History",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: primaryBlack,
+                  ),
+                ),
+                content: Container(
+                  width: double.maxFinite,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, index) {
+                      final goal = snapshot.data![index];
+                      final goalType = goal['goalType'] ?? 'Unknown';
+                      final createdAt = goal['timestamp'] != null
+                          ? (goal['timestamp'] as Timestamp).toDate()
+                          : DateTime.now();
+                      
+                      String details = '';
+                      
+                      if (goalType == 'Leisure') {
+                        final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
+                        final sessionDuration = goal['sessionDuration'] ?? 'N/A';
+                        details = "$daysPerWeek days/week, $sessionDuration min/session";
+                      } else if (goalType == 'High Intensity Cycling') {
+                        final targetWeight = goal['targetWeight'] ?? 'N/A';
+                        details = "Target weight: $targetWeight kg";
+                      } else if (goalType == 'Endurance') {
+                        final targetDistance = goal['targetDistance'] ?? 'N/A';
+                        details = "Target distance: $targetDistance km";
+                      }
+                      
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: index == 0 ? primaryOrange.withOpacity(0.1) : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: index == 0 ? primaryOrange.withOpacity(0.3) : Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  goalType,
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 16,
+                                    color: primaryBlack,
+                                  ),
+                                ),
+                                if (index == 0)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: primaryOrange,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      "Current",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "Created: ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: primaryGray,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              details,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: primaryBlack,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text(
+                      "Close",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        color: primaryGray,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
+        );
+      },
+    );
   }
 
   String _getIconForGoalType(String goalType) {
@@ -712,7 +1708,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       duration = double.tryParse(timeValue) ?? 0.0;
     }
 
-    // Convert from seconds to minutes
     return duration / 60.0;
   }
 
@@ -874,7 +1869,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   }
 
   void _showUpdateWeightDialog() {
-  // Pre-fill with current values
   _updateWeightController.text = "";
   _updateBodyFatController.text = "";
   
@@ -971,11 +1965,9 @@ Future<void> _updateUserMetrics() async {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     
-    // Parse input values
     double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
     double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
     
-    // Get latest userData document
     final userDataQuery = await FirebaseFirestore.instance
         .collection('userData')
         .where('uid', isEqualTo: uid)
@@ -990,10 +1982,8 @@ Future<void> _updateUserMetrics() async {
       'bodyFat': newBodyFat,
     };
     
-    // Copy existing data if available
     if (userDataQuery.docs.isNotEmpty) {
       Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-      // Copy all fields except those we're updating
       existingData.forEach((key, value) {
         if (key != 'uid' && key != 'timestamp' && key != 'weight' && key != 'bodyFat') {
           newData[key] = value;
@@ -1001,17 +1991,14 @@ Future<void> _updateUserMetrics() async {
       });
     }
     
-    // Add new document (not updating existing one)
     await FirebaseFirestore.instance
         .collection('userData')
         .add(newData);
     
-    // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Progress updated successfully!'))
     );
     
-    // Refresh data to update progress bar
     await _loadUserGoalAndActivities();
     
   } catch (e) {
@@ -1193,11 +2180,6 @@ Future<void> _updateUserMetrics() async {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // COPY THE ORIGINAL CONTENT HERE
-                    // This should be the same content that's in your existing return statement
-                    // from the Row with the goal icon to the final Tips section
-                    // Basically everything that's inside the Padding of your original returned Container
-                    
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1245,7 +2227,6 @@ Future<void> _updateUserMetrics() async {
                         ),
                         const SizedBox(height: 16),
 
-                        // Current Week Display based on goal type
                         if (goalType != 'Endurance')
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1327,13 +2308,13 @@ Future<void> _updateUserMetrics() async {
                           _buildProgressCard(
                             "Weekly Cycling Duration",
                             _totalWeeklyDuration,
-                            durationTarget, // Total weekly target is the session duration
+                            durationTarget,
                             "mins",
                             Colors.blue,
                             Icons.timer,
                             helpText: _getDurationHelperText(durationTarget),
                           ),
-                          // Weekly reset info
+ 
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -1369,8 +2350,8 @@ Future<void> _updateUserMetrics() async {
                           // Weight Progress Card
                           _buildProgressCard(
                             "Weight Progress",
-                            _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100, // Invert the progress since we want to lose weight
-                            100, // Target is 100% (reaching target weight)
+                            _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100,
+                            100,
                             "%",
                             primaryOrange,
                             Icons.monitor_weight_outlined,
@@ -1388,13 +2369,12 @@ Future<void> _updateUserMetrics() async {
                           _buildProgressCard(
                             "Weekly Cycling Duration",
                             _totalWeeklyDuration,
-                            durationTarget, // Weekly target cycling duration
+                            durationTarget,
                             "mins",
                             Colors.blue,
                             Icons.timer,
                             helpText: _getDurationHelperText(durationTarget),
                           ),
-                          // Information Card about High Intensity Goals
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -1830,13 +2810,13 @@ Future<void> _updateUserMetrics() async {
                 _buildProgressCard(
                   "Weekly Cycling Duration",
                   _totalWeeklyDuration,
-                  durationTarget, // Total weekly target is the session duration
+                  durationTarget,
                   "mins",
                   Colors.blue,
                   Icons.timer,
                   helpText: _getDurationHelperText(durationTarget),
                 ),
-                // Weekly reset info
+
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -1869,11 +2849,10 @@ Future<void> _updateUserMetrics() async {
                   ),
                 ),
               ] else if (goalType == 'High Intensity Cycling') ...[
-                // Weight Progress Card
                 _buildProgressCard(
                   "Weight Progress",
-                  _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100, // Invert the progress since we want to lose weight
-                  100, // Target is 100% (reaching target weight)
+                  _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100,
+                  100, 
                   "%",
                   primaryOrange,
                   Icons.monitor_weight_outlined,
@@ -1891,13 +2870,13 @@ Future<void> _updateUserMetrics() async {
                 _buildProgressCard(
                   "Weekly Cycling Duration",
                   _totalWeeklyDuration,
-                  durationTarget, // Weekly target cycling duration
+                  durationTarget, 
                   "mins",
                   Colors.blue,
                   Icons.timer,
                   helpText: _getDurationHelperText(durationTarget),
                 ),
-                // Information Card about High Intensity Goals
+
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -2331,6 +3310,29 @@ Future<void> _updateUserMetrics() async {
                         fontFamily: 'Inter',
                         fontSize: 16,
                         color: primaryOrange,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _showGoalHistoryDialog,
+                    icon: const Icon(Icons.history, color: Colors.white),
+                    label: const Text(
+                      "View Goal History",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[800],
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
