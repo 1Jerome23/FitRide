@@ -1,4 +1,3 @@
-import 'package:fitride/pages/UserDataModule.dart';
 import 'package:fitride/pages/goal_tracking.dart';
 import 'package:fitride/pages/profile.dart';
 import 'package:flutter/material.dart';
@@ -94,7 +93,6 @@ class _HomePageState extends State<HomePage>
     fetchWeatherData();
     _getUserName();
     loadStravaUserId();
-    _loadRecentActivities();
 
     // Fetch streak data
     String? userId = FirebaseAuth.instance.currentUser?.uid;
@@ -104,83 +102,6 @@ class _HomePageState extends State<HomePage>
           _streakCount =
               streakData?['streak'] ?? 0; // Default to 0 if no streak exists
         });
-      });
-    }
-  }
-
-  List<Map<String, dynamic>> _recentActivities = [];
-  bool _loadingActivities = false;
-
-  Future<void> _loadRecentActivities() async {
-    setState(() {
-      _loadingActivities = true;
-    });
-
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      try {
-        final athleteQuerySnapshot = await FirebaseFirestore.instance
-            .collection('athletes')
-            .where('app_id', isEqualTo: uid)
-            .limit(1)
-            .get();
-
-        if (athleteQuerySnapshot.docs.isNotEmpty) {
-          final athleteDoc = athleteQuerySnapshot.docs.first;
-          final athleteId = athleteDoc.id;
-
-          final userIdNumber = int.tryParse(athleteId);
-
-          if (userIdNumber != null) {
-            final activitiesSnapshot = await FirebaseFirestore.instance
-                .collection('activities')
-                .where('user_id', isEqualTo: userIdNumber)
-                .limit(10) 
-                .get();
-
-            List<Map<String, dynamic>> activities = [];
-            for (var doc in activitiesSnapshot.docs) {
-              activities.add(doc.data() as Map<String, dynamic>);
-            }
-
-            activities.sort((a, b) {
-              var aDate = a['start_date'];
-              var bDate = b['start_date'];
-              if (aDate == null || bDate == null) return 0;
-              if (aDate is Timestamp && bDate is Timestamp) {
-                return bDate.compareTo(aDate); 
-              }
-              return bDate.toString().compareTo(aDate.toString());
-            });
-
-            // Take only the first 3 after sorting
-            if (activities.length > 3) {
-              activities = activities.sublist(0, 3);
-            }
-
-            setState(() {
-              _recentActivities = activities;
-              _loadingActivities = false;
-            });
-          } else {
-            setState(() {
-              _loadingActivities = false;
-            });
-          }
-        } else {
-          setState(() {
-            _loadingActivities = false;
-          });
-        }
-      } catch (e) {
-        print('Error loading recent activities: $e');
-        setState(() {
-          _loadingActivities = false;
-        });
-      }
-    } else {
-      setState(() {
-        _loadingActivities = false;
       });
     }
   }
@@ -245,8 +166,6 @@ Future<void> loadStravaUserId() async {
     }
 
     print("Converted Strava User ID (Integer): $stravaUserId");
-
-    _loadRecentActivities();
 
   } catch (e) {
     print("Error fetching Strava User ID: $e");
@@ -657,443 +576,313 @@ Future<void> loadStravaUserId() async {
                       ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
                       SizedBox(height: 15),
                       Container(
-  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-  decoration: BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Colors.white,
-        Color(0xFFFAF6F0),
-      ],
-    ),
-    borderRadius: BorderRadius.circular(16),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.grey.withOpacity(0.15),
-        spreadRadius: 2,
-        blurRadius: 15,
-        offset: Offset(0, 5),
-      ),
-    ],
-  ),
-  child: _stravaUserId == null
-      ? Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.link_off, color: Colors.red[400], size: 36),
-              SizedBox(height: 6),
-              Text(
-                "No Strava account connected",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 15,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ],
-          ),
-        )
-      : FutureBuilder<QuerySnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('activities')
-              .where('user_id', isEqualTo: int.tryParse(_stravaUserId!))
-              .orderBy('start_date', descending: false)
-              .get(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: SizedBox(
-                  height: 180,
-                  child: CircularProgressIndicator(
-                    color: Color(0xffFFA500),
-                    strokeWidth: 3,
-                  ),
-                ),
-              );
-            }
-            if (snapshot.hasError || !snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: SizedBox(
-                  height: 180,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.bar_chart_rounded,
-                        color: Colors.grey[400],
-                        size: 40,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        snapshot.hasError 
-                            ? "Error loading data" 
-                            : "No activity data available",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 15,
-                          fontFamily: "Inter",
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            // Parse Firestore data into chart points
-            List<ActivityData> activityData = [];
-            for (var doc in snapshot.data!.docs) {
-              var data = doc.data() as Map<String, dynamic>;
-              double distance = double.tryParse(data['distance'].toString()) ?? 0.0;
-              Timestamp? timestamp = data['start_date'];
-              DateTime date = timestamp?.toDate() ?? DateTime.now();
-
-              // Format month for display
-              String monthLabel = DateFormat('MMM').format(date);
-              
-              activityData.add(
-                ActivityData(
-                  monthLabel, // This will be displayed on the x-axis
-                  distance,
-                ),
-              );
-            }
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 12, top: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Monthly Distance",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0xffFFA500).withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            )
-                          ]
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.insights, size: 14, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text(
-                              "Activity",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().shimmer(delay: 2000.ms, duration: 1800.ms),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: 200, // Compact height
-                  width: double.infinity,
-                  child: SfCartesianChart(
-                    margin: EdgeInsets.zero,
-                    plotAreaBorderWidth: 0,
-                    primaryXAxis: CategoryAxis(
-                      majorGridLines: MajorGridLines(width: 0),
-                      axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-                      labelStyle: TextStyle(
-                        color: Colors.grey[700],
-                        fontFamily: 'Inter',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      majorTickLines: MajorTickLines(size: 0),
-                      labelIntersectAction: AxisLabelIntersectAction.hide,
-                      interval: 1, // Ensure all months are shown
-                      labelRotation: 0, // Keep labels horizontal
-                    ),
-                    primaryYAxis: NumericAxis(
-                      majorGridLines: MajorGridLines(
-                        width: 0.5,
-                        color: Colors.grey[200],
-                        dashArray: <double>[3, 3],
-                      ),
-                      axisLine: AxisLine(width: 0),
-                      labelFormat: '{value}',
-                      labelStyle: TextStyle(
-                        color: Colors.grey[700],
-                        fontFamily: 'Inter',
-                        fontSize: 10,
-                      ),
-                      majorTickLines: MajorTickLines(size: 0),
-                    ),
-                    tooltipBehavior: TooltipBehavior(
-                      enable: true,
-                      color: Colors.grey[800],
-                      textStyle: TextStyle(color: Colors.white, fontSize: 12),
-                      duration: 1500,
-                      animationDuration: 150,
-                      elevation: 10,
-                      shadowColor: Colors.black.withOpacity(0.3),
-                    ),
-                    legend: Legend(isVisible: false),
-                    series: <ChartSeries>[
-                      // Area Series with gradient
-                      AreaSeries<ActivityData, String>(
-                        dataSource: activityData,
-                        xValueMapper: (ActivityData data, _) => data.month,
-                        yValueMapper: (ActivityData data, _) => data.distance,
-                        borderColor: Color(0xffFFA500),
-                        borderWidth: 0, // No border for area
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0xffFFA500).withOpacity(0.5),
-                            Color(0xffFFA500).withOpacity(0.0),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        animationDuration: 1200,
-                      ),
-                      // Main line series - THICKER now
-                      SplineSeries<ActivityData, String>(
-                        dataSource: activityData,
-                        xValueMapper: (ActivityData data, _) => data.month,
-                        yValueMapper: (ActivityData data, _) => data.distance,
-                        width: 5, // Much thicker line
-                        color: Color(0xffFFA500),
-                        animationDuration: 1500,
-                        markerSettings: MarkerSettings(
-                          isVisible: true,
-                          height: 12,
-                          width: 12,
-                          shape: DataMarkerType.circle,
-                          borderWidth: 2,
-                          borderColor: Color(0xffFFA500),
-                          color: Colors.white,
-                        ),
-                        dataLabelSettings: DataLabelSettings(
-                          isVisible: true,
-                          color: Colors.white,
-                          borderColor: Color(0xffFFA500).withOpacity(0.5),
-                          borderWidth: 1,
-                          margin: EdgeInsets.all(4),
-                          textStyle: TextStyle(
-                            color: Colors.black87,
-                            fontFamily: 'Inter',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          labelPosition: ChartDataLabelPosition.outside,
-                        ),
-                        enableTooltip: true,
-                      ),
-                    ],
-                  ),
-                ).animate()
-                 .slideY(
-                   begin: 0.05,
-                   end: 0,
-                   duration: 600.ms,
-                   curve: Curves.easeOutQuad,
-                 ).then(delay: 300.ms)
-                 .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.2)),
-                
-                // Small legend at the bottom
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            height: 3,
-                            width: 20,
-                            decoration: BoxDecoration(
-                              color: Color(0xffFFA500),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            "Distance (km)",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 10,
-                              fontFamily: "Inter",
-                            ),
-                          ),
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          Color(0xFFFAF6F0),
                         ],
                       ),
-                      Text(
-                        "Months",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 10,
-                          fontFamily: "Inter",
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
-              ],
-            ).animate().fadeIn(duration: 400.ms);
-          },
-        ),
-),
-
-                  SizedBox(height: 30),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "User Data Module",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 22,
-                          color: Colors.black,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => MyApp()),
-                          );
-                        },
-                        child: Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Color(0xffFFA500).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                "View All",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xffFFA500),
-                                  fontFamily: "Inter",
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: Color(0xffFFA500),
-                                size: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ).animate().fadeIn(duration: 600.ms, delay: 800.ms),
-                  SizedBox(height: 15),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withOpacity(0.15),
                           spreadRadius: 2,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
+                          blurRadius: 15,
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
-                    child: _loadingActivities
+                    child: _stravaUserId == null
                         ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: CircularProgressIndicator(
-                                color: Color(0xffFFA500),
-                              ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.link_off, color: Colors.red[400], size: 36),
+                                SizedBox(height: 6),
+                                Text(
+                                  "No Strava account connected",
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 15,
+                                    fontFamily: "Inter",
+                                  ),
+                                ),
+                              ],
                             ),
                           )
-                        : _recentActivities.isEmpty
-                            ? ListView.builder(
-                                physics: NeverScrollableScrollPhysics(),
-                                shrinkWrap: true,
-                                itemCount: 1,
-                                itemBuilder: (context, index) {
-                                  return _buildActivityItem(
-                                    "No recent activity",
-                                    "Record your first ride to see it here!",
-                                    "00:00",
-                                    Icons.directions_bike_outlined,
-                                  );
-                                },
-                              )
-                            : ListView.separated(
-                                physics: NeverScrollableScrollPhysics(),
-                                shrinkWrap: true,
-                                itemCount: _recentActivities.length,
-                                separatorBuilder: (context, index) => Divider(
-                                  height: 1,
-                                  color: Colors.grey[200],
-                                ),
-                                itemBuilder: (context, index) {
-                                  final activity = _recentActivities[index];
+                        : FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('activities')
+                                .where('user_id', isEqualTo: int.tryParse(_stravaUserId!))
+                                .orderBy('start_date', descending: false)
+                                .get(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Center(
+                                  child: SizedBox(
+                                    height: 180,
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xffFFA500),
+                                      strokeWidth: 3,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                                return Center(
+                                  child: SizedBox(
+                                    height: 180,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.bar_chart_rounded,
+                                          color: Colors.grey[400],
+                                          size: 40,
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          snapshot.hasError 
+                                              ? "Error loading data" 
+                                              : "No activity data available",
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 15,
+                                            fontFamily: "Inter",
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
 
-                                  final name =
-                                      activity['name'] ?? 'Cycling Activity';
-                                  final type = activity['type'] ?? 'Ride';
+                              // Parse Firestore data into chart points
+                              List<ActivityData> activityData = [];
+                              for (var doc in snapshot.data!.docs) {
+                                var data = doc.data() as Map<String, dynamic>;
+                                double distance = double.tryParse(data['distance'].toString()) ?? 0.0;
+                                Timestamp? timestamp = data['start_date'];
+                                DateTime date = timestamp?.toDate() ?? DateTime.now();
 
-                                  String distanceStr = '0 km';
-                                  if (activity['distance'] != null) {
-                                    try {
-                                      final distance = double.tryParse(
-                                              activity['distance']
-                                                  .toString()) ??
-                                          0.0;
+                                // Format month for display
+                                String monthLabel = DateFormat('MMM').format(date);
+                                
+                                activityData.add(
+                                  ActivityData(
+                                    monthLabel, // This will be displayed on the x-axis
+                                    distance,
+                                  ),
+                                );
+                              }
 
-                                      distanceStr =
-                                          '${distance.toStringAsFixed(1)} km';
-                                    } catch (e) {
-                                      print('Error parsing distance: $e');
-                                      distanceStr = '0 km';
-                                    }
-                                  }
-
-                                  return _buildActivityItem(
-                                    name,
-                                    type,
-                                    distanceStr,
-                                    Icons.directions_bike_outlined,
-                                  );
-                                },
-                              ),
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, bottom: 12, top: 2),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "Monthly Distance",
+                                          style: TextStyle(
+                                            fontFamily: 'Fredoka-SemiBold',
+                                            fontSize: 16,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(12),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Color(0xffFFA500).withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: Offset(0, 2),
+                                              )
+                                            ]
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.insights, size: 14, color: Colors.white),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                "Activity",
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ).animate().shimmer(delay: 2000.ms, duration: 1800.ms),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    height: 200, // Compact height
+                                    width: double.infinity,
+                                    child: SfCartesianChart(
+                                      margin: EdgeInsets.zero,
+                                      plotAreaBorderWidth: 0,
+                                      primaryXAxis: CategoryAxis(
+                                        majorGridLines: MajorGridLines(width: 0),
+                                        axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+                                        labelStyle: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontFamily: 'Inter',
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        majorTickLines: MajorTickLines(size: 0),
+                                        labelIntersectAction: AxisLabelIntersectAction.hide,
+                                        interval: 1, // Ensure all months are shown
+                                        labelRotation: 0, // Keep labels horizontal
+                                      ),
+                                      primaryYAxis: NumericAxis(
+                                        majorGridLines: MajorGridLines(
+                                          width: 0.5,
+                                          color: Colors.grey[200],
+                                          dashArray: <double>[3, 3],
+                                        ),
+                                        axisLine: AxisLine(width: 0),
+                                        labelFormat: '{value}',
+                                        labelStyle: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontFamily: 'Inter',
+                                          fontSize: 10,
+                                        ),
+                                        majorTickLines: MajorTickLines(size: 0),
+                                      ),
+                                      tooltipBehavior: TooltipBehavior(
+                                        enable: true,
+                                        color: Colors.grey[800],
+                                        textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                                        duration: 1500,
+                                        animationDuration: 150,
+                                        elevation: 10,
+                                        shadowColor: Colors.black.withOpacity(0.3),
+                                      ),
+                                      legend: Legend(isVisible: false),
+                                      series: <ChartSeries>[
+                                        // Area Series with gradient
+                                        AreaSeries<ActivityData, String>(
+                                          dataSource: activityData,
+                                          xValueMapper: (ActivityData data, _) => data.month,
+                                          yValueMapper: (ActivityData data, _) => data.distance,
+                                          borderColor: Color(0xffFFA500),
+                                          borderWidth: 0, // No border for area
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Color(0xffFFA500).withOpacity(0.5),
+                                              Color(0xffFFA500).withOpacity(0.0),
+                                            ],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          ),
+                                          animationDuration: 1200,
+                                        ),
+                                        // Main line series - THICKER now
+                                        SplineSeries<ActivityData, String>(
+                                          dataSource: activityData,
+                                          xValueMapper: (ActivityData data, _) => data.month,
+                                          yValueMapper: (ActivityData data, _) => data.distance,
+                                          width: 5, // Much thicker line
+                                          color: Color(0xffFFA500),
+                                          animationDuration: 1500,
+                                          markerSettings: MarkerSettings(
+                                            isVisible: true,
+                                            height: 12,
+                                            width: 12,
+                                            shape: DataMarkerType.circle,
+                                            borderWidth: 2,
+                                            borderColor: Color(0xffFFA500),
+                                            color: Colors.white,
+                                          ),
+                                          dataLabelSettings: DataLabelSettings(
+                                            isVisible: true,
+                                            color: Colors.white,
+                                            borderColor: Color(0xffFFA500).withOpacity(0.5),
+                                            borderWidth: 1,
+                                            margin: EdgeInsets.all(4),
+                                            textStyle: TextStyle(
+                                              color: Colors.black87,
+                                              fontFamily: 'Inter',
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            labelPosition: ChartDataLabelPosition.outside,
+                                          ),
+                                          enableTooltip: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ).animate()
+                                  .slideY(
+                                    begin: 0.05,
+                                    end: 0,
+                                    duration: 600.ms,
+                                    curve: Curves.easeOutQuad,
+                                  ).then(delay: 300.ms)
+                                  .shimmer(duration: 1200.ms, color: Colors.white.withOpacity(0.2)),
+                                  
+                                  // Small legend at the bottom
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              height: 3,
+                                              width: 20,
+                                              decoration: BoxDecoration(
+                                                color: Color(0xffFFA500),
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              "Distance (km)",
+                                              style: TextStyle(
+                                                color: Colors.grey[700],
+                                                fontSize: 10,
+                                                fontFamily: "Inter",
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Text(
+                                          "Months",
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 10,
+                                            fontFamily: "Inter",
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
+                                ],
+                              ).animate().fadeIn(duration: 400.ms);
+                            },
+                          ),
                   ),
-                  SizedBox(height: 20),
                 ],
               ),
             ),
@@ -1212,66 +1001,7 @@ Future<void> loadStravaUserId() async {
     );
   }
 
-  Widget _buildActivityItem(
-      String title, String subtitle, String time, IconData icon) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      leading: Container(
-        padding: EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Color(0xffFFA500).withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: Color(0xffFFA500),
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
-          color: Colors.black87,
-          fontFamily: "Inter",
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[600],
-          fontFamily: "Inter",
-        ),
-      ),
-      trailing: Text(
-        time,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey[500],
-          fontWeight: FontWeight.w500,
-          fontFamily: "Inter",
-        ),
-      ),
-    );
-  }
-}
 
-// BMI Categories Extension
-extension BMICategory on double {
-  String get category {
-    if (this < 18.5) return 'Underweight';
-    if (this < 25.0) return 'Normal';
-    if (this < 30.0) return 'Overweight';
-    return 'Obese';
-  }
-
-  Color get categoryColor {
-    if (this < 18.5) return Colors.blue;
-    if (this < 25.0) return Colors.green;
-    if (this < 30.0) return Colors.orange;
-    return Colors.red;
-  }
 }
 
 // Weather Status Extension
