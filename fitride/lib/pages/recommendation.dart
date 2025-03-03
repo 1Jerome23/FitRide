@@ -150,8 +150,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .limit(1)
           .get();
 
+      DateTime? currentGoalTimestamp;
+
       if (goalsQuery.docs.isNotEmpty) {
         DocumentSnapshot goalsDoc = goalsQuery.docs.first;
+        if (goalsDoc['timestamp'] != null) {
+          currentGoalTimestamp = goalsDoc['timestamp'].toDate();
+        }
+        print("Current goal timestamp: $currentGoalTimestamp");
 
         setState(() {
           goalType = goalsDoc['goalType'] ?? "-";
@@ -173,6 +179,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
           .collection('activities')
           .where('uid', isEqualTo: userId)
+          .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
           .orderBy('start_date', descending: true)
           .limit(30) // Increased to get more historical data
           .get();
