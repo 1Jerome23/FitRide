@@ -240,12 +240,16 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
             print("Converted User ID Number: $userIdNumber");
 
             if (userIdNumber != null) {
+
+              final goalCreationTimestamp = goalData['timestamp'] as Timestamp;
+
               final allActivitiesSnapshot = await FirebaseFirestore.instance
                   .collection('activities')
                   .where('user_id', isEqualTo: userIdNumber)
+                  .where('start_date', isGreaterThan: goalCreationTimestamp)
                   .get();
 
-              print("Activities found: ${allActivitiesSnapshot.docs.length}");
+              print("Activities found after goal creation: ${allActivitiesSnapshot.docs.length}");
 
               hasActivity = allActivitiesSnapshot.docs.isNotEmpty;
 
