@@ -33,12 +33,12 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   List<Map<String, dynamic>> _weeklyActivities = [];
   double _weeklyDaysProgress = 0;
   double _averageSessionDuration = 0;
-  double _totalWeeklyDuration = 0; 
+  double _totalWeeklyDuration = 0;
   double _totalWeeklyDistance = 0;
   Set<String> _uniqueDays = {};
-  
+
   double _currentUserWeight = 0;
-  double targetWeight = 0; 
+  double targetWeight = 0;
 
   Map<String, dynamic>? _bestDistanceActivity;
   double _bestDistance = 0;
@@ -57,7 +57,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     Future.delayed(Duration(milliseconds: 500), () {
       _loadUserGoalAndActivities();
     });
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -95,7 +95,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         );
         break;
       case 2:
-        // Current page
+      // Current page
         break;
       case 3:
         Navigator.pushReplacement(
@@ -468,7 +468,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
             .collection('goals')
             .doc(uid)
             .delete();
-            
+
         // Navigate directly to the goals page (index 2)
         Navigator.pushReplacement(
           context,
@@ -477,7 +477,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       } catch (e) {
         print('Error resetting goal: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to reset goal. Please try again.'))
+            const SnackBar(content: Text('Failed to reset goal. Please try again.'))
         );
       }
     }
@@ -495,10 +495,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         return 'assets/leisure.png';
     }
   }
-  
+
   Widget _buildFirstActivityPrompt() {
     final goalType = userGoal!['goalType'] ?? 'Cycling';
-    
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
@@ -598,7 +598,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     if (_currentUserWeight <= 0) {
       return "Update your current weight in your profile to track progress.";
     }
-    
+
     if (_currentUserWeight > targetWeight) {
       double remaining = _currentUserWeight - targetWeight;
       return "You have ${remaining.toStringAsFixed(1)} kg left to reach your target weight.";
@@ -620,21 +620,21 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     if (_bestDistance <= 0) {
       return "Complete your first cycling activity to establish your baseline.";
     }
-    
-    String bestDateStr = _bestDistanceDate != null ? 
-      DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
-    
+
+    String bestDateStr = _bestDistanceDate != null ?
+    DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
+
     if (_bestDistance < targetDistance) {
       double remaining = targetDistance - _bestDistance;
       String progressText = "Your best performance was ${_bestDistance.toStringAsFixed(1)} km on $bestDateStr.";
-      
+
       if (_latestActivityDate != null && _latestActivityDate != _bestDistanceDate) {
         if (_latestDistance < _bestDistance) {
           String latestDateStr = DateFormat('MMM d, yyyy').format(_latestActivityDate!);
           progressText += " Your latest ride on $latestDateStr was ${_latestDistance.toStringAsFixed(1)} km. Keep training to beat your personal best!";
         }
       }
-      
+
       return progressText + " You need ${remaining.toStringAsFixed(1)} more km to reach your target.";
     } else {
       return "Congratulations! You've reached your distance target of ${targetDistance.toStringAsFixed(1)} km on $bestDateStr.";
@@ -643,7 +643,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
   double _getBestActivityDuration() {
     if (_bestDistanceActivity == null) return 0;
-    
+
     double duration = 0.0;
     var timeValue = _bestDistanceActivity!['elapsed_time'];
     if (timeValue is int) {
@@ -653,18 +653,18 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     } else if (timeValue is String) {
       duration = double.tryParse(timeValue) ?? 0.0;
     }
-    
+
     // Convert from seconds to minutes
     return duration / 60.0;
   }
-  
+
   String _getBestDurationHelperText(double targetDuration) {
     if (_bestDistanceActivity == null) return "";
-    
+
     double bestDuration = _getBestActivityDuration();
-    String bestDateStr = _bestDistanceDate != null ? 
-      DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
-    
+    String bestDateStr = _bestDistanceDate != null ?
+    DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
+
     if (bestDuration > targetDuration) {
       return "Your best distance ride took longer than your target duration. Try to improve your speed while maintaining distance.";
     } else {
@@ -674,7 +674,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
   Widget _buildProgressCard(String title, double progress, double target, String unit, Color color, IconData icon, {String? helpText}) {
     final percentage = (progress / target).clamp(0.0, 1.0);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -853,23 +853,23 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         ),
       );
     }
-    
+
     if (!_hasActivityAfterGoal) {
       return _buildFirstActivityPrompt();
     }
 
     final goalType = userGoal!['goalType'] ?? '';
-    final createdAt = userGoal!['timestamp'] != null 
+    final createdAt = userGoal!['timestamp'] != null
         ? (userGoal!['timestamp'] as Timestamp).toDate()
         : DateTime.now();
-    
+
     // Format week range for display
     final weekRangeStr = "${DateFormat('MMM d').format(_weekStartDate)} - ${DateFormat('MMM d').format(_weekEndDate)}";
-    
+
     // Get target values from user goal - safely convert to double from any type
     double daysTarget = 7.0; // Default value
     double durationTarget = 30.0; // Default value
-    
+
     // Parse daysPerWeek safely
     if (userGoal!.containsKey('daysPerWeek')) {
       var daysValue = userGoal!['daysPerWeek'];
@@ -882,7 +882,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       }
       print("Days target parsed as: $daysTarget from ${userGoal!['daysPerWeek']}");
     }
-    
+
     if (userGoal!.containsKey('sessionDuration')) {
       var durationValue = userGoal!['sessionDuration'];
       if (durationValue is int) {
@@ -894,7 +894,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       }
       print("Duration target parsed as: $durationTarget from ${userGoal!['sessionDuration']}");
     }
-    
+
     // For weight management
     if (goalType == 'High Intensity Cycling') {
       var targetWeightValue = userGoal!['targetWeight'];
@@ -907,7 +907,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       }
       print("Target weight: $targetWeight, Current weight: $_currentUserWeight");
     }
-    
+
     // For endurance
     double targetDistance = 0;
     if (goalType == 'Endurance') {
@@ -929,7 +929,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     } else {
       daysHelperText = "Great job! You've reached your weekly cycling goal.";
     }
-    
+
     String durationHelperText = '';
     if (_averageSessionDuration < durationTarget) {
       double needed = durationTarget - _averageSessionDuration;
@@ -1005,7 +1005,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Current Week Display based on goal type
               if (goalType != 'Endurance')
                 Container(
@@ -1071,9 +1071,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                     ],
                   ),
                 ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Progress metrics based on goal type
               if (goalType == 'Leisure') ...[
                 _buildProgressCard(
@@ -1198,7 +1198,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                   Icons.straighten_rounded,
                   helpText: _getEnduranceHelperText(targetDistance),
                 ),
-                
+
                 // Best Duration Card
                 if (_bestDistanceActivity != null) ...[
                   _buildProgressCard(
@@ -1211,7 +1211,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                     helpText: _getBestDurationHelperText(durationTarget),
                   ),
                 ],
-                
+
                 // Endurance Goals Info Card
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -1245,9 +1245,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 16),
-              
+
               // Weekly Activities Summary - only for non-endurance goals
               if (_weeklyActivities.isNotEmpty && goalType != 'Endurance') ...[
                 Container(
@@ -1298,7 +1298,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                   ),
                 ),
               ],
-              
+
               // Latest activity summary for endurance goals
               if (goalType == 'Endurance' && _latestActivityDate != null && _latestActivityDate != _bestDistanceDate) ...[
                 Container(
@@ -1345,24 +1345,24 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                           color: primaryGray,
                         ),
                       ),
-                      _latestDistance < _bestDistance 
-                        ? Text(
-                            "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: primaryOrange,
-                            ),
-                          )
-                        : Container(),
+                      _latestDistance < _bestDistance
+                          ? Text(
+                        "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                          color: primaryOrange,
+                        ),
+                      )
+                          : Container(),
                     ],
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 16),
-              
+
               // Tips based on goal type
               Container(
                 padding: const EdgeInsets.all(16),
@@ -1467,127 +1467,127 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
         ],
       ),
       body: SafeArea(
-        child: _isLoading 
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
+        child: _isLoading
+            ? const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
+          ),
+        )
+            : SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Goal Tracking",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 28,
+                  color: primaryBlack,
+                ),
               ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Goal Tracking",
-                    style: TextStyle(
-                      fontFamily: 'Fredoka-SemiBold',
-                      fontSize: 28,
-                      color: primaryBlack,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Track your cycling progress and stay motivated to achieve your fitness goals!",
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 15,
-                      color: primaryGray,
-                    ),
-                  ),
-                  userGoal == null
-                      ? Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 50),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.track_changes_rounded,
-                                  size: 70,
-                                  color: Colors.grey[300],
-                                ),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  "No goal found",
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 20,
-                                    color: primaryBlack,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "Set up your cycling goal to start tracking your progress",
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 15,
-                                    color: primaryGray,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 20),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    // Navigate directly to the goals page (index 2)
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryOrange,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Set Up Goal",
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : _buildGoalCard(),
-                  
-                  if (userGoal != null && _hasActivityAfterGoal) ...[
-                    const SizedBox(height: 20),
-                  ],
-                  
-                  if (userGoal != null) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed: _showChangeGoalConfirmation,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: const BorderSide(color: primaryOrange),
+              const SizedBox(height: 8),
+              const Text(
+                "Track your cycling progress and stay motivated to achieve your fitness goals!",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  color: primaryGray,
+                ),
+              ),
+              userGoal == null
+                  ? Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 50),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.track_changes_rounded,
+                        size: 70,
+                        color: Colors.grey[300],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        "No goal found",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 20,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        "Set up your cycling goal to start tracking your progress",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 15,
+                          color: primaryGray,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () {
+                          // Navigate directly to the goals page (index 2)
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryOrange,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: const Text(
-                          "Change Goal",
+                          "Set Up Goal",
                           style: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 16,
-                            color: primaryOrange,
+                            color: Colors.white,
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              )
+                  : _buildGoalCard(),
+
+              if (userGoal != null && _hasActivityAfterGoal) ...[
+                const SizedBox(height: 20),
+              ],
+
+              if (userGoal != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: _showChangeGoalConfirmation,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: primaryOrange),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ],
-                ],
-              ),
-            ),
+                    child: const Text(
+                      "Change Goal",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        color: primaryOrange,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
