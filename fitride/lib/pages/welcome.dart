@@ -1,9 +1,37 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fitride/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'login_register.dart';
 
 class WelcomePage extends StatelessWidget {
-  const WelcomePage ({Key? key}) : super(key: key);
+  const WelcomePage({Key? key}) : super(key: key);
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Show a loading indicator while checking auth state
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasData) {
+            // User is signed in, navigate to HomePage
+            return HomePage();
+          } else if (snapshot.hasError) {
+            // Handle errors gracefully
+            return Center(child: Text('Something went wrong!'));
+          } else {
+            // User is not signed in, show the welcome screen
+            return WelcomeScreen();
+          }
+        },
+      ),
+    );
+  }
+}
+
+class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var height = MediaQuery.of(context).size.height;
@@ -14,17 +42,26 @@ class WelcomePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Image(image: AssetImage("assets/startpic.gif"), height:height * 0.5),
+            Image(
+              image: AssetImage("assets/startpic.gif"),
+              height: height * 0.5,
+            ),
             Column(
               children: [
-                Text("Get Started", style: TextStyle(
-                  color: Colors.black,
-                  fontFamily: "Fredoka-Bold",
-                  fontSize: 35)
+                Text(
+                  "Get Started",
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontFamily: "Fredoka-Bold",
+                    fontSize: 35,
+                  ),
                 ),
-                Text("Your personal cycling companion for a healthier, more enjoyable ride. Set your goals, track progress, and get insights tailored just for you.", style: TextStyle(
-                  color: Colors.black,
-                  fontFamily: "Inter",),
+                Text(
+                  "Your personal cycling companion for a healthier, more enjoyable ride. Set your goals, track progress, and get insights tailored just for you.",
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontFamily: "Inter",
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -33,48 +70,62 @@ class WelcomePage extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: (){
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => LoginPage()),
                       );
-                    }, 
+                    },
                     style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
                       foregroundColor: Color(0xff272727),
                       side: BorderSide(color: Color(0xff272727)),
-                      padding: EdgeInsets.symmetric(vertical: 15.0)
+                      padding: EdgeInsets.symmetric(vertical: 15.0),
                     ),
-                    child: Text("Login".toUpperCase(), style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold),
+                    child: Text(
+                      "Login".toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  )
+                  ),
                 ),
-                const SizedBox(
-                  width: 10.0,
-                ),
+                const SizedBox(width: 10.0),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: (){
+                    onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => LoginPage(startWithSignup: true)),
+                        MaterialPageRoute(
+                          builder: (context) => LoginPage(startWithSignup: true),
+                        ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
                       foregroundColor: Colors.white,
                       backgroundColor: Color(0xff272727),
                       side: BorderSide(color: Color(0xff272727)),
                       padding: EdgeInsets.symmetric(vertical: 15.0),
                     ),
-                    child: Text("Signup".toUpperCase(), style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold),
+                    child: Text(
+                      "Signup".toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  )
+                  ),
                 ),
               ],
-            )
+            ),
           ],
-        )
+        ),
       ),
     );
   }
