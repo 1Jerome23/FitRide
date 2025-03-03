@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -13,12 +12,52 @@ class HealthSummary extends StatefulWidget {
 
 class _HealthSummaryState extends State<HealthSummary> {
   late String userId;
-
+  String goalType = "-";
   @override
   void initState() {
     super.initState();
     final user = FirebaseAuth.instance.currentUser;
     userId = user?.uid ?? '';
+    if (userId.isNotEmpty) {
+    fetchGoalType();
+  }
+  }
+  Future<void> fetchGoalType() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("❌ No authenticated user.");
+      return;
+    }
+
+    print("🔍 Fetching goalType for userId: ${user.uid}");
+
+    try {
+      QuerySnapshot goalsQuery = await FirebaseFirestore.instance
+          .collection('goals')
+          .where('uid', isEqualTo: user.uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (goalsQuery.docs.isNotEmpty) {
+        DocumentSnapshot goalsDoc = goalsQuery.docs.first;
+        print("🏆 Goal Data: ${goalsDoc.data()}");
+
+        setState(() {
+          goalType = goalsDoc['goalType'] ?? "-"; // ✅ Update goalType properly
+        });
+
+        print("✅ Updated goalType: $goalType");
+      } else {
+        print("⚠️ No goal found for user ID: ${user.uid}");
+
+        setState(() {
+          goalType = "Leisure"; // ✅ Set default fallback
+        });
+      }
+    } catch (e) {
+      print("❌ Error fetching goalType: $e");
+    }
   }
 
   Future<Map<String, dynamic>> _fetchData() async {
@@ -28,7 +67,7 @@ class _HealthSummaryState extends State<HealthSummary> {
     
     try {
       final userDoc = await FirebaseFirestore.instance.collection('userData').doc(userId).get();
-      final activitiesSnapshot = await FirebaseFirestore.instance.collection('activities').where('user_id', isEqualTo: userId).get();
+      final activitiesSnapshot = await FirebaseFirestore.instance.collection('activities').where('uid', isEqualTo: userId).get();
       final athleteDoc = await FirebaseFirestore.instance.collection('athletes').doc(userId).get();
 
       final userData = userDoc.data() ?? {};
@@ -39,35 +78,45 @@ class _HealthSummaryState extends State<HealthSummary> {
       double weight = double.tryParse(userData['weight']?.toString() ?? '0') ?? 0;
       double bmi = (height > 0) ? weight / (height * height) : 0;
       double metabolicRate = double.tryParse(userData['metabolic_rate']?.toString() ?? '0') ?? 0;
-      double bodyFatPercentage = double.tryParse(userData['body_fat_percentage']?.toString() ?? '0') ?? 0;
+      double bodyFatPercentage = double.tryParse(userData['bodyFat']?.toString() ?? '0') ?? 0;
 
-      double totalHeartRate = 0, maxHeartRate = 0, totalDistance = 0, totalCalories = 0;
-      int heartRateCount = 0;
+      double totalDistance = 0, totalCalories = 0;
+      double latestHeartRate = 0;
+      Timestamp? latestTimestamp;
 
       for (var activity in activities) {
-        double heartRate = double.tryParse(activity['average_heartrate']?.toString() ?? '0') ?? 0;
-        if (heartRate > 0) {
-          totalHeartRate += heartRate;
-          heartRateCount++;
-          if (heartRate > maxHeartRate) maxHeartRate = heartRate;
-        }
+        // Convert distance and calories directly
         totalDistance += double.tryParse(activity['distance']?.toString() ?? '0') ?? 0;
         totalCalories += double.tryParse(activity['calories_burned']?.toString() ?? '0') ?? 0;
-      }
 
-      return {
-        'Athlete Name': athleteData['athlete_name'] ?? 'N/A',
-        'Age': userData['age']?.toString() ?? 'N/A',
-        'Height (cm)': userData['height']?.toString() ?? 'N/A',
-        'Weight (kg)': userData['weight']?.toString() ?? 'N/A',
-        'BMI': bmi.toStringAsFixed(2),
-        'Metabolic Rate': metabolicRate.toStringAsFixed(2),
-        'Body Fat %': bodyFatPercentage.toStringAsFixed(2),
-        'Avg. Heart Rate': heartRateCount > 0 ? (totalHeartRate / heartRateCount).toStringAsFixed(2) : 'N/A',
-        'Max Heart Rate': maxHeartRate.toStringAsFixed(2),
-        'Total Distance (km)': totalDistance.toStringAsFixed(2),
-        'Total Calories': totalCalories.toStringAsFixed(2),
-      };
+        // Ensure heart rate is valid
+        double heartRate = double.tryParse(activity['average_heartrate']?.toString() ?? '0') ?? 0;
+        Timestamp? activityTimestamp = activity['start_date']; // Assuming timestamp is stored
+
+        if (heartRate > 0 && activityTimestamp != null) {
+          if (latestTimestamp == null || activityTimestamp.millisecondsSinceEpoch > latestTimestamp.millisecondsSinceEpoch) {
+            latestTimestamp = activityTimestamp;
+            latestHeartRate = heartRate;
+          }
+        }
+      }
+      print("🔥 Heart Rate: $latestHeartRate");
+      print("🔥 Total Distance: $totalDistance");
+      print("🔥 Total Calories: $totalCalories");
+    return {
+      'Athlete Name': athleteData['athlete_name'] ?? 'N/A',
+      'Age': userData['age']?.toString() ?? 'N/A',
+      'Height (cm)': userData['height']?.toString() ?? 'N/A',
+      'Weight (kg)': userData['weight']?.toString() ?? 'N/A',
+      'BMI': bmi > 0 ? bmi.toStringAsFixed(2) : 'N/A',
+      'Metabolic Rate': metabolicRate > 0 ? metabolicRate.toStringAsFixed(2) : 'N/A',
+      'Body Fat %': bodyFatPercentage > 0 ? bodyFatPercentage.toStringAsFixed(2) : 'N/A',
+      'Avg. Heart Rate': latestHeartRate > 0 ? latestHeartRate.toStringAsFixed(2) : 'N/A', // ✅ Uses latest heart rate
+      'Total Distance (km)': totalDistance > 0 ? totalDistance.toStringAsFixed(2) : 'N/A',
+      'Total Calories': totalCalories > 0 ? totalCalories.toStringAsFixed(2) : 'N/A',
+
+    };
+    
     } catch (e) {
       throw Exception("Error fetching data: $e");
     }
@@ -250,26 +299,33 @@ class _HealthSummaryState extends State<HealthSummary> {
                   ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
                   
                   SizedBox(height: 24),
-                  
+
                   // Physical Metrics Section
                   _buildSectionHeader("Physical Metrics", Icons.monitor_weight),
                   SizedBox(height: 12),
                   _buildMetricCard("Height", data['Height (cm)'] + " cm", Icons.height, Colors.blue),
-                  _buildMetricCard("Weight", data['Weight (kg)'] + " kg", Icons.fitness_center, Colors.green),
-                  _buildMetricCard("BMI", data['BMI'], Icons.speed, _getBMIColor(double.tryParse(data['BMI']) ?? 0)),
-                  _buildMetricCard("Body Fat", data['Body Fat %'] + "%", Icons.pie_chart, Colors.purple),
-                  
+
+                  // Show Weight and Body Fat only if goalType is "High Intensity Cycling"
+                  if (goalType == "High Intensity Cycling") ...[
+                    _buildMetricCard("Weight", data['Weight (kg)'] + " kg", Icons.fitness_center, Colors.green),
+                    _buildMetricCard("BMI", data['BMI'], Icons.speed, _getBMIColor(double.tryParse(data['BMI']) ?? 0)),
+                    _buildMetricCard("Body Fat", data['Body Fat %'] + "%", Icons.pie_chart, Colors.purple),
+                  ],
+
                   SizedBox(height: 24),
-                  
+
                   // Performance Metrics Section
                   _buildSectionHeader("Performance Metrics", Icons.trending_up),
                   SizedBox(height: 12),
                   _buildMetricCard("Average Heart Rate", data['Avg. Heart Rate'] + " bpm", Icons.favorite, Colors.red),
-                  _buildMetricCard("Max Heart Rate", data['Max Heart Rate'] + " bpm", Icons.favorite, Colors.deepOrange),
                   _buildMetricCard("Total Distance", data['Total Distance (km)'] + " km", Icons.directions_bike, Color(0xffFFA500)),
-                  _buildMetricCard("Total Calories", data['Total Calories'] + " kcal", Icons.local_fire_department, Colors.amber),
-                  _buildMetricCard("Metabolic Rate", data['Metabolic Rate'] + " kcal", Icons.bolt, Colors.teal),
-                  
+
+                  // Show Total Calories and Metabolic Rate only if goalType is "High Intensity Cycling"
+                  if (goalType == "High Intensity Cycling") ...[
+                    _buildMetricCard("Total Calories", data['Total Calories'] + " kcal", Icons.local_fire_department, Colors.amber),
+                    _buildMetricCard("Metabolic Rate", data['Metabolic Rate'] + " kcal", Icons.bolt, Colors.teal),
+                  ],
+
                   SizedBox(height: 30),
                   
                   Center(
