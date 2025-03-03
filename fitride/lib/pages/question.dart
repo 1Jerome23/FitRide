@@ -37,7 +37,7 @@ class _QuestionPageState extends State<QuestionPage>
   
   // Weight loss goal controllers
   final TextEditingController weightController = TextEditingController();
-  final TextEditingController bodyWaterController = TextEditingController();
+  final TextEditingController basalMetabolicRateController = TextEditingController();
   final TextEditingController bodyFatController = TextEditingController();
   final TextEditingController targetWeightController = TextEditingController();
   
@@ -158,7 +158,7 @@ class _QuestionPageState extends State<QuestionPage>
     ageController.dispose();
     heightController.dispose();
     weightController.dispose();
-    bodyWaterController.dispose();
+    basalMetabolicRateController.dispose();
     bodyFatController.dispose();
     targetWeightController.dispose();
     daysPerWeekController.dispose();
@@ -252,7 +252,7 @@ class _QuestionPageState extends State<QuestionPage>
       } else if (_selectedGoal == 'High Intensity Cycling') {
         Map<String, dynamic> bodyMetrics = {
           'weight': weightController.text,
-          'bodyWater': bodyWaterController.text,
+          'basalMetabolicRate': basalMetabolicRateController.text,
           'bodyFat': bodyFatController.text,
         };
         
@@ -267,6 +267,7 @@ class _QuestionPageState extends State<QuestionPage>
       } else if (_selectedGoal == 'Endurance') {
         goalData['targetDistance'] = targetDistanceController.text;
         goalData['targetDuration'] = targetDurationController.text;
+        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
       }
 
       await FirebaseFirestore.instance
@@ -379,6 +380,17 @@ class _QuestionPageState extends State<QuestionPage>
                         fontFamily: "Inter",
                         color: primaryGray,
                         fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "Before proceeding, kindly enable Strava to get your heart rate. To do this,\nGo to Strava > Profile > Settings > Data Permissions > Health-Related Data > click 'Allow'",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: "Inter",
+                        color: Colors.redAccent,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     SizedBox(height: 20),
@@ -1462,70 +1474,70 @@ class _QuestionPageState extends State<QuestionPage>
               ),
               SizedBox(height: 15),
 
-              // Body Water
+              // Basal Metabolic Rate
               Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            padding: EdgeInsets.all(15),
-                            child: Image.asset(
-                              "assets/water.png",
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: bodyWaterController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Body Water",
-                                hintStyle: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryGray
-                                ),
-                              ),
-                              style: TextStyle(
-                                fontFamily: "Inter",
-                                color: Colors.black
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    alignment: Alignment.center,
+              children: [
+                Expanded(
+                  child: Container(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
-                      ),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
-                    child: Text(
-                      "%",
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          padding: EdgeInsets.all(15),
+                          child: Image.asset(
+                            "assets/fire.png",
+                          ),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: basalMetabolicRateController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              border: InputBorder.none,
+                              hintText: "Basal Metabolic Rate",
+                              hintStyle: TextStyle(
+                                fontFamily: "Inter",
+                                color: primaryGray
+                              ),
+                            ),
+                            style: TextStyle(
+                              fontFamily: "Inter",
+                              color: Colors.black
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                SizedBox(width: 8),
+                Container(
+                  width: 50,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Text(
+                    "KCAL",
+                    style: TextStyle(
+                      fontFamily: "Inter",
+                      color: Colors.white, 
+                      fontSize: 12
+                    ),
+                  ),
+                ),
+              ],
+            ),
               SizedBox(height: 15),
 
               // Body Fat
@@ -1994,6 +2006,58 @@ class _QuestionPageState extends State<QuestionPage>
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        
+        // Days per week
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "How many days per week do you plan to cycle?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: daysPerWeekController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Enter a number between 1-7",
+                  hintStyle: TextStyle(
+                    fontFamily: "Inter",
+                    color: primaryGray,
+                    fontSize: 14
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                ),
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  color: primaryBlack,
+                ),
               ),
             ],
           ),
