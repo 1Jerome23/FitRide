@@ -11,13 +11,16 @@ import 'dart:developer';
 import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fitride/pages/welcome.dart';
+import 'package:provider/provider.dart';
+import 'auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
   setupNotificationChannel(); 
-  runApp(const _MainApp());
+  runApp(const MainApp());
 }
 
 void setupNotificationChannel() {
@@ -35,12 +38,50 @@ void setupNotificationChannel() {
       ?.createNotificationChannel(channel);
 }
 
-class _MainApp extends StatelessWidget {
-  static const id = '_MainApp';
-  const _MainApp();
+class MainApp extends StatelessWidget {
+  static const id = 'MainApp';
+  const MainApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Create Auth instance
+    final Auth auth = Auth();
+    
+    return Provider<Auth>(
+      create: (_) => auth,
+      child: MaterialApp(
+        navigatorKey: Globals.navigatorKey,
+        scaffoldMessengerKey: Globals.scaffoldMessengerKey,
+        debugShowCheckedModeBanner: false,
+        home: FutureBuilder(
+          // Initialize Auth persistence
+          future: auth.initAuth(),
+          builder: (context, snapshot) {
+            // Show loading indicator while initializing auth
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            
+            // Return the main app after auth initialization
+            return _MainAppContent();
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MainAppContent extends StatelessWidget {
+  static const id = '_MainAppContent';
+  
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<Auth>(context);
+    
     return FirebaseNotificationsHandler(
       localNotificationsConfiguration: LocalNotificationsConfiguration(
         androidConfig: AndroidNotificationsConfig(),
@@ -121,9 +162,17 @@ class _MainApp extends StatelessWidget {
             ),
           ),
         ),
-        initialRoute: '/',
+        home: StreamBuilder<User?>(
+          stream: auth.authStateChanges,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+            // If user is logged in, go to widget tree, otherwise show welcome page
+            return snapshot.hasData ? WidgetTree() : WelcomePage();
+          },
+        ),
         routes: {
-          '/': (context) => WelcomePage(),
           '/questionnaire': (context) => QuestionPage(),
           '/homepage': (context) => WidgetTree(),
           '/recommendation': (context) => PostExercise(),
