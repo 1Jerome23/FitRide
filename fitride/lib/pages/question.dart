@@ -392,16 +392,6 @@ class _QuestionPageState extends State<QuestionPage>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      "\nBefore connecting, kindly enable Strava to get your heart rate. To do this, navigate to your Strava account.\n\nGo to Profile > Settings > Data Permissions > click 'Allow'",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: primaryGray,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
                   ],
                 ),
               ),
