@@ -161,9 +161,11 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> signInWithGoogle() async {
+Future<void> signInWithGoogle() async {
   try {
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    await googleSignIn.signOut(); // ✅ Ensure fresh login prompt
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
     if (googleUser == null) {
       setState(() {
@@ -173,25 +175,79 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
     final OAuthCredential credential = GoogleAuthProvider.credential(
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
 
-    await _auth.signInWithCredential(credential);
+    UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+    User? user = userCredential.user;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
+    if (user != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      bool hasCompletedQuestionnaire = prefs.getBool('${user.uid}_completed_questionnaire') ?? false;
+
+      print("🔍 Has Completed Questionnaire: $hasCompletedQuestionnaire");
+
+      if (!hasCompletedQuestionnaire) {
+        print("➡️ Redirecting to Questionnaire...");
+
+        // ✅ Immediately mark questionnaire as completed
+        await prefs.setBool('${user.uid}_completed_questionnaire', true);
+        print("✅ Set questionnaire as completed IMMEDIATELY");
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => QuestionPage()),
+        );
+      } else {
+        print("🏠 Redirecting to HomePage...");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
+    }
   } catch (e) {
     setState(() {
       errorMessage = 'Google Sign-In failed: $e';
     });
+    print("❌ Google Sign-In Error: $e");
   }
 }
 
+
+void completeQuestionnaire() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
+
+  if (userId == null) {
+    print("❌ Error: No authenticated user.");
+    return;
+  }
+
+  print("🔹 Attempting to save questionnaire completion for user: $userId");
+
+  // ✅ Save flag
+  await prefs.setBool('${userId}_completed_questionnaire', true);
+
+  // ✅ Force reload before checking the value
+  await Future.delayed(Duration(milliseconds: 300));
+  await prefs.reload(); // Ensures value is persisted
+
+  // ✅ Read and print saved value
+  bool savedValue = prefs.getBool('${userId}_completed_questionnaire') ?? false;
+  print("✅ Questionnaire completed flag saved: $savedValue");
+
+  // ✅ Add another delay to ensure SharedPreferences is fully written
+  await Future.delayed(Duration(milliseconds: 300));
+
+  // Redirect to HomePage after completing the questionnaire
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => HomePage()),
+  );
+}
   void toggleAuthMode() {
     setState(() {
       isLogin = !isLogin;
