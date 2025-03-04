@@ -326,6 +326,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
           // Analyze body composition trends if we have enough data
           if (recentData.length >= 2) {
             _analyzeBodyCompositionTrends();
+            
           }
         } else {
           print("No documents found in after_exercise for user $userId");
@@ -335,7 +336,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       // Fetch weather and air quality data
       try {
         QuerySnapshot weatherSnapshot = await FirebaseFirestore.instance
-            .collection('weather')
+            .collection('weatherData')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
             .limit(5) // Get more weather history

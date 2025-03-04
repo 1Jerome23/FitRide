@@ -19,6 +19,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool isLogin = true;
+  final _formKey = GlobalKey<FormState>(); // Add form key for validation
 
   @override
   void initState() {
@@ -29,6 +30,10 @@ class _LoginPageState extends State<LoginPage> {
   String? errorMessage = '';
   bool _isPasswordVisible = false;
   late SharedPreferences _prefs;
+
+  // Validation error messages
+  String? _emailError;
+  String? _passwordError;
 
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
@@ -43,7 +48,69 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // Email validation
+  bool _isValidEmail(String email) {
+    final emailRegExp = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    return emailRegExp.hasMatch(email);
+  }
+
+  // Password validation - Minimum 6 characters, at least 1 letter and 1 number
+  bool _isValidPassword(String password) {
+    if (password.length < 6) {
+      return false;
+    }
+    
+    final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
+    final hasNumber = RegExp(r'[0-9]').hasMatch(password);
+    
+    return hasLetter && hasNumber;
+  }
+
+  // Validate inputs before submission
+  bool _validateInputs() {
+    bool isValid = true;
+    
+    // Reset previous errors
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+      errorMessage = '';
+    });
+    
+    // Check email
+    if (_controllerEmail.text.isEmpty) {
+      setState(() {
+        _emailError = 'Email cannot be empty';
+      });
+      isValid = false;
+    } else if (!_isValidEmail(_controllerEmail.text)) {
+      setState(() {
+        _emailError = 'Please enter a valid email address';
+      });
+      isValid = false;
+    }
+    
+    // Check password
+    if (_controllerPassword.text.isEmpty) {
+      setState(() {
+        _passwordError = 'Password cannot be empty';
+      });
+      isValid = false;
+    } else if (!isLogin && !_isValidPassword(_controllerPassword.text)) {
+      setState(() {
+        _passwordError = 'Password must be at least 6 characters with at least 1 letter and 1 number';
+      });
+      isValid = false;
+    }
+    
+    return isValid;
+  }
+
   Future<void> signInWithEmailAndPassword() async {
+    if (!_validateInputs()) {
+      return;
+    }
+    
     try {
       await Auth().signInWithEmailAndPassword(
         email: _controllerEmail.text,
@@ -62,6 +129,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> createUserWithEmailAndPassword() async {
+    if (!_validateInputs()) {
+      return;
+    }
+
     try {
       await Auth().createUserWithEmailAndPassword(
         email: _controllerEmail.text,
@@ -75,11 +146,25 @@ class _LoginPageState extends State<LoginPage> {
         MaterialPageRoute(builder: (context) => HomePage()),
       );
     } on FirebaseAuthException catch (e) {
+      String message = 'An error occurred during signup';
+      
+      // Handle specific Firebase error codes
+      if (e.code == 'email-already-in-use') {
+        message = 'This email is already registered';
+      } else if (e.code == 'weak-password') {
+        message = 'The password provided is too weak';
+      } else if (e.code == 'invalid-email') {
+        message = 'The email address is not valid';
+      } else if (e.message != null) {
+        message = e.message!;
+      }
+      
       setState(() {
-        errorMessage = e.message;
+        errorMessage = message;
       });
     }
   }
+  
   Future _getFCMToken() async {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
       String? token = await messaging.getToken();
@@ -252,6 +337,8 @@ void completeQuestionnaire() async {
     setState(() {
       isLogin = !isLogin;
       errorMessage = '';
+      _emailError = null;
+      _passwordError = null;
     });
   }
 
@@ -290,6 +377,7 @@ void completeQuestionnaire() async {
                   ),
                 ),
                 Form(
+                  key: _formKey, // Assign the form key
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 20.0),
                     child: Column(
@@ -311,7 +399,17 @@ void completeQuestionnaire() async {
                               borderRadius: BorderRadius.circular(10),
                               borderSide: BorderSide.none,
                             ),
+                            errorText: _emailError,
+                            errorStyle: TextStyle(color: Colors.red[300]),
                           ),
+                          onChanged: (value) {
+                            // Clear error when typing
+                            if (_emailError != null) {
+                              setState(() {
+                                _emailError = null;
+                              });
+                            }
+                          },
                         ),
                         const SizedBox(height: 10.0),
                         TextFormField(
@@ -331,6 +429,8 @@ void completeQuestionnaire() async {
                               borderRadius: BorderRadius.circular(10),
                               borderSide: BorderSide.none,
                             ),
+                            errorText: _passwordError,
+                            errorStyle: TextStyle(color: Colors.red[300]),
                             suffixIcon: IconButton(
                               onPressed: () {
                                 setState(() {
@@ -342,13 +442,21 @@ void completeQuestionnaire() async {
                                   : Icons.visibility_off, color: Colors.white),
                             ),
                           ),
+                          onChanged: (value) {
+                            // Clear error when typing
+                            if (_passwordError != null) {
+                              setState(() {
+                                _passwordError = null;
+                              });
+                            }
+                          },
                         ),
                         if (errorMessage?.isNotEmpty ?? false)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 10.0),
                             child: Text(
                               errorMessage!,
-                              style: TextStyle(color: Colors.red),
+                              style: TextStyle(color: Colors.red[300]),
                             ),
                           ),
                         const SizedBox(height: 50.0),
