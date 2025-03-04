@@ -213,6 +213,15 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                   .limit(1)
                   .get();
 
+              if (!goalData.containsKey('initialWeight')) {
+                await FirebaseFirestore.instance
+                  .collection('goals')
+                  .doc(mostRecentGoalDoc.id)
+                  .update({'initialWeight': _currentUserWeight});
+                
+                goalData['initialWeight'] = _currentUserWeight;
+              }
+
               if (userDataQuery.docs.isNotEmpty) {
                 final userData = userDataQuery.docs.first.data();
                 print("Latest user data found: $userData");
@@ -1645,16 +1654,30 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   }
 
   double _getWeightLossProgress() {
-    if (_currentUserWeight <= 0 || _currentUserWeight < targetWeight) {
+    if (_currentUserWeight <= 0) {
       return 0.0; 
     }
     
-    double initialWeight = _currentUserWeight;
+    double initialWeight = 0.0;
+    if (userGoal != null && userGoal!.containsKey('initialWeight')) {
+      var initialWeightValue = userGoal!['initialWeight'];
+      if (initialWeightValue is int) {
+        initialWeight = initialWeightValue.toDouble();
+      } else if (initialWeightValue is double) {
+        initialWeight = initialWeightValue;
+      } else if (initialWeightValue is String) {
+        initialWeight = double.tryParse(initialWeightValue) ?? 0.0;
+      }
+    }
+    
+    if (initialWeight <= 0) {
+      return 0.0;
+    }
     
     double weightLost = initialWeight - _currentUserWeight;
     double weightToLose = initialWeight - targetWeight;
     
-    if (weightToLose <= 0) return 100.0;
+    if (weightToLose <= 0) return 0.0;
     
     double progress = (weightLost / weightToLose) * 100.0;
     
@@ -2350,7 +2373,7 @@ Future<void> _updateUserMetrics() async {
                           // Weight Progress Card
                           _buildProgressCard(
                             "Weight Progress",
-                            _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100,
+                            _getWeightLossProgress(),
                             100,
                             "%",
                             primaryOrange,
@@ -2851,7 +2874,7 @@ Future<void> _updateUserMetrics() async {
               ] else if (goalType == 'High Intensity Cycling') ...[
                 _buildProgressCard(
                   "Weight Progress",
-                  _currentUserWeight <= 0 ? 0 : targetWeight / _currentUserWeight * 100,
+                  _getWeightLossProgress(),
                   100, 
                   "%",
                   primaryOrange,

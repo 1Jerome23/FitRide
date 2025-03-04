@@ -245,6 +245,7 @@ class _QuestionPageState extends State<QuestionPage>
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
         goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'High Intensity Cycling') {
+        double initialWeight = double.tryParse(weightController.text) ?? 0.0;
         Map<String, dynamic> bodyMetrics = {
           'weight': weightController.text,
           'basalMetabolicRate': basalMetabolicRateController.text,
@@ -257,6 +258,7 @@ class _QuestionPageState extends State<QuestionPage>
             .set(bodyMetrics, SetOptions(merge: true));
             
         goalData['targetWeight'] = targetWeightController.text;
+        goalData['initialWeight'] = initialWeight;
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
         goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'Endurance') {
