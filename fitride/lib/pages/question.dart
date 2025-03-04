@@ -345,85 +345,119 @@ class _QuestionPageState extends State<QuestionPage>
     return Scaffold(
       backgroundColor: Color(0xFFEEF9FF),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(height: 100),
-              Image.asset(
-                'assets/strava_logo.png',
-                height: media.width * 0.4, 
-              ),
-              SizedBox(height: 30),
-              Text(
-                "Authorize Strava",
-                style: TextStyle(
-                  fontFamily: "Fredoka-SemiBold",
-                  color: Colors.black,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+        child: SingleChildScrollView( 
+          child: Padding(
+            padding: const EdgeInsets.all(25.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(height: media.height * 0.05), 
+                Image.asset(
+                  'assets/strava_logo.png',
+                  height: media.width * 0.3,
+                  fit: BoxFit.contain,
                 ),
-              ),
-              SizedBox(height: 20),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  children: [
-                    Text(
-                      "Connect your Strava account to sync your activities and track your progress",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: primaryGray,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "Before proceeding, kindly enable Strava to get your heart rate. To do this,\nGo to Strava > Profile > Settings > Data Permissions > Health-Related Data > click 'Allow'",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.redAccent,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "⚠️ This is a requirement to use FitRide",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: primaryOrange,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                SizedBox(height: 20),
+                Text(
+                  "Authorize Strava",
+                  style: TextStyle(
+                    fontFamily: "Fredoka-SemiBold",
+                    color: Colors.black,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              SizedBox(height: 40),
-              Container(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _authorizeStrava();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFFC4C02),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+                SizedBox(height: 20),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Connect your Strava account to sync your activities and track your progress",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        "Before proceeding, kindly enable Strava to get your heart rate. To do this,\nGo to Strava > Profile > Settings > Data Permissions > Health-Related Data > click 'Allow'",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          color: Colors.redAccent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        "⚠️ This is a requirement to use FitRide",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryOrange,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 30), 
+                Container(
+                  width: double.infinity,
+                  height: 50, 
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _authorizeStrava();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFFC4C02),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 10),
+                        Text(
+                          "Connect with Strava",
+                          style: TextStyle(
+                            fontFamily: "Inter",
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(width: 10),
-                      Text(
-                        "Connect with Strava",
+                ),
+                
+                if (_stravaAuthSuccessful) ...[
+                  SizedBox(height: 20),
+                  Container(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _controller.animateToPage(
+                          page: 1,
+                          duration: 600,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryOrange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: Text(
+                        "Next",
                         style: TextStyle(
                           fontFamily: "Inter",
                           color: Colors.white,
@@ -431,42 +465,12 @@ class _QuestionPageState extends State<QuestionPage>
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              if (_stravaAuthSuccessful) ...[
-                SizedBox(height: 30),
-                Container(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _controller.animateToPage(
-                        page: 1,
-                        duration: 600,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryOrange,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: Text(
-                      "Next",
-                      style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ),
-                ),
+                ],
+                SizedBox(height: 20),
               ],
-            ],
+            ),
           ),
         ),
       ),
