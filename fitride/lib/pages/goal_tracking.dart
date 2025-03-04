@@ -1819,18 +1819,21 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
                 ),
                 Container(
                   height: 8,
-                  width: MediaQuery.of(context).size.width * percentage * 0.7,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [color, color.withOpacity(0.7)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  width: min(
+                  MediaQuery.of(context).size.width * 0.7, 
+                  MediaQuery.of(context).size.width * percentage * 0.7,
                 ),
-              ],
-            ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, color.withOpacity(0.7)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ],
+          ),
             const SizedBox(height: 8),
             unit != "%" ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
