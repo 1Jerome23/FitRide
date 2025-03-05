@@ -1,222 +1,322 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 
-class PostExercise extends StatefulWidget {
+class FoodQuestionnairePage extends StatefulWidget {
+  const FoodQuestionnairePage({Key? key}) : super(key: key);
+
   @override
-  _PostExerciseState createState() => _PostExerciseState();
+  State<FoodQuestionnairePage> createState() => _FoodQuestionnairePageState();
 }
 
-class _PostExerciseState extends State<PostExercise> {
+class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _exertionController = TextEditingController();
-  final TextEditingController _foodController = TextEditingController();
-
-  String goalType = "-";
+  final TextEditingController _breakfastController = TextEditingController();
+  final TextEditingController _lunchController = TextEditingController();
+  final TextEditingController _dinnerController = TextEditingController();
+  
+  double _breakfastCalories = 0;
+  double _lunchCalories = 0;
+  double _dinnerCalories = 0;
+  
+  bool _isCalculatingBreakfast = false;
+  bool _isCalculatingLunch = false;
+  bool _isCalculatingDinner = false;
   bool _isSubmitting = false;
 
   @override
-  void initState() {
-    super.initState();
-    print("🔄 Initializing PostExercise widget");
-    // Call getUserGoal immediately and add a callback for when it completes
-    getUserGoal().then((_) {
-      print("✅ getUserGoal completed, goalType is now: $goalType");
-      // Force a rebuild of the widget after goal is fetched
-      if (mounted) setState(() {});
-    });
+  void dispose() {
+    _breakfastController.dispose();
+    _lunchController.dispose();
+    _dinnerController.dispose();
+    super.dispose();
   }
 
-
-  Future<int> _getDaysPerWeek(String userId) async {
-    QuerySnapshot goalsQuery = await FirebaseFirestore.instance
-        .collection('goals')
-        .where('uid', isEqualTo: userId)
-        .orderBy('timestamp',
-        descending: true) // Sort by timestamp in descending order
-        .limit(1) // Limit to the most recent document
-        .get();
-
-    if (goalsQuery.docs.isNotEmpty) {
-      DocumentSnapshot goalsDoc =
-          goalsQuery.docs.first; // Get the first (most recent) document
-        return goalsDoc['daysPerWeek'] ?? 0; // Default to 0 if not set
-    }
-    return 0; // Default to 0 if an error occurs or data is missing
-  }
-
-  Future<void> getUserGoal() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print("❌ No authenticated user.");
-      return;
-    }
-
-    print("🔍 Fetching goal for userId: ${user.uid}");
-
-    try {
-      // Fetch the most recent document from goals collection where uid matches userId
-      QuerySnapshot goalsQuery = await FirebaseFirestore.instance
-          .collection('goals')
-          .where('uid', isEqualTo: user.uid)
-          .orderBy('timestamp',
-          descending: true) // Sort by timestamp in descending order
-          .limit(1) // Limit to the most recent document
-          .get();
-
-      if (goalsQuery.docs.isNotEmpty) {
-        DocumentSnapshot goalsDoc =
-            goalsQuery.docs.first; // Get the first (most recent) document
-        print("🏆 Goal Data: $goalsDoc");
-
-        setState(() {
-          goalType = goalsDoc['goalType'] ?? "-"; // Update state
-        });
-
-        print("✅ Updated goalType: $goalType");
-      } else {
-        print("⚠️ No goal found for user ID: ${user.uid}");
-        
-        // Optionally set a default if you want this field to show anyway
-        setState(() {
-          goalType = "Leisure"; // Set default to make the field appear
-        });
-      }
-    } catch (e) {
-      print("❌ Error fetching user goal: $e");
-    }
-  }
-
-  Future<void> _updateStreakCount(String userId) async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfWeek = startOfDay.add(Duration(days: 7 - startOfDay.weekday));
-
-    // Fetch the required days per week for the user
-    int daysPerWeek = await _getDaysPerWeek(userId);
-
-    // Check if there is an existing streak document for this week
-    DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
-        .collection('Streak')
-        .doc(userId)
-        .get();
-
-    bool isNewWeek = !snapshot.exists || (snapshot.data()!['endOfWeek'] as Timestamp).toDate().isBefore(startOfDay);
-
-    if (isNewWeek) {
-      // Create a new streak document for the current week
-      await FirebaseFirestore.instance.collection('Streak').doc(userId).set({
-        'userId': userId,
-        'activityCount': 1,
-        'streak': snapshot.exists ? snapshot.data()!['streak'] + 1 : 1,
-        'startOfWeek': FieldValue.serverTimestamp(),
-        'endOfWeek': endOfWeek,
-      });
-    } else {
-      // Update the existing streak document
-      int currentActivityCount = snapshot.data()!['activityCount'] ?? 0;
-      int updatedActivityCount = currentActivityCount + 1;
-
-      if (updatedActivityCount >= daysPerWeek) {
-        // User has completed the required activities for the week
-        await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
-          'activityCount': updatedActivityCount,
-          'streak': FieldValue.increment(1), // Increment streak
-        });
-      } else {
-        // User has not yet completed the required activities for the week
-        await FirebaseFirestore.instance.collection('Streak').doc(userId).update({
-          'activityCount': updatedActivityCount,
-        });
-      }
-    }
-  }
-
-Future<void> _saveToFirestore() async {
-  if (_isSubmitting) return;
-  if (!_formKey.currentState!.validate()) {
-    print("❌ Form validation failed.");
-    return;
-  }
-
-  setState(() {
-    _isSubmitting = true;
-  });
-
-  FocusScope.of(context).unfocus();
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print("❌ User not logged in!");
-    setState(() {
-      _isSubmitting = false;
-    });
-    return;
-  }
-
-  try {
-    print("Fetching estimated calories...");
-    double estimatedCalories = await _getCaloriesFromUSDA(_foodController.text);
-    
-    // Debugging output before Firestore write
-    print("🔥 Saving the following data to Firestore:");
-    print("User ID: ${user.uid}");
-    print("Level of Exertion: ${_exertionController.text}");
-    print("Food Taken: ${_foodController.text}");
-    print("Estimated Calories: $estimatedCalories");
-
-    await FirebaseFirestore.instance.collection('after_exercise').add({
-      'userId': user.uid,
-      'levelOfExertion': int.tryParse(_exertionController.text) ?? 0,
-      'foodTaken': _foodController.text.isNotEmpty ? _foodController.text : null,
-      'estimatedCalories': estimatedCalories,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-
-    print("✅ Data saved successfully!");
-
-    await fetchWeatherData(user.uid);
-    await _updateStreakCount(user.uid);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Data saved successfully!"),
-        backgroundColor: Color(0xffFFA500),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Daily Food Diary'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'What did you eat today?',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[400],
+                ),
+              ),
+              SizedBox(height: 24),
+              
+              // Breakfast Section
+              _buildMealSection(
+                mealTitle: 'Breakfast',
+                controller: _breakfastController,
+                calories: _breakfastCalories,
+                isCalculating: _isCalculatingBreakfast,
+                onCalculate: () async {
+                  if (_breakfastController.text.isEmpty) return;
+                  
+                  setState(() {
+                    _isCalculatingBreakfast = true;
+                  });
+                  
+                  final calories = await _getCaloriesFromUSDA(_breakfastController.text);
+                  
+                  setState(() {
+                    _breakfastCalories = calories;
+                    _isCalculatingBreakfast = false;
+                  });
+                },
+              ),
+              SizedBox(height: 16),
+              
+              // Lunch Section
+              _buildMealSection(
+                mealTitle: 'Lunch',
+                controller: _lunchController,
+                calories: _lunchCalories,
+                isCalculating: _isCalculatingLunch,
+                onCalculate: () async {
+                  if (_lunchController.text.isEmpty) return;
+                  
+                  setState(() {
+                    _isCalculatingLunch = true;
+                  });
+                  
+                  final calories = await _getCaloriesFromUSDA(_lunchController.text);
+                  
+                  setState(() {
+                    _lunchCalories = calories;
+                    _isCalculatingLunch = false;
+                  });
+                },
+              ),
+              SizedBox(height: 16),
+              
+              // Dinner Section
+              _buildMealSection(
+                mealTitle: 'Dinner',
+                controller: _dinnerController,
+                calories: _dinnerCalories,
+                isCalculating: _isCalculatingDinner,
+                onCalculate: () async {
+                  if (_dinnerController.text.isEmpty) return;
+                  
+                  setState(() {
+                    _isCalculatingDinner = true;
+                  });
+                  
+                  final calories = await _getCaloriesFromUSDA(_dinnerController.text);
+                  
+                  setState(() {
+                    _dinnerCalories = calories;
+                    _isCalculatingDinner = false;
+                  });
+                },
+              ),
+              SizedBox(height: 24),
+              
+              // Total Calories
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[800]!),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Calories:',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      '${(_breakfastCalories + _lunchCalories + _dinnerCalories).toStringAsFixed(0)} kcal',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 32),
+              
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: (_isCalculatingBreakfast || 
+                             _isCalculatingLunch || 
+                             _isCalculatingDinner || 
+                             _isSubmitting) ? null : _saveToFirestore,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    disabledBackgroundColor: Colors.grey,
+                  ),
+                  child: _isSubmitting
+                      ? CircularProgressIndicator(color: Colors.black)
+                      : Text(
+                          'Save Food Diary',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } catch (e, stacktrace) {
-    print("❌ Error saving data: $e");
-    print("📜 Stacktrace: $stacktrace");
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Failed to save data! Please try again."),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  }
+  
+  Widget _buildMealSection({
+    required String mealTitle,
+    required TextEditingController controller,
+    required double calories,
+    required bool isCalculating,
+    required VoidCallback onCalculate,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[800]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            mealTitle,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: controller,
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'What did you eat?',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.white),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[800],
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter what you ate';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              SizedBox(width: 8),
+              SizedBox(
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: isCalculating ? null : onCalculate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: isCalculating
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Icon(Icons.calculate),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Calories: ',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                ),
+              ),
+              Text(
+                '${calories.toStringAsFixed(0)} kcal',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
-  } finally {
-    setState(() {
-      _isSubmitting = false;
-    });
   }
-}
-
 
   Future<double> _getCaloriesFromUSDA(String foodInput) async {
     if (foodInput.isEmpty) return 0.0;
@@ -266,233 +366,80 @@ Future<void> _saveToFirestore() async {
     }
   }
 
-  Future<void> fetchWeatherData(String userId) async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      final latitude = position.latitude;
-      final longitude = position.longitude;
-
-      final weatherResponse = await http.get(Uri.parse(
-          'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&hourly=relative_humidity_2m'));
-
-      if (weatherResponse.statusCode == 200) {
-        final data = json.decode(weatherResponse.body);
-        double temperature = (data['current_weather']['temperature'] as num).toDouble();
-        double humidity = data['hourly']['relative_humidity_2m'][0]?.toDouble() ?? 0.0;
-
-        FirebaseFirestore.instance.collection('weatherData').add({
-          'userId': userId,
-          'temperature': temperature,
-          'humidity': humidity,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      print('Error fetching weather data: $e');
+  Future<void> _saveToFirestore() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.grey[900],
-        elevation: 0,
-        title: Text(
-          "Post Exercise Summary",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            color: Color(0xffFFA500),
-            fontSize: 22,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Color(0xffFFA500)),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "How was your ride?",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 24,
-                    color: Colors.black87,
-                  ),
-                ).animate().fadeIn(duration: 400.ms, delay: 100.ms).slideY(begin: -0.1, end: 0),
-                
-                SizedBox(height: 6),
-                
-                Text(
-                  "Let us know about your cycling experience today",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: -0.1, end: 0),
-                
-                SizedBox(height: 30),
-                
-                _buildInputField(
-                  label: "Level of Exertion",
-                  hintText: "Rate from 1-10 how hard you worked",
-                  controller: _exertionController,
-                  icon: Icons.fitness_center,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return "Please enter your exertion level";
-                    final numValue = int.tryParse(value);
-                    if (numValue == null || numValue < 1 || numValue > 10) 
-                      return "Enter a number between 1-10";
-                    return null;
-                  },
-                  delay: 300,
-                ),
-                
-                if (goalType == "High Intensity Cycling") 
-                  SizedBox(height: 20),
+    setState(() {
+      _isSubmitting = true;
+    });
 
-                if (goalType == "High Intensity Cycling") 
-                  _buildInputField(
-                    label: "Food Intake",
-                    hintText: "What did you eat today?",
-                    controller: _foodController,
-                    icon: Icons.restaurant_menu,
-                    validator: (value) {
-                      if (goalType == "High Intensity Cycling" && (value == null || value.isEmpty)) {
-                        return "Please enter what you ate";
-                      }
-                      return null;
-                    },
-                    delay: 400,
-                  ),
-                SizedBox(height: 40),
-                
-                Center(
-                  child: Container(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _saveToFirestore,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xffFFA500),
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: _isSubmitting
-                          ? SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                            )
-                          : Text(
-                              "Submit",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                    ),
-                  ).animate().fadeIn(duration: 400.ms, delay: 600.ms).scale(begin: Offset(0.95, 0.95)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You must be logged in to save food data')),
+      );
+      setState(() {
+        _isSubmitting = false;
+      });
+      return;
+    }
 
-  Widget _buildInputField({
-    required String label,
-    required String hintText,
-    required TextEditingController controller,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-    int delay = 0,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            fontSize: 16,
-            color: Colors.black87,
-          ),
-        ),
-        SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              color: Colors.black87,
-            ),
-            validator: validator,
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.grey[400],
-              ),
-              prefixIcon: Icon(
-                icon,
-                color: Color(0xffFFA500),
-                size: 22,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              filled: true,
-              fillColor: Colors.white,
-              errorStyle: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                color: Colors.red[700],
-              ),
-            ),
-          ),
-        ),
-      ],
-    ).animate().fadeIn(duration: 400.ms, delay: delay.ms).slideY(begin: 0.1, end: 0);
+    try {
+      // Get the current date (without time)
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // Create data entry
+      final foodEntry = {
+        'userId': user.uid,
+        'date': Timestamp.fromDate(today),
+        'breakfast_calories': _breakfastCalories,
+        'lunch_calories': _lunchCalories,
+        'dinner_calories': _dinnerCalories,
+        'total_calories': _breakfastCalories + _lunchCalories + _dinnerCalories,
+        'breakfast': _breakfastController.text,
+        'lunch': _lunchController.text,
+        'dinner': _dinnerController.text,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      // Check if an entry already exists for today
+      final querySnapshot = await FirebaseFirestore.instance
+        .collection('food_entries')
+        .where('userId', isEqualTo: user.uid)
+        .where('date', isEqualTo: Timestamp.fromDate(today))
+        .limit(1)
+        .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        // Update existing entry
+        await FirebaseFirestore.instance
+          .collection('food_entries')
+          .doc(querySnapshot.docs.first.id)
+          .update(foodEntry);
+      } else {
+        // Create new entry
+        await FirebaseFirestore.instance
+          .collection('food_entries')
+          .add(foodEntry);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Food diary saved successfully!')),
+      );
+
+      Navigator.of(context).pop();
+    } catch (e) {
+      print('Error saving food data: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving food data: $e')),
+      );
+    } finally {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 }

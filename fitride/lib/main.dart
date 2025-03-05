@@ -126,10 +126,10 @@ class _MainApp extends StatelessWidget {
           '/': (context) => WelcomePage(),
           '/questionnaire': (context) => QuestionPage(),
           '/homepage': (context) => WidgetTree(),
-          '/recommendation': (context) => PostExercise(),
+          '/recommendation': (context) => FoodQuestionnairePage(),
           '/goal_tracking': (context) => GoalTrackingPage(),
           '/profile': (context) => ProfilePage(),
-          '/question_after_exercise': (context) => PostExercise(),
+          '/question_after_exercise': (context) => FoodQuestionnairePage(),
         },
       ),
     );
