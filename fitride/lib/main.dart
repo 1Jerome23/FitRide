@@ -11,14 +11,28 @@ import 'dart:developer';
 import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fitride/pages/welcome.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:fitride/pages/update_metrics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
-  setupNotificationChannel(); 
+  
+  // Initialize timezone data
+  tz_data.initializeTimeZones();
+  
+  setupNotificationChannel();
+  await scheduleWeeklyMetricsUpdate();
+  
   runApp(const _MainApp());
 }
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+    FlutterLocalNotificationsPlugin();
 
 void setupNotificationChannel() {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -27,12 +41,108 @@ void setupNotificationChannel() {
     description: 'This is the default notification channel for the app.', 
     importance: Importance.high,
   );
+  
+  const AndroidNotificationChannel metricsChannel = AndroidNotificationChannel(
+    'metrics_update_channel', 
+    'Metrics Update Channel', 
+    description: 'This channel is used for weekly metrics update reminders.', 
+    importance: Importance.high,
+  );
  
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
   flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
+      
+  flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(metricsChannel);
+      
+  // Initialize local notifications
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+      
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+  
+  flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      log('Local notification tapped: ${response.payload}', name: '_MainApp');
+      if (response.payload == 'update_metrics') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (Globals.navigatorKey.currentContext != null) {
+            Navigator.pushNamed(Globals.navigatorKey.currentContext!, '/update_metrics');
+          }
+        });
+      }
+    },
+  );
+}
+
+Future<void> scheduleWeeklyMetricsUpdate() async {
+  try {
+    // Request notification permissions for Android
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+            
+    if (androidPlugin != null) {
+      await androidPlugin.requestNotificationsPermission();
+    }
+    
+    // Check if we already scheduled the notification
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isScheduled = prefs.getBool('metrics_notification_scheduled') ?? false;
+    
+    if (!isScheduled) {
+      // Cancel any existing notifications with this ID
+      await flutterLocalNotificationsPlugin.cancel(0);
+      
+      // Schedule the notification for one week from now
+      final now = tz.TZDateTime.now(tz.local);
+      final scheduledDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day + 7,
+        10, // 10 AM
+      );
+      
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+        'metrics_update_channel',
+        'Metrics Update Channel',
+        channelDescription: 'This channel is used for weekly metrics update reminders.',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+      );
+      
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        0,
+        'Time to Update Your Metrics',
+        'Please update your weight, body fat, and metabolic rate for better tracking.',
+        scheduledDate,
+        platformChannelSpecifics,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: 'update_metrics',
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      
+      // Mark as scheduled
+      await prefs.setBool('metrics_notification_scheduled', true);
+      
+      log('Weekly metrics update notification scheduled for $scheduledDate', name: '_MainApp');
+    }
+  } catch (e) {
+    log('Error scheduling notification: $e', name: '_MainApp');
+  }
 }
 
 class _MainApp extends StatelessWidget {
@@ -72,6 +182,15 @@ class _MainApp extends StatelessWidget {
               if (Globals.navigatorKey.currentContext != null) {
                 log('Navigating to /question_after_exercise', name: id);
                 Navigator.pushNamed(Globals.navigatorKey.currentContext!, '/question_after_exercise');
+              } else {
+                log('Navigation failed: No valid context available.', name: id);
+              }
+            });
+          } else if (redirectTo == 'update_metrics') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (Globals.navigatorKey.currentContext != null) {
+                log('Navigating to /update_metrics', name: id);
+                Navigator.pushNamed(Globals.navigatorKey.currentContext!, '/update_metrics');
               } else {
                 log('Navigation failed: No valid context available.', name: id);
               }
@@ -130,6 +249,7 @@ class _MainApp extends StatelessWidget {
           '/goal_tracking': (context) => GoalTrackingPage(),
           '/profile': (context) => ProfilePage(),
           '/question_after_exercise': (context) => FoodQuestionnairePage(),
+          '/update_metrics': (context) => UpdateMetricsPage(), // New route
         },
       ),
     );
