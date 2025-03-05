@@ -1199,207 +1199,221 @@ class _HomePageState extends State<HomePage>
 
 // First graph for 'High Intensity Cycling' goal - Weight over time
   Widget _buildWeightOverTimeGraph() {
-    return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('UserMetrics')
-          .where('userId', isEqualTo: userId)
-          .where('goalType', isEqualTo: _userGoal)
-          .orderBy('date', descending: true)
-          .limit(5) // Last 5 weight entries
-          .get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingGraph();
-        }
+  return FutureBuilder<QuerySnapshot>(
+    future: FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(5) // Last 5 weight entries
+        .get(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-        if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.docs.isEmpty) {
-          return _buildEmptyGraph("No weight tracking data available");
-        }
+      if (snapshot.hasError ||
+          !snapshot.hasData ||
+          snapshot.data!.docs.isEmpty) {
+        return _buildEmptyGraph("No weight tracking data available");
+      }
 
-        List<MetricData> chartData = [];
+      List<MetricData> chartData = [];
 
-        for (var doc in snapshot.data!.docs.reversed) {
-          // Use reversed to show oldest to newest
-          var data = doc.data() as Map<String, dynamic>;
-          double weight = safeParseDouble(data['weight']);
-          Timestamp? timestamp = data['date'];
-          DateTime date = timestamp?.toDate() ?? DateTime.now();
+      for (var doc in snapshot.data!.docs.reversed) {
+        // Use reversed to show oldest to newest
+        var data = doc.data() as Map<String, dynamic>;
+        double weight = safeParseDouble(data['weight']);
+        
+        // Get the exact timestamp for the x-axis
+        Timestamp timestamp = data['timestamp'];
+        DateTime date = timestamp.toDate();
 
-          // Format date for display
-          String dateLabel = DateFormat('MMM d').format(date);
+        // Format date to show exact measurement time
+        String dateLabel = DateFormat('MM/dd HH:mm').format(date);
 
-          chartData.add(MetricData(dateLabel, weight));
-        }
+        chartData.add(MetricData(dateLabel, weight));
+      }
 
-        return _buildGraphContainer(
-          title: "Weight Tracking",
-          subtitle: "High Intensity goal",
-          child: SfCartesianChart(
-            primaryXAxis: CategoryAxis(
-              majorGridLines: MajorGridLines(width: 0),
-              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
+      return _buildGraphContainer(
+        title: "Weight Tracking",
+        subtitle: "High Intensity goal",
+        child: SfCartesianChart(
+          margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
+          primaryXAxis: CategoryAxis(
+            majorGridLines: MajorGridLines(width: 0),
+            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10, // Smaller font for detailed timestamps
+              fontWeight: FontWeight.w500,
             ),
-            primaryYAxis: NumericAxis(
-              majorGridLines: MajorGridLines(
-                width: 0.5,
-                color: Colors.grey[200],
-                dashArray: <double>[3, 3],
-              ),
-              axisLine: AxisLine(width: 0),
-              labelFormat: '{value} kg',
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 10,
-              ),
-            ),
-            tooltipBehavior: TooltipBehavior(
-              enable: true,
-              color: Colors.grey[800],
-              textStyle: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            series: <ChartSeries>[
-              SplineSeries<MetricData, String>(
-                dataSource: chartData,
-                xValueMapper: (MetricData data, _) => data.date,
-                yValueMapper: (MetricData data, _) => data.value,
-                color: Color(0xff2196F3), // Blue for weight
-                width: 3,
-                markerSettings: MarkerSettings(
-                  isVisible: true,
-                  shape: DataMarkerType.circle,
-                  color: Color(0xff2196F3),
-                  borderColor: Colors.white,
-                  borderWidth: 2,
-                  height: 10,
-                  width: 10,
-                ),
-                dataLabelSettings: DataLabelSettings(
-                  isVisible: true,
-                  textStyle: TextStyle(
-                    color: Colors.black87,
-                    fontFamily: 'Inter',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            labelRotation: 15, // Angle the labels to avoid overlap
+            labelAlignment: LabelAlignment.end,
+            maximumLabels: 5, // Limit number of labels to avoid crowding
           ),
-        );
-      },
-    );
-  }
+          primaryYAxis: NumericAxis(
+            majorGridLines: MajorGridLines(
+              width: 0.5,
+              color: Colors.grey[200],
+              dashArray: <double>[3, 3],
+            ),
+            axisLine: AxisLine(width: 0),
+            labelFormat: '{value} kg',
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10,
+            ),
+          ),
+          tooltipBehavior: TooltipBehavior(
+            enable: true,
+            color: Colors.grey[800],
+            textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            format: 'Weight: point.y kg\nTime: point.x', // Custom tooltip
+          ),
+          series: <ChartSeries>[
+            SplineSeries<MetricData, String>(
+              dataSource: chartData,
+              xValueMapper: (MetricData data, _) => data.date,
+              yValueMapper: (MetricData data, _) => data.value,
+              color: Color(0xff2196F3), // Blue for weight
+              width: 3,
+              markerSettings: MarkerSettings(
+                isVisible: true,
+                shape: DataMarkerType.circle,
+                color: Color(0xff2196F3),
+                borderColor: Colors.white,
+                borderWidth: 2,
+                height: 10,
+                width: 10,
+              ),
+              dataLabelSettings: DataLabelSettings(
+                isVisible: true,
+                textStyle: TextStyle(
+                  color: Colors.black87,
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                labelAlignment: ChartDataLabelAlignment.top,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
 // Second graph for 'High Intensity Cycling' goal - Body fat percentage over time
-  Widget _buildBodyFatOverTimeGraph() {
-    return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('UserMetrics')
-          .where('userId', isEqualTo: userId)
-          .where('goalType', isEqualTo: _userGoal)
-          .orderBy('date', descending: true)
-          .limit(5) // Last 5 entries
-          .get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingGraph();
-        }
+Widget _buildBodyFatOverTimeGraph() {
+  return FutureBuilder<QuerySnapshot>(
+    future: FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(5) // Last 5 entries
+        .get(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-        if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.docs.isEmpty) {
-          return _buildEmptyGraph("No body fat tracking data available");
-        }
+      if (snapshot.hasError ||
+          !snapshot.hasData ||
+          snapshot.data!.docs.isEmpty) {
+        return _buildEmptyGraph("No body fat tracking data available");
+      }
 
-        List<MetricData> chartData = [];
+      List<MetricData> chartData = [];
 
-        for (var doc in snapshot.data!.docs.reversed) {
-          // Use reversed to show oldest to newest
-          var data = doc.data() as Map<String, dynamic>;
-          double bodyFat = safeParseDouble(data['bodyFat']);
-          Timestamp? timestamp = data['date'];
-          DateTime date = timestamp?.toDate() ?? DateTime.now();
+      for (var doc in snapshot.data!.docs.reversed) {
+        // Use reversed to show oldest to newest
+        var data = doc.data() as Map<String, dynamic>;
+        double bodyFat = safeParseDouble(data['bodyFat']);
+        
+        // Get the exact timestamp for the x-axis
+        Timestamp timestamp = data['timestamp'];
+        DateTime date = timestamp.toDate();
 
-          // Format date for display
-          String dateLabel = DateFormat('MMM d').format(date);
+        // Format date to show exact measurement time
+        String dateLabel = DateFormat('MM/dd HH:mm').format(date);
 
-          chartData.add(MetricData(dateLabel, bodyFat));
-        }
+        chartData.add(MetricData(dateLabel, bodyFat));
+      }
 
-        return _buildGraphContainer(
-          title: "Body Fat Percentage",
-          subtitle: "High Intensity goal",
-          child: SfCartesianChart(
-            primaryXAxis: CategoryAxis(
-              majorGridLines: MajorGridLines(width: 0),
-              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
+      return _buildGraphContainer(
+        title: "Body Fat Percentage",
+        subtitle: "High Intensity goal",
+        child: SfCartesianChart(
+          margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
+          primaryXAxis: CategoryAxis(
+            majorGridLines: MajorGridLines(width: 0),
+            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10, // Smaller font for detailed timestamps
+              fontWeight: FontWeight.w500,
             ),
-            primaryYAxis: NumericAxis(
-              majorGridLines: MajorGridLines(
-                width: 0.5,
-                color: Colors.grey[200],
-                dashArray: <double>[3, 3],
-              ),
-              axisLine: AxisLine(width: 0),
-              labelFormat: '{value}%',
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 10,
-              ),
-            ),
-            tooltipBehavior: TooltipBehavior(
-              enable: true,
-              color: Colors.grey[800],
-              textStyle: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            series: <ChartSeries>[
-              SplineSeries<MetricData, String>(
-                dataSource: chartData,
-                xValueMapper: (MetricData data, _) => data.date,
-                yValueMapper: (MetricData data, _) => data.value,
-                color: Color(0xffE91E63), // Pink for body fat
-                width: 3,
-                markerSettings: MarkerSettings(
-                  isVisible: true,
-                  shape: DataMarkerType.circle,
-                  color: Color(0xffE91E63),
-                  borderColor: Colors.white,
-                  borderWidth: 2,
-                  height: 10,
-                  width: 10,
-                ),
-                dataLabelSettings: DataLabelSettings(
-                  isVisible: true,
-                  textStyle: TextStyle(
-                    color: Colors.black87,
-                    fontFamily: 'Inter',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            labelRotation: 15, // Angle the labels to avoid overlap
+            labelAlignment: LabelAlignment.end,
+            maximumLabels: 5, // Limit number of labels to avoid crowding
           ),
-        );
-      },
-    );
-  }
+          primaryYAxis: NumericAxis(
+            majorGridLines: MajorGridLines(
+              width: 0.5,
+              color: Colors.grey[200],
+              dashArray: <double>[3, 3],
+            ),
+            axisLine: AxisLine(width: 0),
+            labelFormat: '{value}%',
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10,
+            ),
+          ),
+          tooltipBehavior: TooltipBehavior(
+            enable: true,
+            color: Colors.grey[800],
+            textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            format: 'Body Fat: point.y%\nTime: point.x', // Custom tooltip
+          ),
+          series: <ChartSeries>[
+            SplineSeries<MetricData, String>(
+              dataSource: chartData,
+              xValueMapper: (MetricData data, _) => data.date,
+              yValueMapper: (MetricData data, _) => data.value,
+              color: Color(0xffE91E63), // Pink for body fat
+              width: 3,
+              markerSettings: MarkerSettings(
+                isVisible: true,
+                shape: DataMarkerType.circle,
+                color: Color(0xffE91E63),
+                borderColor: Colors.white,
+                borderWidth: 2,
+                height: 10,
+                width: 10,
+              ),
+              dataLabelSettings: DataLabelSettings(
+                isVisible: true,
+                textStyle: TextStyle(
+                  color: Colors.black87,
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                labelAlignment: ChartDataLabelAlignment.top,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
 // Helper methods for common UI elements
   Widget _buildLoadingGraph() {

@@ -198,7 +198,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double bestSpeed = 0.0;
   double lowestHeartRate = 0.0;
   DateTime bestPerformanceDate = DateTime.now();
-  
+
+  // Add these variables to _RecommendationPageState class
+  bool hasActiveSubgoal = false;
+  double subgoalTargetWeight = 0.0;
+  DateTime subgoalStartDate = DateTime.now();
+  DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
+  List<String> subgoalSuggestions = [];
+  double weeklyWeightLossRate = 0.0;
 
   // Activity patterns with extended analysis
   DateTime lastActivityDate = DateTime.now();
@@ -425,6 +432,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       } catch (e) {
         print("Error fetching Strava User ID: $e");
       }
+      
 
       // Fetch MORE activities data for historical analysis (increased limit from 10 to 30)
       QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
@@ -695,10 +703,20 @@ class _RecommendationPageState extends State<RecommendationPage> {
         print("Nutrition data collection may not exist: $e");
       }
 
+
       // Generate recommendations based on the fetched data
       _generateRecommendation();
 
+
       _calculateBaselineComparison();
+      // Fetch active subgoal if it's a weight management goal
+      if (goalType == "High Intensity Cycling") {
+        await _fetchActiveSubgoal();
+      }
+
+      setState(() {
+        _isLoadingGraphs = false;
+      });
       setState(() {
         _isLoadingGraphs = false;
       });
@@ -1905,6 +1923,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 ],
               ),
             ),
+            // Subgoal section - only shown for High Intensity Cycling goal
+            if (goalType == "High Intensity Cycling") ...[
+              // Show active subgoal if exists, otherwise show selection options
+              hasActiveSubgoal ? _buildActiveSubgoalCard() : _buildSubgoalSelectionCard(),
+            ],
             SizedBox(height: 24),
 
             // Recommendation Categories Carousel
@@ -2178,6 +2201,448 @@ class _RecommendationPageState extends State<RecommendationPage> {
       ),
     );
   }
+
+  Widget _buildSubgoalSelectionCard() {
+  if (hasActiveSubgoal || goalType != "High Intensity Cycling") return SizedBox.shrink();
+  
+  // Calculate weight loss options based on user metrics
+  double conservativeGoal = 0.5; // 0.5kg per week
+  double moderateGoal = 0.75;    // 0.75kg per week
+  double ambitiousGoal = 1.0;    // 1kg per week
+  
+  // Limit ambitious goal to 1% of body weight (safe maximum)
+  double maxSafeGoal = (latestWeight * 0.01 * 10).round() / 10;
+  if (ambitiousGoal > maxSafeGoal) ambitiousGoal = maxSafeGoal;
+  
+  return Container(
+    margin: EdgeInsets.only(bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Set Your Weekly Weight Goal",
+          style: GoogleFonts.roboto(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          "Choose a goal that challenges you but is achievable with your current routine.",
+          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+        ),
+        SizedBox(height: 16),
+        
+        // Subgoal options
+        Row(
+          children: [
+            Expanded(
+              child: _buildSubgoalOption(
+                "Gentle",
+                "${conservativeGoal.toStringAsFixed(1)} kg",
+                "Easier to achieve",
+                Colors.green[500]!,
+                () => _setSubgoal(conservativeGoal),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: _buildSubgoalOption(
+                "Moderate",
+                "${moderateGoal.toStringAsFixed(1)} kg",
+                "Balanced approach",
+                Colors.orange[500]!,
+                () => _setSubgoal(moderateGoal),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: _buildSubgoalOption(
+                "Ambitious",
+                "${ambitiousGoal.toStringAsFixed(1)} kg",
+                "Challenging",
+                Colors.red[500]!,
+                () => _setSubgoal(ambitiousGoal),
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 12),
+        
+        // Health note
+        Container(
+          padding: EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue[100]!, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "Health experts recommend losing 0.5-1kg per week for sustainable results.",
+                  style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildSubgoalOption(String title, String weightLoss, String difficulty, Color color, VoidCallback onTap) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            weightLoss,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            difficulty,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildActiveSubgoalCard() {
+  if (!hasActiveSubgoal) return SizedBox.shrink();
+  
+  // Calculate days remaining
+  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+  if (daysRemaining < 0) daysRemaining = 0;
+  
+  // Calculate progress
+  double initialWeight = latestWeight + weeklyWeightLossRate;
+  double targetWeight = subgoalTargetWeight;
+  double currentWeight = latestWeight;
+  double progressPercent = initialWeight == targetWeight ? 
+      1.0 : (initialWeight - currentWeight) / (initialWeight - targetWeight);
+  if (progressPercent < 0) progressPercent = 0;
+  if (progressPercent > 1) progressPercent = 1;
+  
+  return Container(
+    margin: EdgeInsets.only(bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "This Week's Goal",
+              style: GoogleFonts.roboto(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[300]!, width: 1),
+              ),
+              child: Text(
+                "$daysRemaining days left",
+                style: GoogleFonts.lato(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Goal description
+        Text(
+          "Lose ${weeklyWeightLossRate.toStringAsFixed(1)} kg this week",
+          style: GoogleFonts.lato(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Progress visualization
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "${initialWeight.toStringAsFixed(1)} kg",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                Text(
+                  "${targetWeight.toStringAsFixed(1)} kg",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Stack(
+              children: [
+                Container(
+                  height: 8,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Container(
+                  height: 8,
+                  width: MediaQuery.of(context).size.width * 0.8 * progressPercent,
+                  decoration: BoxDecoration(
+                    color: progressPercent >= 1.0 ? Colors.green[500] : Colors.orange[500],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              "Current: ${currentWeight.toStringAsFixed(1)} kg (${(progressPercent * 100).toInt()}% of goal)",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Divider
+        Divider(),
+        
+        // Suggestions title
+        Text(
+          "How to achieve this goal:",
+          style: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        
+        SizedBox(height: 8),
+        
+        // Suggestions list
+        Column(
+          children: subgoalSuggestions.map((suggestion) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.arrow_right, size: 16, color: Colors.orange[700]),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    suggestion,
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          )).toList(),
+        ),
+      ],
+    ),
+  );
+}
+
+void _setSubgoal(double weeklyWeightLossTarget) {
+  setState(() {
+    hasActiveSubgoal = true;
+    weeklyWeightLossRate = weeklyWeightLossTarget;
+    subgoalTargetWeight = latestWeight - weeklyWeightLossTarget;
+    subgoalStartDate = DateTime.now();
+    subgoalEndDate = DateTime.now().add(Duration(days: 7));
+    
+    // Generate tailored suggestions
+    _generateSubgoalSuggestions(weeklyWeightLossTarget);
+  });
+  
+  // Store in Firestore
+  _saveSubgoalToFirestore(weeklyWeightLossTarget);
+}
+
+void _generateSubgoalSuggestions(double weeklyWeightLossTarget) {
+  // Clear existing suggestions
+  subgoalSuggestions = [];
+  
+  // 1 kg of fat ~= 7700 calories
+  double caloriesDeficitNeeded = 7700 * weeklyWeightLossTarget;
+  double dailyDeficitNeeded = caloriesDeficitNeeded / 7;
+  
+  // Calculate current metrics
+  double currentDailyExerciseBurn = latestCaloriesBurned * (weeklyActivityCount / 7.0);
+  double currentHeartRate = safeParseDouble(averageHeartrate);
+  double currentSpeed = safeParseDouble(averageSpeed);
+  double currentDistance = safeParseDouble(distance);
+  int sessionMinutes = (safeParseDouble(sessionDuration) / 60).round(); // Convert to minutes
+  
+  // Generate diet recommendations (70% of deficit)
+  double dietaryDeficit = dailyDeficitNeeded * 0.7;
+  subgoalSuggestions.add("Reduce daily calorie intake by ${dietaryDeficit.round()} calories (about ${(dietaryDeficit/100).round()*100} calories less than your current diet)");
+  
+  // Generate exercise recommendations (30% of deficit)
+  double exerciseDeficit = dailyDeficitNeeded * 0.3;
+  
+  // Frequency recommendations
+  if (weeklyActivityCount < 3) {
+    subgoalSuggestions.add("Increase to ${math.max(3, weeklyActivityCount + 1)} cycling sessions per week to burn an additional ${(latestCaloriesBurned).round()} calories");
+  }
+  
+  // Intensity recommendations
+  double maxHeartRate = 220 - age.toDouble();
+  double fatBurningZoneLower = maxHeartRate * 0.7;
+  double fatBurningZoneUpper = maxHeartRate * 0.8;
+  
+  if (currentHeartRate < fatBurningZoneLower && currentHeartRate > 0) {
+    subgoalSuggestions.add("Increase cycling intensity to reach heart rate of ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning");
+  }
+  
+  // Duration recommendations
+  if (sessionMinutes > 0) {
+    int additionalMinutes = (exerciseDeficit / (latestCaloriesBurned / sessionMinutes)).round();
+    if (additionalMinutes > 5 && additionalMinutes < 30) {
+      subgoalSuggestions.add("Extend each cycling session by $additionalMinutes minutes to burn ${exerciseDeficit.round()} more calories");
+    }
+  }
+  
+  // Add interval training recommendation
+  subgoalSuggestions.add("Add 4-6 high-intensity intervals (30s sprint, 1min recovery) to burn 20-30% more calories");
+  
+  // Add specific nutrition tips
+  subgoalSuggestions.add("Increase protein intake to 25% of daily calories to preserve muscle during weight loss");
+  subgoalSuggestions.add("Reduce carbohydrates 2-3 hours before bedtime to optimize fat burning during sleep");
+  
+  // Add hydration advice
+  subgoalSuggestions.add("Drink 500ml of water 30min before cycling to boost metabolism and improve performance");
+}
+
+void _saveSubgoalToFirestore(double weeklyWeightLossTarget) {
+  try {
+    FirebaseFirestore.instance.collection('subgoals').add({
+      'userId': userId,
+      'startWeight': latestWeight,
+      'targetWeight': subgoalTargetWeight,
+      'startDate': subgoalStartDate,
+      'endDate': subgoalEndDate,
+      'weeklyWeightLossTarget': weeklyWeightLossTarget,
+      'createdAt': DateTime.now(),
+    });
+  } catch (e) {
+    print("Error saving subgoal: $e");
+  }
+}
+
+// Fetch active subgoal when loading the page
+Future<void> _fetchActiveSubgoal() async {
+  if (userId == null) return;
+  
+  try {
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('subgoals')
+        .where('userId', isEqualTo: userId)
+        .where('endDate', isGreaterThan: DateTime.now())
+        .orderBy('endDate', descending: false)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty) {
+      DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
+      var data = subgoalDoc.data() as Map<String, dynamic>;
+      
+      setState(() {
+        hasActiveSubgoal = true;
+        subgoalTargetWeight = data['targetWeight'];
+        subgoalStartDate = data['startDate'].toDate();
+        subgoalEndDate = data['endDate'].toDate();
+        weeklyWeightLossRate = data['weeklyWeightLossTarget'];
+        
+        // Generate suggestions based on fetched subgoal
+        _generateSubgoalSuggestions(weeklyWeightLossRate);
+      });
+    }
+  } catch (e) {
+    print("Error fetching active subgoal: $e");
+  }
+}
+
+
 
   // Calculate how many days the activity data spans
   String _calculateActivitySpan() {
@@ -3835,4 +4300,5 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 }
 
-//updated recommendation page without sub-goals
+
+//Test Recommendation Page with Sub-Goals
