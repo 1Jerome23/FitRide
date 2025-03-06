@@ -43,6 +43,18 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   Map<String, dynamic>? _latestActivity;
   DateTime? _latestActivityDate;
   double _latestDistance = 0;
+  bool hasActiveSubgoal = false;
+  String subgoalType = ""; // "distance", "pace", "duration", or "maintain"
+  double subgoalTargetValue = 0.0;
+  DateTime subgoalStartDate = DateTime.now();
+  DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
+  List<String> subgoalSuggestions = [];
+  List<String> subgoalWarnings = [];
+
+  // Baseline values for comparisons
+  double baselineDistance = 0.0;
+  double baselinePace = 0.0;
+  double baselineDuration = 0.0;
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
@@ -52,7 +64,62 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   static const Color primaryGray = Color(0xFF676767);
   late DateTime _weekStartDate;
   late DateTime _weekEndDate;
-
+  // Method to fetch active subgoal when loading the page
+Future<void> _fetchActiveSubgoal() async {
+  String? uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return;
+  
+  try {
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: uid)
+        .where('endDate', isGreaterThan: DateTime.now())
+        .orderBy('endDate', descending: false)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty) {
+      DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
+      var data = subgoalDoc.data() as Map<String, dynamic>;
+      
+      setState(() {
+        hasActiveSubgoal = true;
+        subgoalType = data['subgoalType'];
+        subgoalTargetValue = data['targetValue'];
+        subgoalStartDate = data['startDate'].toDate();
+        subgoalEndDate = data['endDate'].toDate();
+        
+        // Load stored suggestions and warnings
+        if (data.containsKey('suggestions')) {
+          subgoalSuggestions = List<String>.from(data['suggestions']);
+        }
+        
+        if (data.containsKey('warnings')) {
+          subgoalWarnings = List<String>.from(data['warnings']);
+        }
+        
+        // Load baseline values if available
+        if (data.containsKey('baselineDistance')) {
+          baselineDistance = data['baselineDistance'];
+        }
+        if (data.containsKey('baselinePace')) {
+          baselinePace = data['baselinePace'];
+        }
+        if (data.containsKey('baselineDuration')) {
+          baselineDuration = data['baselineDuration'];
+        }
+      });
+      print("Active subgoal found and loaded: $subgoalType");
+    } else {
+      setState(() {
+        hasActiveSubgoal = false;
+      });
+      print("No active subgoal found");
+    }
+  } catch (e) {
+    print("Error fetching active subgoal: $e");
+  }
+}
   DateTime _getWeekStartDate() {
     DateTime now = DateTime.now();
     // Get Monday at 00:00:00 (midnight)
@@ -409,7 +476,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
           } else {
             print("No matching athlete found, but goal exists");
           }
-
+          if (userGoal != null && userGoal!['goalType'] == 'High Intensity Cycling') {
+              await _fetchActiveSubgoal();
+            }
           setState(() {
             userGoal = goalData;
             _hasActivityAfterGoal = hasActivity;
@@ -446,7 +515,381 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
       });
     }
   }
-
+Widget _buildActiveSubgoalCard() {
+  if (!hasActiveSubgoal) return SizedBox.shrink();
+  
+  // Calculate days remaining
+  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+  if (daysRemaining < 0) daysRemaining = 0;
+  
+  // Calculate progress based on weekly averages and current activity data
+  double progressPercent = 0.0;
+  String currentValueText = "";
+  String targetValueText = "";
+  String baselineValueText = "";
+  
+  // Calculate current week's performance metrics
+  double currentWeekAvgDistance = 0.0;
+  double currentWeekAvgPace = 0.0;
+  double currentWeekAvgDuration = 0.0;
+  
+  if (_weeklyActivities.isNotEmpty) {
+    double totalDistance = 0.0;
+    double totalDuration = 0.0;
+    List<double> paces = [];
+    
+    for (var activity in _weeklyActivities) {
+      // Get distance
+      double distance = 0.0;
+      if (activity['distance'] != null) {
+        var distanceValue = activity['distance'];
+        if (distanceValue is int) {
+          distance = distanceValue.toDouble();
+        } else if (distanceValue is double) {
+          distance = distanceValue;
+        } else if (distanceValue is String) {
+          distance = double.tryParse(distanceValue) ?? 0.0;
+        }
+      }
+      totalDistance += distance;
+      
+      // Get duration in minutes
+      double duration = 0.0;
+      if (activity['elapsed_time'] != null) {
+        var timeValue = activity['elapsed_time'];
+        if (timeValue is int) {
+          duration = timeValue.toDouble() / 60.0; // Convert seconds to minutes
+        } else if (timeValue is double) {
+          duration = timeValue / 60.0;
+        } else if (timeValue is String) {
+          duration = (double.tryParse(timeValue) ?? 0.0) / 60.0;
+        }
+      }
+      totalDuration += duration;
+      
+      // Calculate pace (minutes per km)
+      if (distance > 0 && duration > 0) {
+        double pace = duration / distance;
+        paces.add(pace);
+      }
+    }
+    
+    // Calculate averages
+    if (_weeklyActivities.isNotEmpty) {
+      currentWeekAvgDistance = totalDistance / _weeklyActivities.length;
+      currentWeekAvgDuration = totalDuration / _weeklyActivities.length;
+      
+      if (paces.isNotEmpty) {
+        currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+      }
+    }
+  }
+  
+  // Calculate progress based on subgoal type
+  switch (subgoalType) {
+    case "distance":
+      // Calculate progress using weekly averages
+      if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (currentWeekAvgDistance - baselineDistance) / (subgoalTargetValue - baselineDistance);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        progressPercent = currentWeekAvgDistance > 0 ? 0.5 : 0.0;
+      }
+      
+      currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
+      baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
+      targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
+      break;
+      
+    case "pace":
+      // For pace, lower is better (faster)
+      if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - subgoalTargetValue);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        progressPercent = currentWeekAvgPace > 0 ? 0.5 : 0.0;
+      }
+      
+      currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
+      baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
+      targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
+      break;
+      
+    case "duration":
+      if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (currentWeekAvgDuration - baselineDuration) / (subgoalTargetValue - baselineDuration);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        progressPercent = currentWeekAvgDuration > 0 ? 0.5 : 0.0;
+      }
+      
+      currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
+      baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
+      targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
+      break;
+      
+    case "maintain":
+      // For maintenance, we aim to keep within a certain range of the baseline
+      progressPercent = 0.75; // Default to good progress for maintenance
+      
+      currentValueText = "Maintaining consistent performance";
+      baselineValueText = "";
+      targetValueText = "";
+      break;
+  }
+  
+  // Get goal title
+  String goalTitle = "";
+  
+  switch (subgoalType) {
+    case "distance":
+      goalTitle = "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
+      break;
+    case "pace":
+      goalTitle = "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+      break;
+    case "duration":
+      goalTitle = "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
+      break;
+    case "maintain":
+      goalTitle = "Maintain current cycling performance";
+      break;
+  }
+  
+  Color progressColor = progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
+  
+  return Container(
+    margin: EdgeInsets.only(top: 20, bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "This Week's Cycling Goal",
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 18,
+                color: Colors.black87,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[300]!, width: 1),
+              ),
+              child: Text(
+                "$daysRemaining days left",
+                style: TextStyle(
+                  fontFamily: 'Lato',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Goal description - clarify this is based on weekly averages
+        Text(
+          goalTitle,
+          style: TextStyle(
+            fontFamily: 'Lato',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Progress visualization with baseline included
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subgoalType != "maintain") ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Last Week's Avg: $baselineValueText",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    "Target Avg: $targetValueText",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Current Avg: $currentValueText",
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    currentValueText,
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+            ],
+            Stack(
+              children: [
+                Container(
+                  height: 8,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Container(
+                  height: 8,
+                  width: MediaQuery.of(context).size.width * 0.7 * progressPercent,
+                  decoration: BoxDecoration(
+                    color: progressColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              subgoalType == "maintain" 
+                  ? "Maintaining consistent performance"
+                  : "${(progressPercent * 100).toInt()}% of goal achieved",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Divider
+        Divider(),
+        
+        // Suggestions title
+        Text(
+          "Action Plan:",
+          style: TextStyle(
+            fontFamily: 'Lato',
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        
+        SizedBox(height: 8),
+        
+        // Suggestions list
+        Column(
+          children: subgoalSuggestions.map((suggestion) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_circle_outline, size: 16, color: Colors.green[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    suggestion,
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          )).toList(),
+        ),
+        
+        // Warnings if available
+        if (subgoalWarnings.isNotEmpty) ...[
+          SizedBox(height: 12),
+          Text(
+            "Important Notes:",
+            style: TextStyle(
+              fontFamily: 'Lato',
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8),
+          Column(
+            children: subgoalWarnings.map((warning) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_outlined, size: 16, color: Colors.orange[700]),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      warning,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                    ),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ],
+      ],
+    ),
+  );
+}
   void _checkEnduranceGoalCompletion() {
     print("⭐ Checking endurance goal completion...");
     
@@ -1748,78 +2191,78 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
     }
   }
 
-  Widget _buildProgressCard(String title, double progress, double target, String unit, Color color, IconData icon, {String? helpText}) {
-    final percentage = (progress / target).clamp(0.0, 1.0);
+Widget _buildProgressCard(String title, double progress, double target, String unit, Color color, IconData icon, {String? helpText}) {
+  final percentage = (progress / target).clamp(0.0, 1.0);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            spreadRadius: 0,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 22,
-                  ),
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+          spreadRadius: 0,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontFamily: 'Fredoka-SemiBold',
-                      fontSize: 16,
-                      color: primaryBlack,
-                    ),
-                  ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 22,
                 ),
-                Text(
-                  "${(percentage * 100).toStringAsFixed(0)}%",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                    color: primaryBlack,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Stack(
-              children: [
-                Container(
-                  height: 8,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+              ),
+              Text(
+                "${(percentage * 100).toStringAsFixed(0)}%",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
                 ),
-                Container(
-                  height: 8,
-                  width: min(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Stack(
+            children: [
+              Container(
+                height: 8,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              Container(
+                height: 8,
+                width: min(
                   MediaQuery.of(context).size.width * 0.7, 
                   MediaQuery.of(context).size.width * percentage * 0.7,
                 ),
@@ -1834,205 +2277,75 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
               ),
             ],
           ),
-            const SizedBox(height: 8),
-            unit != "%" ? Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Current: ${progress.toStringAsFixed(1)} $unit",
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: primaryGray,
-                  ),
-                ),
-                Text(
-                  "Target: ${target.toStringAsFixed(1)} $unit",
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: primaryGray,
-                  ),
-                ),
-              ],
-            ) : title == "Weight Progress" ? Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: primaryGray,
-                  ),
-                ),
-                Text(
-                  "Target: ${targetWeight.toStringAsFixed(1)} kg",
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: primaryGray,
-                  ),
-                ),
-              ],
-            ) : Container(),
-            if (helpText != null) ...[
-              const SizedBox(height: 8),
+          const SizedBox(height: 8),
+          unit != "%" ? Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                helpText,
+                "Current: ${progress.toStringAsFixed(1)} $unit",
                 style: const TextStyle(
                   fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
+                  fontSize: 14,
+                  color: primaryGray,
+                ),
+              ),
+              Text(
+                "Target: ${target.toStringAsFixed(1)} $unit",
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
                   color: primaryGray,
                 ),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showUpdateWeightDialog() {
-  _updateWeightController.text = "";
-  _updateBodyFatController.text = "";
-  
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text(
-          "Update Your Progress",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            fontSize: 22,
-            color: primaryBlack,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _updateWeightController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.black),
-              decoration: InputDecoration(
-                labelText: "Current Weight (kg)",
-                labelStyle: const TextStyle(color: Colors.black),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          ) : title == "Weight Progress" ? Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  color: primaryGray,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _updateBodyFatController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.black),
-              decoration: InputDecoration(
-                labelText: "Body Fat Percentage (%)",
-                labelStyle: const TextStyle(color: Colors.black),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+              Text(
+                "Target: ${targetWeight.toStringAsFixed(1)} kg",
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  color: primaryGray,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
+            ],
+          ) : Container(),
+          if (helpText != null) ...[
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate available width for text
+                return Container(
+                  width: constraints.maxWidth,
+                  child: Text(
+                    helpText,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12, // Slightly smaller font
+                      fontStyle: FontStyle.italic,
+                      color: primaryGray,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.ellipsis, // Use ellipsis for overflow
+                    maxLines: 2, // Limit to 2 lines
+                  ),
+                );
+              }
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text(
-              "Cancel",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                color: primaryGray,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _updateUserMetrics();
-              Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryOrange,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: const Text(
-              "Save",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-          ),
         ],
-      );
-    },
+      ),
+    ),
   );
-}
-
-Future<void> _updateUserMetrics() async {
-  try {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    
-    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
-    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
-    
-    final userDataQuery = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-    
-    Map<String, dynamic> newData = {
-      'uid': uid,
-      'timestamp': FieldValue.serverTimestamp(),
-      'weight': newWeight,
-      'bodyFat': newBodyFat,
-    };
-    
-    if (userDataQuery.docs.isNotEmpty) {
-      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-      existingData.forEach((key, value) {
-        if (key != 'uid' && key != 'timestamp' && key != 'weight' && key != 'bodyFat') {
-          newData[key] = value;
-        }
-      });
-    }
-    
-    await FirebaseFirestore.instance
-        .collection('userData')
-        .add(newData);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Progress updated successfully!'))
-    );
-    
-    await _loadUserGoalAndActivities();
-    
-  } catch (e) {
-    print('Error updating metrics: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to update progress: $e'))
-    );
-  }
 }
 
   Widget _buildGoalCard() {
@@ -2155,52 +2468,31 @@ Future<void> _updateUserMetrics() async {
       durationHelperText = "Excellent! You're meeting your duration targets.";
     }
 
-    if (goalType == 'High Intensity Cycling') {
-      return FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            // Update Weight Button
-            Container(
-              margin: const EdgeInsets.only(bottom: 5, top: 15),
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showUpdateWeightDialog,
-                icon: const Icon(Icons.update, color: Colors.white),
-                label: const Text(
-                  "Update Weight & Body Fat",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryOrange,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+     if (goalType == 'High Intensity Cycling') {
+  return FadeTransition(
+    opacity: _fadeAnimation,
+    child: Column(
+      children: [
+        // Add the subgoal card here
+        if (hasActiveSubgoal) _buildActiveSubgoalCard(),
+        
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                primaryOrange.withOpacity(0.2),
+                primaryOrange.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    primaryOrange.withOpacity(0.2),
-                    primaryOrange.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: primaryOrange.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: primaryOrange.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(

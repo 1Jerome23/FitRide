@@ -1147,6 +1147,7 @@ Widget _buildActiveSubgoalCard() {
   String currentValueText = "";
   String targetValueText = "";
   String baselineValueText = "";
+  bool isCompleted = false;
   
   switch (subgoalType) {
     case "distance":
@@ -1159,12 +1160,16 @@ Widget _buildActiveSubgoalCard() {
         // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (currentWeekAvgDistance - baselineDistance) / (targetDistance - baselineDistance);
         
+        // Check if goal is completed
+        isCompleted = currentWeekAvgDistance >= targetDistance;
+        
         // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
         // If target is somehow lower than baseline, show 100% progress
         progressPercent = 1.0;
+        isCompleted = true;
       }
       
       currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
@@ -1182,12 +1187,16 @@ Widget _buildActiveSubgoalCard() {
         // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - targetPace);
         
+        // Check if goal is completed
+        isCompleted = currentWeekAvgPace <= targetPace;
+        
         // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
         // If baseline is somehow faster than target, show 100% progress
         progressPercent = 1.0;
+        isCompleted = true;
       }
       
       currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
@@ -1204,12 +1213,16 @@ Widget _buildActiveSubgoalCard() {
         // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (currentWeekAvgDuration - baselineDuration) / (targetDuration - baselineDuration);
         
+        // Check if goal is completed
+        isCompleted = currentWeekAvgDuration >= targetDuration;
+        
         // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
         // If target is somehow shorter than baseline, show 100% progress
         progressPercent = 1.0;
+        isCompleted = true;
       }
       
       currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
@@ -1251,6 +1264,9 @@ Widget _buildActiveSubgoalCard() {
       // Convert to a progress percentage (closer to baseline = higher progress)
       progressPercent = 1.0 - math.min(deviation, 1.0);
       
+      // For maintain goal, consider it completed after a week of maintenance
+      isCompleted = currentWeekDistances.length >= 3 && progressPercent >= 0.8;
+      
       currentValueText = "Current: ${currentWeekAvgDistance.toStringAsFixed(1)} km";
       baselineValueText = "Target: Maintain baseline";
       targetValueText = "";
@@ -1277,6 +1293,103 @@ Widget _buildActiveSubgoalCard() {
   
   Color progressColor = progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
   
+  // If the goal is completed, show completion card
+  if (isCompleted && progressPercent >= 1.0) {
+    return Container(
+      margin: EdgeInsets.only(top: 20, bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Goal Achieved!",
+                style: GoogleFonts.roboto(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.green[300]!, width: 1),
+                ),
+                child: Text(
+                  "100% Complete",
+                  style: GoogleFonts.lato(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Text(
+            "Congratulations! You've achieved your weekly goal:",
+            style: GoogleFonts.lato(
+              fontSize: 16,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            goalTitle,
+            style: GoogleFonts.lato(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              // Reset the subgoal
+              _resetCompletedSubgoal();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[600],
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                "Set New Goal",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // If not completed, show the regular progress card
   return Container(
     margin: EdgeInsets.only(top: 20, bottom: 20),
     padding: EdgeInsets.all(16),
@@ -1376,16 +1489,6 @@ Widget _buildActiveSubgoalCard() {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    baselineValueText,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
                     currentValueText,
                     style: TextStyle(
                       fontSize: 12, 
@@ -1409,7 +1512,7 @@ Widget _buildActiveSubgoalCard() {
                 ),
                 Container(
                   height: 8,
-                  width: MediaQuery.of(context).size.width * 0.8 * progressPercent,
+                  width: MediaQuery.of(context).size.width * 0.7 * progressPercent,
                   decoration: BoxDecoration(
                     color: progressColor,
                     borderRadius: BorderRadius.circular(4),
@@ -1513,6 +1616,47 @@ Widget _buildActiveSubgoalCard() {
       ],
     ),
   );
+}
+
+// Add this method to reset the subgoal
+Future<void> _resetCompletedSubgoal() async {
+  if (userId == null) return;
+  
+  try {
+    // First, mark the completed subgoal as completed in Firestore
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: userId)
+        .where('endDate', isGreaterThan: DateTime.now())
+        .orderBy('endDate', descending: false)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .doc(subgoalQuery.docs.first.id)
+          .update({
+            'completedAt': DateTime.now(),
+            'endDate': DateTime.now(), // Set end date to now so it won't show up in future queries
+            'isCompleted': true
+          });
+    }
+    
+    // Reset local state
+    setState(() {
+      hasActiveSubgoal = false;
+      subgoalType = "";
+      subgoalTargetValue = 0.0;
+      subgoalSuggestions = [];
+      subgoalWarnings = [];
+    });
+    
+    // Recalculate baselines for the next subgoal
+    _calculateBaselines();
+  } catch (e) {
+    print("Error resetting completed subgoal: $e");
+  }
 }
 
   void _calculateBaselineComparison() {
@@ -3191,12 +3335,9 @@ Widget _buildActiveSubgoalCard() {
             ),
             SizedBox(height: 24),
             if (goalType == "High Intensity Cycling") ...[
-              // Show active subgoal if exists, otherwise show selection options
-              hasActiveSubgoal ? _buildActiveSubgoalCard() : _buildSubgoalSelectionCard(),
+            _buildSubgoalSelectionCard(),
             ],
-            // Recommendation Categories Carousel
             _buildRecommendationCarousel(),
-            // Goal Progress Graphs
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -4709,7 +4850,7 @@ Widget _buildActiveSubgoalCard() {
     return _buildGraphContainer(
         title: "Weekly Summary",
         subtitle: "Comprehensive view",
-        height: 320, // Increase height for this specific graph
+        height: 600, // Increase height for this specific graph
         child: SingleChildScrollView(
           // Add scrolling capability
           child: Container(
@@ -4972,7 +5113,7 @@ Widget _buildActiveSubgoalCard() {
     return _buildGraphContainer(
         title: "Calorie Balance",
         subtitle: "Last 7 days",
-        height: 300, // Slightly taller
+        height: 600, // Slightly taller
         child: SingleChildScrollView(
             child: Container(
           height: 260, // Fixed height for the chart
@@ -5056,7 +5197,111 @@ Widget _buildActiveSubgoalCard() {
           ),
         )));
   }
-
+bool _isSubgoalCompleted() {
+  if (!hasActiveSubgoal) return false;
+  
+  // Get current week's performance metrics
+  double currentWeekAvgDistance = 0.0;
+  double currentWeekAvgPace = 0.0;
+  double currentWeekAvgDuration = 0.0;
+  
+  // Calculate current week stats from activities
+  if (activityData.isNotEmpty) {
+    List<double> distances = [];
+    List<double> durations = [];
+    List<double> paces = [];
+    
+    // Get activities from the current week
+    DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
+    
+    for (var activity in activityData) {
+      if (activity['start_date'] != null) {
+        DateTime activityDate = activity['start_date'].toDate();
+        if (activityDate.isAfter(oneWeekAgo)) {
+          double distance = safeParseDouble(activity['distance']);
+          double durationSeconds = safeParseDouble(activity['elapsed_time']);
+          double durationMinutes = durationSeconds / 60.0;
+          
+          if (distance > 0) distances.add(distance);
+          if (durationMinutes > 0) durations.add(durationMinutes);
+          
+          // Calculate pace (minutes per km)
+          if (distance > 0 && durationMinutes > 0) {
+            double pace = durationMinutes / distance;
+            paces.add(pace);
+          }
+        }
+      }
+    }
+    
+    // Calculate averages
+    if (distances.isNotEmpty) {
+      currentWeekAvgDistance = distances.reduce((a, b) => a + b) / distances.length;
+    }
+    
+    if (durations.isNotEmpty) {
+      currentWeekAvgDuration = durations.reduce((a, b) => a + b) / durations.length;
+    }
+    
+    if (paces.isNotEmpty) {
+      currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+    }
+  }
+  Future<void> _resetCompletedSubgoal() async {
+  if (userId == null) return;
+  
+  try {
+    // First, mark the completed subgoal as completed in Firestore
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: userId)
+        .where('endDate', isGreaterThan: DateTime.now())
+        .orderBy('endDate', descending: false)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .doc(subgoalQuery.docs.first.id)
+          .update({
+            'completedAt': DateTime.now(),
+            'endDate': DateTime.now(), // Set end date to now so it won't show up in future queries
+            'isCompleted': true
+          });
+    }
+    
+    // Reset local state
+    setState(() {
+      hasActiveSubgoal = false;
+      subgoalType = "";
+      subgoalTargetValue = 0.0;
+      subgoalSuggestions = [];
+      subgoalWarnings = [];
+    });
+    
+    // Recalculate baselines for the next subgoal
+    _calculateBaselines();
+  } catch (e) {
+    print("Error resetting completed subgoal: $e");
+  }
+}
+  // Check completion based on subgoal type
+  switch (subgoalType) {
+    case "distance":
+      return currentWeekAvgDistance >= subgoalTargetValue;
+    case "pace":
+      // For pace, lower is better (faster)
+      return currentWeekAvgPace <= subgoalTargetValue;
+    case "duration":
+      return currentWeekAvgDuration >= subgoalTargetValue;
+    case "maintain":
+      // Maintain goals are considered complete after a week
+      return subgoalEndDate.isBefore(DateTime.now());
+    default:
+      return false;
+  }
+}
   Color _getRecommendationColor(String recommendation) {
     if (recommendation.contains("✅") ||
         recommendation.contains("Good") ||
