@@ -109,6 +109,18 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<Map<String, dynamic>> nutritionData = [];
   // Baseline comparison data
   Map<String, dynamic> baselineComparison = {};
+  bool hasActiveSubgoal = false;
+  String subgoalType = ""; // "distance", "pace", "duration", or "maintain"
+  double subgoalTargetValue = 0.0;
+  DateTime subgoalStartDate = DateTime.now();
+  DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
+  List<String> subgoalSuggestions = [];
+  List<String> subgoalWarnings = [];
+
+  // Baseline values for comparisons
+  double baselineDistance = 0.0;
+  double baselinePace = 0.0; // in min/km
+  double baselineDuration = 0.0; //
 
   String recommendation = "Loading...";
   String feedback = "";
@@ -234,6 +246,1274 @@ class _RecommendationPageState extends State<RecommendationPage> {
     _pageController.dispose();
     super.dispose();
   }
+  
+// Method to fetch active subgoal when loading the page
+Future<void> _fetchActiveSubgoal() async {
+  if (userId == null) return;
+  
+  try {
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: userId)
+        .where('endDate', isGreaterThan: DateTime.now())
+        .orderBy('endDate', descending: false)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty) {
+      DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
+      var data = subgoalDoc.data() as Map<String, dynamic>;
+      
+      setState(() {
+        hasActiveSubgoal = true; // Make sure this is set to true
+        subgoalType = data['subgoalType'];
+        subgoalTargetValue = data['targetValue'];
+        subgoalStartDate = data['startDate'].toDate();
+        subgoalEndDate = data['endDate'].toDate();
+        
+        // Load stored suggestions and warnings
+        if (data.containsKey('suggestions')) {
+          subgoalSuggestions = List<String>.from(data['suggestions']);
+        }
+        
+        if (data.containsKey('warnings')) {
+          subgoalWarnings = List<String>.from(data['warnings']);
+        }
+      });
+      print("Active subgoal found and loaded: $subgoalType");
+    } else {
+      // Explicitly set hasActiveSubgoal to false if no active subgoal is found
+      setState(() {
+        hasActiveSubgoal = false;
+      });
+      print("No active subgoal found");
+    }
+  } catch (e) {
+    print("Error fetching active subgoal: $e");
+  }
+}
+
+// Method to set a new cycling subgoal
+void _setCyclingSubgoal(String type, double targetValue) {
+  // Calculate baselines if not already done
+  if (baselineDistance == 0.0) {
+    _calculateBaselines();
+  }
+  
+  // Generate subgoal title and progress tracking info
+  String title = "";
+  List<String> suggestions = [];
+  List<String> warnings = [];
+  
+  switch (type) {
+    case "distance":
+      title = "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
+      
+      // Generate suggestions
+      suggestions.add("Start with a proper warm-up to prepare for the longer distance");
+      suggestions.add("Increase your hydration for longer rides");
+      suggestions.add("Plan a route with the target distance in advance");
+      
+      // Check if it's a big jump and add warnings if needed
+      if (targetValue > baselineDistance * 1.3 && baselineDistance > 0) {
+        warnings.add("This is a ${((targetValue/baselineDistance - 1) * 100).toStringAsFixed(0)}% increase from your average. Consider a more gradual progression.");
+      }
+      
+      if (respiratoryCondition == "Yes" && targetValue > baselineDistance * 1.2) {
+        warnings.add("With your respiratory condition, consider a more moderate increase in distance.");
+      }
+      break;
+      
+    case "pace":
+      // For pace, a lower number is better (faster)
+      double currentPaceMinPerKm = baselinePace;
+      title = "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
+      
+      suggestions.add("Include interval training in your routine");
+      suggestions.add("Focus on consistent pedaling cadence");
+      suggestions.add("Make sure your bike is properly maintained for optimal efficiency");
+      
+      if (currentPaceMinPerKm > 0 && targetValue < currentPaceMinPerKm * 0.8) {
+        warnings.add("This is a ${((1 - targetValue/currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase, which may be challenging. Consider a gradual approach.");
+      }
+      
+      if (cardiovascularCondition == "Yes") {
+        warnings.add("With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
+      }
+      break;
+      
+    case "duration":
+      title = "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
+      
+      suggestions.add("Build endurance with a steady pace");
+      suggestions.add("Ensure proper nutrition before longer sessions");
+      suggestions.add("Take small breaks if needed during the extended ride");
+      
+      if (targetValue > baselineDuration * 1.5 && baselineDuration > 0) {
+        warnings.add("This is a ${((targetValue/baselineDuration - 1) * 100).toStringAsFixed(0)}% increase in duration, which may lead to fatigue. Consider a more gradual approach.");
+      }
+      
+      break;
+      
+    case "maintain":
+      title = "Maintain current cycling performance";
+      
+      suggestions.add("Focus on consistency in your current routine");
+      suggestions.add("Work on technique refinement");
+      suggestions.add("Use this period to establish a sustainable rhythm");
+      break;
+  }
+  
+  // Set state variables
+  setState(() {
+    hasActiveSubgoal = true;
+    subgoalType = type;
+    subgoalTargetValue = targetValue;
+    subgoalStartDate = DateTime.now();
+    subgoalEndDate = DateTime.now().add(Duration(days: 7));
+    subgoalSuggestions = suggestions;
+    subgoalWarnings = warnings;
+  });
+  
+  // Store in Firestore
+  _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
+}
+
+// Method to save the subgoal to Firestore
+void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String> suggestions, List<String> warnings) {
+  try {
+    FirebaseFirestore.instance.collection('cycling_subgoals').add({
+      'userId': userId,
+      'subgoalType': type,
+      'targetValue': targetValue, // This is the target weekly average
+      'baselineDistance': baselineDistance, // Current weekly average
+      'baselinePace': baselinePace,
+      'baselineDuration': baselineDuration,
+      'suggestions': suggestions,
+      'warnings': warnings,
+      'startDate': subgoalStartDate,
+      'endDate': subgoalEndDate,
+      'createdAt': DateTime.now(),
+      'isWeeklyAverage': true, // Flag to indicate this is a weekly average goal
+    });
+  } catch (e) {
+    print("Error saving cycling subgoal: $e");
+  }
+}
+
+// Widget to display subgoal selection options
+// Modify the _buildSubgoalSelectionCard() method to check if the user has completed their weekly commitment:
+
+Widget _buildSubgoalSelectionCard() {
+  if (hasActiveSubgoal || goalType != "High Intensity Cycling") return SizedBox.shrink();
+  
+  // Get the number of days per week from the user's goal
+  int targetDaysPerWeek = int.tryParse(daysPerWeek) ?? 0;
+  
+  // Check if the user has completed their weekly commitment
+  bool hasCompletedWeeklyCommitment = weeklyActivityCount >= targetDaysPerWeek;
+  
+  // If the user hasn't completed their weekly commitment, show a message instead
+  if (!hasCompletedWeeklyCommitment || targetDaysPerWeek == 0) {
+    return Container(
+      margin: EdgeInsets.only(top: 20, bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Weekly Goal Progress",
+            style: GoogleFonts.roboto(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 12),
+          
+          // Progress information
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.directions_bike_outlined, color: Colors.blue[700], size: 24),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$weeklyActivityCount of $targetDaysPerWeek weekly sessions completed",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Complete your weekly commitment to unlock next week's goals",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          SizedBox(height: 16),
+          
+          // Progress bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    height: 8,
+                    width: targetDaysPerWeek > 0 
+                        ? MediaQuery.of(context).size.width * 0.8 * (weeklyActivityCount / targetDaysPerWeek)
+                        : 0,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[500],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Current: $weeklyActivityCount sessions",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    "Target: $targetDaysPerWeek sessions",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          SizedBox(height: 16),
+          
+          // Motivation message
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[100]!, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb_outline, size: 20, color: Colors.orange[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Complete ${targetDaysPerWeek - weeklyActivityCount} more cycling ${(targetDaysPerWeek - weeklyActivityCount) == 1 ? 'session' : 'sessions'} this week to unlock personalized goals for next week.",
+                    style: TextStyle(fontSize: 14, color: Colors.orange[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Calculate baseline if it hasn't been calculated yet
+  if (baselineDistance == 0.0) {
+    _calculateBaselines();
+  }
+  
+  // Make sure we have sufficient activity data from the past week
+  if (activityData.isEmpty || weeklyActivityCount < 2) {
+    return Container(
+      margin: EdgeInsets.only(top: 20, bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Weekly Goal Completed!",
+            style: GoogleFonts.roboto(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.check_circle_outline, color: Colors.green[700], size: 24),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "You've completed your weekly commitment!",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "We need more activity data to suggest your next weekly average goal. Keep cycling!",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Define goal options based on user's current weekly average performance
+  double distanceOption1 = math.max(baselineDistance * 1.1, baselineDistance + 1).roundToDouble(); // 10% increase or +1km
+  double distanceOption2 = math.max(baselineDistance * 1.2, baselineDistance + 2).roundToDouble(); // 20% increase or +2km
+  
+  // For pace, lower is better (faster pace)
+  double paceOption1 = baselinePace > 0 ? math.max(baselinePace * 0.95, baselinePace - 0.5) : 0;
+  double paceOption2 = baselinePace > 0 ? math.max(baselinePace * 0.9, baselinePace - 1) : 0;
+  
+  // For duration, longer is more challenging
+  double durationOption1 = math.max(baselineDuration * 1.1, baselineDuration + 10).roundToDouble(); // 10% increase or +10 min
+  double durationOption2 = math.max(baselineDuration * 1.2, baselineDuration + 15).roundToDouble(); // 20% increase or +15 min
+  
+  return Container(
+    margin: EdgeInsets.only(top: 20, bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Set Your Next Week's Goal",
+              style: GoogleFonts.roboto(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.green[300]!, width: 1),
+              ),
+              child: Text(
+                "Weekly Goal Completed!",
+                style: GoogleFonts.lato(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        Text(
+          "Set a goal for your weekly average cycling metrics based on your data from this week.",
+          style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+        ),
+        SizedBox(height: 16),
+        
+        // Current weekly averages information box
+        Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue[100]!, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Your Current Weekly Averages:",
+                style: TextStyle(
+                  fontSize: 14, 
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800]
+                ),
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      Text(
+                        "${baselineDistance.toStringAsFixed(1)} km",
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87
+                        ),
+                      ),
+                      Text(
+                        "Distance",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700]
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      Text(
+                        "${baselinePace > 0 ? baselinePace.toStringAsFixed(1) : '-'} min/km",
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87
+                        ),
+                      ),
+                      Text(
+                        "Pace",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700]
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      Text(
+                        "${baselineDuration.toStringAsFixed(0)} min",
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87
+                        ),
+                      ),
+                      Text(
+                        "Duration",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700]
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 4),
+              Center(
+                child: Text(
+                  "Based on your ${weeklyActivityCount} activities this week",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[700]
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Distance option
+        _buildSubgoalOptionTitle("Weekly Average Distance", Icons.straighten_outlined),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSubgoalOptionButton(
+                "Moderate",
+                "${distanceOption1.toStringAsFixed(1)} km/ride",
+                "From ${baselineDistance.toStringAsFixed(1)} km avg",
+                Colors.blue[700]!,
+                () => _setCyclingSubgoal("distance", distanceOption1),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: _buildSubgoalOptionButton(
+                "Challenging",
+                "${distanceOption2.toStringAsFixed(1)} km/ride",
+                "From ${baselineDistance.toStringAsFixed(1)} km avg",
+                Colors.blue[900]!,
+                () => _setCyclingSubgoal("distance", distanceOption2),
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Pace option (if baseline pace is available)
+        if (baselinePace > 0) ...[
+          _buildSubgoalOptionTitle("Weekly Average Pace", Icons.speed_outlined),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSubgoalOptionButton(
+                  "Moderate",
+                  "${paceOption1.toStringAsFixed(1)} min/km",
+                  "From ${baselinePace.toStringAsFixed(1)} min/km avg",
+                  Colors.orange[700]!,
+                  () => _setCyclingSubgoal("pace", paceOption1),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildSubgoalOptionButton(
+                  "Challenging",
+                  "${paceOption2.toStringAsFixed(1)} min/km",
+                  "From ${baselinePace.toStringAsFixed(1)} min/km avg",
+                  Colors.orange[900]!,
+                  () => _setCyclingSubgoal("pace", paceOption2),
+                ),
+              ),
+            ],
+          ),
+        ],
+        
+        SizedBox(height: 16),
+        
+        // Duration option
+        _buildSubgoalOptionTitle("Weekly Average Duration", Icons.timer_outlined),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSubgoalOptionButton(
+                "Moderate",
+                "${durationOption1.toStringAsFixed(0)} min/ride",
+                "From ${baselineDuration.toStringAsFixed(0)} min avg",
+                Colors.green[700]!,
+                () => _setCyclingSubgoal("duration", durationOption1),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: _buildSubgoalOptionButton(
+                "Challenging",
+                "${durationOption2.toStringAsFixed(0)} min/ride",
+                "From ${baselineDuration.toStringAsFixed(0)} min avg",
+                Colors.green[900]!,
+                () => _setCyclingSubgoal("duration", durationOption2),
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Maintain current performance
+        _buildSubgoalOptionTitle("Maintain Current Level", Icons.equalizer_outlined),
+        SizedBox(height: 8),
+        InkWell(
+          onTap: () => _setCyclingSubgoal("maintain", 0),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: Colors.grey[700], size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Maintain Weekly Averages",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "Focus on consistency and technique",
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Weekly average explanation
+        Container(
+          padding: EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "Goals are based on your weekly average per ride, not individual activities. Progress will be measured across all your rides next week.",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+void _calculateBaselines() {
+  // We specifically want to calculate weekly averages
+  if (activityData.isEmpty) return;
+  
+  List<double> distances = [];
+  List<double> durations = [];
+  List<double> paces = [];
+  
+  // Get activities from the past week
+  DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
+  List<Map<String, dynamic>> thisWeeksActivities = [];
+  
+  for (var activity in activityData) {
+    if (activity['start_date'] != null) {
+      DateTime activityDate = activity['start_date'].toDate();
+      if (activityDate.isAfter(oneWeekAgo)) {
+        thisWeeksActivities.add(activity);
+      }
+    }
+  }
+  
+  // If no activities this week, fall back to the most recent activities
+  if (thisWeeksActivities.isEmpty) {
+    // Get last 5 activities or fewer if less data is available
+    int count = math.min(activityData.length, 5);
+    thisWeeksActivities = activityData.sublist(0, count);
+  }
+  
+  // Calculate metrics from activities
+  for (var activity in thisWeeksActivities) {
+    double distance = safeParseDouble(activity['distance']);
+    double durationSeconds = safeParseDouble(activity['elapsed_time']);
+    double durationMinutes = durationSeconds / 60.0;
+    
+    if (distance > 0) distances.add(distance);
+    if (durationMinutes > 0) durations.add(durationMinutes);
+    
+    // Calculate pace (minutes per km)
+    if (distance > 0 && durationMinutes > 0) {
+      double pace = durationMinutes / distance;
+      paces.add(pace);
+    }
+  }
+  
+  // Calculate averages - these represent the weekly averages
+  if (distances.isNotEmpty) {
+    baselineDistance = distances.reduce((a, b) => a + b) / distances.length;
+  }
+  
+  if (durations.isNotEmpty) {
+    baselineDuration = durations.reduce((a, b) => a + b) / durations.length;
+  }
+  
+  if (paces.isNotEmpty) {
+    baselinePace = paces.reduce((a, b) => a + b) / paces.length;
+  }
+}
+
+// Section title widget helper
+Widget _buildSubgoalOptionTitle(String title, IconData icon) {
+  return Row(
+    children: [
+      Icon(icon, size: 18, color: Colors.grey[800]),
+      SizedBox(width: 8),
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey[800],
+        ),
+      ),
+    ],
+  );
+}
+
+// Option button widget helper
+Widget _buildSubgoalOptionButton(
+  String title, 
+  String value, 
+  String baseline, 
+  Color color, 
+  VoidCallback onTap
+) {
+  return InkWell(
+    onTap: onTap,
+    child: Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            baseline,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Widget to display active subgoal
+Widget _buildActiveSubgoalCard() {
+  if (!hasActiveSubgoal) return SizedBox.shrink();
+  
+  // Calculate days remaining
+  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+  if (daysRemaining < 0) daysRemaining = 0;
+  
+  // Calculate current week's average performance
+  double currentWeekAvgDistance = 0.0;
+  double currentWeekAvgPace = 0.0;
+  double currentWeekAvgDuration = 0.0;
+  
+  // Get activities from the current week for calculating current averages
+  DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
+  List<double> currentWeekDistances = [];
+  List<double> currentWeekPaces = [];
+  List<double> currentWeekDurations = [];
+  
+  for (var activity in activityData) {
+    if (activity['start_date'] != null) {
+      DateTime activityDate = activity['start_date'].toDate();
+      if (activityDate.isAfter(oneWeekAgo)) {
+        double distance = safeParseDouble(activity['distance']);
+        double durationSeconds = safeParseDouble(activity['elapsed_time']);
+        double durationMinutes = durationSeconds / 60.0;
+        
+        if (distance > 0) currentWeekDistances.add(distance);
+        if (durationMinutes > 0) currentWeekDurations.add(durationMinutes);
+        
+        // Calculate pace (minutes per km)
+        if (distance > 0 && durationMinutes > 0) {
+          double pace = durationMinutes / distance;
+          currentWeekPaces.add(pace);
+        }
+      }
+    }
+  }
+  
+  // Calculate current week's averages
+  if (currentWeekDistances.isNotEmpty) {
+    currentWeekAvgDistance = currentWeekDistances.reduce((a, b) => a + b) / currentWeekDistances.length;
+  } else {
+    // Fall back to latest activity if no weekly data
+    currentWeekAvgDistance = latestDistance; 
+  }
+  
+  if (currentWeekPaces.isNotEmpty) {
+    currentWeekAvgPace = currentWeekPaces.reduce((a, b) => a + b) / currentWeekPaces.length;
+  } else if (latestDistance > 0 && safeParseDouble(sessionDuration) > 0) {
+    // Fall back to latest activity if no weekly data
+    currentWeekAvgPace = (safeParseDouble(sessionDuration) / 60) / latestDistance;
+  } else {
+    currentWeekAvgPace = baselinePace;
+  }
+  
+  if (currentWeekDurations.isNotEmpty) {
+    currentWeekAvgDuration = currentWeekDurations.reduce((a, b) => a + b) / currentWeekDurations.length;
+  } else {
+    // Fall back to latest activity if no weekly data
+    currentWeekAvgDuration = safeParseDouble(sessionDuration) / 60;
+  }
+  
+  // Calculate progress based on subgoal type using weekly averages
+  double progressPercent = 0.0;
+  String currentValueText = "";
+  String targetValueText = "";
+  String baselineValueText = "";
+  
+  switch (subgoalType) {
+    case "distance":
+      // Calculate progress using weekly averages
+      double baselineDistance = this.baselineDistance; // Average distance from previous week
+      double targetDistance = subgoalTargetValue;      // Target average distance for this week
+      
+      // Calculate progress as a percentage of the additional distance needed
+      if (targetDistance > baselineDistance) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (currentWeekAvgDistance - baselineDistance) / (targetDistance - baselineDistance);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        // If target is somehow lower than baseline, show 100% progress
+        progressPercent = 1.0;
+      }
+      
+      currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
+      baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
+      targetValueText = "${targetDistance.toStringAsFixed(1)} km";
+      break;
+      
+    case "pace":
+      // For pace, lower is better (faster)
+      double baselinePace = this.baselinePace;     // Average pace from previous week
+      double targetPace = subgoalTargetValue;      // Target average pace for this week
+      
+      // Calculate progress from baseline to target (remember, for pace lower is better)
+      if (baselinePace > targetPace) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - targetPace);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        // If baseline is somehow faster than target, show 100% progress
+        progressPercent = 1.0;
+      }
+      
+      currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
+      baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
+      targetValueText = "${targetPace.toStringAsFixed(1)} min/km";
+      break;
+      
+    case "duration":
+      double baselineDuration = this.baselineDuration;  // Average duration from previous week
+      double targetDuration = subgoalTargetValue;       // Target average duration for this week
+      
+      // Calculate progress from baseline to target
+      if (targetDuration > baselineDuration) {
+        // Progress is how much of the gap between baseline and target has been covered
+        progressPercent = (currentWeekAvgDuration - baselineDuration) / (targetDuration - baselineDuration);
+        
+        // Cap progress between 0-100%
+        if (progressPercent < 0) progressPercent = 0;
+        if (progressPercent > 1) progressPercent = 1;
+      } else {
+        // If target is somehow shorter than baseline, show 100% progress
+        progressPercent = 1.0;
+      }
+      
+      currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
+      baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
+      targetValueText = "${targetDuration.toStringAsFixed(0)} min";
+      break;
+      
+    case "maintain":
+      // For maintenance, we calculate how close the current average is to the baseline
+      double baseline = 0.0;
+      double current = 0.0;
+      double tolerance = 0.0;
+      
+      switch (subgoalTargetValue.toInt()) {
+        case 1: // Maintain distance
+          baseline = baselineDistance;
+          current = currentWeekAvgDistance;
+          tolerance = baseline * 0.1; // 10% tolerance
+          break;
+        case 2: // Maintain pace
+          baseline = baselinePace;
+          current = currentWeekAvgPace;
+          tolerance = baseline * 0.1; // 10% tolerance
+          break;
+        case 3: // Maintain duration
+          baseline = baselineDuration;
+          current = currentWeekAvgDuration;
+          tolerance = baseline * 0.1; // 10% tolerance
+          break;
+        default:
+          baseline = baselineDistance;
+          current = currentWeekAvgDistance;
+          tolerance = baseline * 0.1;
+      }
+      
+      // Calculate how far the current value is from baseline, as a percentage of tolerance
+      double deviation = math.cos(current - baseline) / tolerance;
+      
+      // Convert to a progress percentage (closer to baseline = higher progress)
+      progressPercent = 1.0 - math.min(deviation, 1.0);
+      
+      currentValueText = "Current: ${currentWeekAvgDistance.toStringAsFixed(1)} km";
+      baselineValueText = "Target: Maintain baseline";
+      targetValueText = "";
+      break;
+  }
+  
+  // Get goal title
+  String goalTitle = "";
+  
+  switch (subgoalType) {
+    case "distance":
+      goalTitle = "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
+      break;
+    case "pace":
+      goalTitle = "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+      break;
+    case "duration":
+      goalTitle = "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
+      break;
+    case "maintain":
+      goalTitle = "Maintain current cycling performance";
+      break;
+  }
+  
+  Color progressColor = progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
+  
+  return Container(
+    margin: EdgeInsets.only(top: 20, bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "This Week's Cycling Goal",
+              style: GoogleFonts.roboto(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[300]!, width: 1),
+              ),
+              child: Text(
+                "$daysRemaining days left",
+                style: GoogleFonts.lato(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Goal description - clarify this is based on weekly averages
+        Text(
+          goalTitle,
+          style: GoogleFonts.lato(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Progress visualization with baseline included
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subgoalType != "maintain") ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Last Week's Avg: $baselineValueText",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    "Target Avg: $targetValueText",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Current Avg: $currentValueText",
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    baselineValueText,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    currentValueText,
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+            ],
+            Stack(
+              children: [
+                Container(
+                  height: 8,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Container(
+                  height: 8,
+                  width: MediaQuery.of(context).size.width * 0.8 * progressPercent,
+                  decoration: BoxDecoration(
+                    color: progressColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              subgoalType == "maintain" 
+                  ? "Maintaining consistent performance"
+                  : "${(progressPercent * 100).toInt()}% of goal achieved",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            if (currentWeekDistances.length > 0) ...[
+              SizedBox(height: 4),
+              Text(
+                "Based on ${currentWeekDistances.length} activities this week",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        
+        // Divider
+        Divider(),
+        
+        // Suggestions title
+        Text(
+          "Action Plan:",
+          style: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        
+        SizedBox(height: 8),
+        
+        // Suggestions list
+        Column(
+          children: subgoalSuggestions.map((suggestion) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_circle_outline, size: 16, color: Colors.green[700]),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    suggestion,
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          )).toList(),
+        ),
+        
+        // Warnings if available
+        if (subgoalWarnings.isNotEmpty) ...[
+          SizedBox(height: 12),
+          Text(
+            "Important Notes:",
+            style: GoogleFonts.lato(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8),
+          Column(
+            children: subgoalWarnings.map((warning) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_outlined, size: 16, color: Colors.orange[700]),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      warning,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                    ),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ],
+      ],
+    ),
+  );
+}
 
   void _calculateBaselineComparison() {
     if (activityData.length < 4) return;
@@ -699,6 +1979,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
       _generateRecommendation();
 
       _calculateBaselineComparison();
+      if (goalType == "High Intensity Cycling") {
+        _calculateBaselines(); // Calculate baseline metrics
+        await _fetchActiveSubgoal(); // Check for any active subgoals
+      }
       setState(() {
         _isLoadingGraphs = false;
       });
@@ -1906,10 +3190,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
               ),
             ),
             SizedBox(height: 24),
-
+            if (goalType == "High Intensity Cycling") ...[
+              // Show active subgoal if exists, otherwise show selection options
+              hasActiveSubgoal ? _buildActiveSubgoalCard() : _buildSubgoalSelectionCard(),
+            ],
             // Recommendation Categories Carousel
             _buildRecommendationCarousel(),
-// Goal Progress Graphs
+            // Goal Progress Graphs
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -3792,39 +5079,45 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return Colors.black;
     }
   }
+void _onItemTapped(int index) {
+  setState(() {
+    _selectedIndex = index;
+  });
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    switch (index) {
-      case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
-        break;
-      case 1:
+  switch (index) {
+    case 0:
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+      break;
+    case 1:
+      // When navigating back to the recommendation page, simply reload the page
+      // instead of creating a new instance
+      // This will fix the immediate issue but may cause other state issues
+      // A better solution would be to use a state management solution like Provider
+      if (_selectedIndex != 1) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => RecommendationPage()),
         );
-        break;
-      case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => GoalTrackingPage()),
-        );
-        break;
-      case 3:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ProfilePage()),
-        );
-        break;
-    }
+      }
+      break;
+    case 2:
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => GoalTrackingPage()),
+      );
+      break;
+    case 3:
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ProfilePage()),
+      );
+      break;
   }
+}
+
 
   void _logout() {
     FirebaseAuth.instance.signOut();
