@@ -19,9 +19,10 @@ class _HealthSummaryState extends State<HealthSummary> {
     final user = FirebaseAuth.instance.currentUser;
     userId = user?.uid ?? '';
     if (userId.isNotEmpty) {
-    fetchGoalType();
+      fetchGoalType();
+    }
   }
-  }
+  
   Future<void> fetchGoalType() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -60,6 +61,168 @@ class _HealthSummaryState extends State<HealthSummary> {
     }
   }
 
+  Future<double> fetchWeeklyAverageCalories() async {
+    if (userId.isEmpty) {
+      return 0;
+    }
+    
+    try {
+      // Get all entries for this user
+      QuerySnapshot foodEntries = await FirebaseFirestore.instance
+          .collection('food_entries')
+          .where('userId', isEqualTo: userId)  // Using userId field instead of uid
+          .get();
+      
+      print("🍎 Found ${foodEntries.docs.length} total food entries");
+      
+      if (foodEntries.docs.isEmpty) {
+        print("⚠️ No food entries found");
+        return 0;
+      }
+      
+      // Calculate dates for the past week
+      final now = DateTime.now();
+      final oneWeekAgo = now.subtract(Duration(days: 7));
+      
+      // Group entries by day
+      Map<String, double> dailyCalories = {};
+      
+      for (var doc in foodEntries.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        
+        print("🍎 Processing entry: ${doc.id}");
+        print("🍎 Entry data: $data");
+        
+        // Check for timestamp fields
+        Timestamp? entryTimestamp;
+        
+        // Try both 'timestamp' and 'date' fields
+        if (data['timestamp'] != null) {
+          entryTimestamp = data['timestamp'] as Timestamp;
+        } else if (data['date'] != null) {
+          entryTimestamp = data['date'] as Timestamp;
+        }
+        
+        if (entryTimestamp == null) {
+          print("⚠️ No timestamp/date found in entry ${doc.id}");
+          continue;
+        }
+        
+        final date = entryTimestamp.toDate();
+        print("🍎 Entry date: $date");
+        
+        // Only include entries from the past week
+        if (date.isBefore(oneWeekAgo)) {
+          print("🍎 Entry is older than one week, skipping");
+          continue;
+        }
+        
+        // Create a key for the day
+        final dayKey = "${date.year}-${date.month}-${date.day}";
+        
+        // Get calories from the entry
+        final calories = double.tryParse(data['total_calories']?.toString() ?? '0') ?? 0;
+        print("🍎 Entry calories: $calories");
+        
+        // Add calories to the daily total
+        if (dailyCalories.containsKey(dayKey)) {
+          dailyCalories[dayKey] = dailyCalories[dayKey]! + calories;
+        } else {
+          dailyCalories[dayKey] = calories;
+        }
+      }
+      
+      print("🍎 Daily calories by date: $dailyCalories");
+      
+      // If no entries from past week, return 0
+      if (dailyCalories.isEmpty) {
+        print("⚠️ No entries found in the past week");
+        return 0;
+      }
+      
+      // Calculate the average daily calories
+      double totalCalories = 0;
+      dailyCalories.forEach((day, calories) {
+        totalCalories += calories;
+      });
+      
+      double averageCalories = totalCalories / dailyCalories.length;
+      print("🍎 Average daily calories: $averageCalories (over ${dailyCalories.length} day(s))");
+      
+      return averageCalories;
+    } catch (e) {
+      print("❌ Error fetching food entries: $e");
+      return 0;
+    }
+  }
+  
+  Future<double> fetchLatestBasalMetabolicRate() async {
+    if (userId.isEmpty) {
+      return 0;
+    }
+    
+    try {
+      // Simplifying to avoid composite index issues
+      // First try the direct document approach
+      final userDoc = await FirebaseFirestore.instance
+          .collection('userData')
+          .doc(userId)
+          .get();
+      
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        final bmr = double.tryParse(data['basalMetabolicRate']?.toString() ?? '0') ?? 0;
+        
+        if (bmr > 0) {
+          print("🔥 Basal Metabolic Rate from direct document: $bmr");
+          return bmr;
+        }
+      }
+      
+      // If that doesn't work, get all documents for this user without ordering
+      QuerySnapshot userDataQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: userId)
+          .get();
+      
+      if (userDataQuery.docs.isEmpty) {
+        print("⚠️ No user data found for basal metabolic rate");
+        return 0;
+      }
+      
+      // Find the document with the most recent timestamp manually
+      DocumentSnapshot? latestDoc;
+      Timestamp? latestTimestamp;
+      
+      for (var doc in userDataQuery.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final timestamp = data['timestamp'] as Timestamp?;
+        
+        if (timestamp != null && (latestTimestamp == null || 
+            timestamp.compareTo(latestTimestamp) > 0)) {
+          latestTimestamp = timestamp;
+          latestDoc = doc;
+        }
+      }
+      
+      if (latestDoc == null) {
+        print("⚠️ No user data with timestamp found for basal metabolic rate");
+        // Fall back to first document if no timestamps found
+        latestDoc = userDataQuery.docs.first;
+      }
+      
+      final data = latestDoc.data() as Map<String, dynamic>;
+      final bmr = double.tryParse(data['basalMetabolicRate']?.toString() ?? '0') ?? 0;
+      
+      print("🔥 Latest Basal Metabolic Rate: $bmr");
+      return bmr;
+    } catch (e) {
+      print("❌ Error fetching basal metabolic rate: $e");
+      print("⚠️ You may need to create a composite index - check the error message for details");
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> _fetchData() async {
     if (userId.isEmpty) {
       throw Exception("User not logged in");
@@ -69,6 +232,10 @@ class _HealthSummaryState extends State<HealthSummary> {
       final userDoc = await FirebaseFirestore.instance.collection('userData').doc(userId).get();
       final activitiesSnapshot = await FirebaseFirestore.instance.collection('activities').where('uid', isEqualTo: userId).get();
       final athleteDoc = await FirebaseFirestore.instance.collection('athletes').doc(userId).get();
+      
+      // Fetch the weekly average calories and latest BMR
+      final averageCalories = await fetchWeeklyAverageCalories();
+      final basalMetabolicRate = await fetchLatestBasalMetabolicRate();
 
       final userData = userDoc.data() ?? {};
       final athleteData = athleteDoc.data() ?? {};
@@ -103,6 +270,9 @@ class _HealthSummaryState extends State<HealthSummary> {
       print("🔥 Heart Rate: $latestHeartRate");
       print("🔥 Total Distance: $totalDistance");
       print("🔥 Total Calories: $totalCalories");
+      print("🔥 Average Daily Calories: $averageCalories");
+      print("🔥 Basal Metabolic Rate: $basalMetabolicRate");
+      
     return {
       'Athlete Name': athleteData['athlete_name'] ?? 'N/A',
       'Age': userData['age']?.toString() ?? 'N/A',
@@ -110,11 +280,12 @@ class _HealthSummaryState extends State<HealthSummary> {
       'Weight (kg)': userData['weight']?.toString() ?? 'N/A',
       'BMI': bmi > 0 ? bmi.toStringAsFixed(2) : 'N/A',
       'Metabolic Rate': metabolicRate > 0 ? metabolicRate.toStringAsFixed(2) : 'N/A',
+      'Basal Metabolic Rate': basalMetabolicRate > 0 ? basalMetabolicRate.toStringAsFixed(2) : 'N/A',
       'Body Fat %': bodyFatPercentage > 0 ? bodyFatPercentage.toStringAsFixed(2) : 'N/A',
       'Avg. Heart Rate': latestHeartRate > 0 ? latestHeartRate.toStringAsFixed(2) : 'N/A', // ✅ Uses latest heart rate
       'Total Distance (km)': totalDistance > 0 ? totalDistance.toStringAsFixed(2) : 'N/A',
       'Total Calories': totalCalories > 0 ? totalCalories.toStringAsFixed(2) : 'N/A',
-
+      'Avg. Daily Calories': averageCalories > 0 ? averageCalories.toStringAsFixed(2) : 'N/A',
     };
     
     } catch (e) {
@@ -320,10 +491,21 @@ class _HealthSummaryState extends State<HealthSummary> {
                   _buildMetricCard("Average Heart Rate", data['Avg. Heart Rate'] + " bpm", Icons.favorite, Colors.red),
                   _buildMetricCard("Total Distance", data['Total Distance (km)'] + " km", Icons.directions_bike, Color(0xffFFA500)),
 
-                  // Show Total Calories and Metabolic Rate only if goalType is "High Intensity Cycling"
+                  // Show Average calories and basal metabolic rate only if goalType is "High Intensity Cycling"
                   if (goalType == "High Intensity Cycling") ...[
-                    _buildMetricCard("Total Calories", data['Total Calories'] + " kcal", Icons.local_fire_department, Colors.amber),
-                    _buildMetricCard("Metabolic Rate", data['Metabolic Rate'] + " kcal", Icons.bolt, Colors.teal),
+                    _buildMetricCard(
+                      "Average Daily Calories", 
+                      data['Avg. Daily Calories'] + " kcal", 
+                      Icons.food_bank, 
+                      Colors.orange,
+                      note: "Based on food entries this week"
+                    ),
+                    _buildMetricCard(
+                      "Basal Metabolic Rate", 
+                      data['Basal Metabolic Rate'] + " kcal", 
+                      Icons.whatshot, 
+                      Colors.deepOrange
+                    ),
                   ],
 
                   SizedBox(height: 30),
@@ -400,7 +582,7 @@ class _HealthSummaryState extends State<HealthSummary> {
     ).animate().fadeIn(duration: 400.ms, delay: 200.ms);
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color iconColor) {
+  Widget _buildMetricCard(String label, String value, IconData icon, Color iconColor, {String? note}) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -452,6 +634,18 @@ class _HealthSummaryState extends State<HealthSummary> {
                     color: Colors.black87,
                   ),
                 ),
+                if (note != null) ...[
+                  SizedBox(height: 4),
+                  Text(
+                    note,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
