@@ -14,7 +14,7 @@ class UpdateMetricsPage extends StatefulWidget {
   _UpdateMetricsPageState createState() => _UpdateMetricsPageState();
 }
 
-class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
+class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   
   final _weightController = TextEditingController();
@@ -24,10 +24,22 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
   bool _isLoading = true;
   Map<String, dynamic>? _userData;
   
+  final Color orangeColor = const Color(0xffFFA500);
+  final Color darkGrey = const Color(0xFF303030);
+  
+  AnimationController? _animationController;
+  
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    
+    _animationController!.forward();
   }
   
   @override
@@ -35,8 +47,10 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
     _weightController.dispose();
     _bodyFatController.dispose();
     _metabolicRateController.dispose();
+    _animationController?.dispose();
     super.dispose();
   }
+
   
   Future<void> _loadUserData() async {
     setState(() {
@@ -50,7 +64,6 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
         setState(() {
           _userData = userData;
           
-          // Pre-fill with last values if available
           if (userData.containsKey('weight')) {
             _weightController.text = userData['weight'].toString();
           }
@@ -66,10 +79,12 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
       }
     } catch (e) {
       log('Error loading user data: $e');
-      // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading your data: $e')),
+          SnackBar(
+            content: Text('Error loading your data: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -88,7 +103,6 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
       
       final String uid = currentUser.uid;
       
-      // Check if we have recent metrics data
       final metricsSnapshot = await FirebaseFirestore.instance
           .collection('user_metrics')
           .where('uid', isEqualTo: uid)
@@ -96,12 +110,10 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
           .limit(1)
           .get();
       
-      // If we have recent metrics data, use that
       if (metricsSnapshot.docs.isNotEmpty) {
         return metricsSnapshot.docs.first.data();
       }
       
-      // Otherwise, fall back to user profile data
       final userSnapshot = await FirebaseFirestore.instance
           .collection('userData')
           .where('uid', isEqualTo: uid)
@@ -129,7 +141,6 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
       
       final String uid = currentUser.uid;
       
-      // Get latest user data for all fields
       final userSnapshot = await FirebaseFirestore.instance
           .collection('userData')
           .where('uid', isEqualTo: uid)
@@ -144,25 +155,21 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
       
       final userData = userSnapshot.docs.first.data();
       
-      // Create new metrics document with all original fields
       Map<String, dynamic> newData = Map.from(userData);
-      
-      // Update only the metrics fields
+
       newData['timestamp'] = Timestamp.now();
       newData['weight'] = weight;
       newData['bodyFat'] = bodyFat;
-      newData['basalMetabolicRate'] = metabolicRate; // Using correct field name
+      newData['basalMetabolicRate'] = metabolicRate; 
       
-      // Create new document in the same userData collection
       await FirebaseFirestore.instance.collection('userData').add(newData);
       
       log('User metrics saved successfully');
       
-      // Schedule the next notification
       await scheduleWeeklyMetricsUpdate();
     } catch (e) {
       log('Error saving user metrics: $e');
-      throw e; // Rethrow to handle in the UI
+      throw e; 
     }
   }
 
@@ -171,7 +178,6 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
       final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
           FlutterLocalNotificationsPlugin();
       
-      // Request notification permissions for Android
       final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
           flutterLocalNotificationsPlugin
               .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -180,22 +186,19 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
         await androidPlugin.requestNotificationsPermission();
       }
       
-      // Check if we already scheduled the notification
       SharedPreferences prefs = await SharedPreferences.getInstance();
       bool isScheduled = prefs.getBool('metrics_notification_scheduled') ?? false;
       
       if (!isScheduled) {
-        // Cancel any existing notifications with this ID
         await flutterLocalNotificationsPlugin.cancel(0);
         
-        // Schedule the notification for one week from now
         final now = tz.TZDateTime.now(tz.local);
         final scheduledDate = tz.TZDateTime(
           tz.local,
           now.year,
           now.month,
           now.day + 7,
-          10, // 10 AM
+          10, 
         );
         
         const AndroidNotificationDetails androidPlatformChannelSpecifics =
@@ -224,7 +227,6 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
         
-        // Mark as scheduled
         await prefs.setBool('metrics_notification_scheduled', true);
         
         log('Weekly metrics update notification scheduled for $scheduledDate');
@@ -249,17 +251,22 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Your metrics have been updated!')),
+            SnackBar(
+              content: Text('Your metrics have been updated!'),
+              backgroundColor: Colors.green,
+            ),
           );
           
-          // Navigate back after successful save
           Navigator.pop(context);
         }
       } catch (e) {
         log('Error saving metrics: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving your metrics: $e')),
+            SnackBar(
+              content: Text('Error saving your metrics: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } finally {
@@ -276,118 +283,252 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Update Your Metrics'),
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
+        title: const Text(
+          "Update Metrics",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            color: Color(0xffFFA500),
+            fontSize: 22,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, color: orangeColor),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
+      backgroundColor: Colors.white,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(orangeColor),
+              ),
+            )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Update your health metrics to track your progress',
-                      style: TextStyle(fontSize: 16, color: Colors.black),
-                    ),
-                    const SizedBox(height: 24),
                     
-                    // Weight field
-                    TextFormField(
-                      controller: _weightController,
-                      decoration: const InputDecoration(
-                        labelText: 'Weight (kg)',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white24,
+                    Container(
+                      margin: EdgeInsets.only(bottom: 15),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: orangeColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.monitor_weight_outlined,
+                              color: orangeColor,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "Your Health Metrics",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                      ],
-                      style: const TextStyle(color: Colors.black),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your weight';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return 'Please enter a valid number';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 16),
                     
-                    // Body Fat Percentage field
-                    TextFormField(
-                      controller: _bodyFatController,
-                      decoration: const InputDecoration(
-                        labelText: 'Body Fat (%)',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white24,
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
-                      ],
-                      style: const TextStyle(color: Colors.black),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your body fat percentage';
-                        }
-                        final bodyFat = double.tryParse(value);
-                        if (bodyFat == null) {
-                          return 'Please enter a valid number';
-                        }
-                        if (bodyFat < 0 || bodyFat > 100) {
-                          return 'Body fat percentage must be between 0 and 100';
-                        }
-                        return null;
-                      },
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            controller: _weightController,
+                            labelText: 'Weight (kg)',
+                            icon: Icons.monitor_weight,
+                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your weight';
+                              }
+                              if (double.tryParse(value) == null) {
+                                return 'Please enter a valid number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          _buildTextField(
+                            controller: _bodyFatController,
+                            labelText: 'Body Fat (%)',
+                            icon: Icons.percent,
+                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your body fat percentage';
+                              }
+                              final bodyFat = double.tryParse(value);
+                              if (bodyFat == null) {
+                                return 'Please enter a valid number';
+                              }
+                              if (bodyFat < 0 || bodyFat > 100) {
+                                return 'Body fat percentage must be between 0 and 100';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          _buildTextField(
+                            controller: _metabolicRateController,
+                            labelText: 'Metabolic Rate (calories/day)',
+                            icon: Icons.local_fire_department,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your metabolic rate';
+                              }
+                              if (int.tryParse(value) == null) {
+                                return 'Please enter a valid number';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
                     
-                    // Metabolic Rate field
-                    TextFormField(
-                      controller: _metabolicRateController,
-                      decoration: const InputDecoration(
-                        labelText: 'Metabolic Rate (calories/day)',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white24,
-                      ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      style: const TextStyle(color: Colors.black),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your metabolic rate';
-                        }
-                        if (int.tryParse(value) == null) {
-                          return 'Please enter a valid number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 25),
                     
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _saveMetrics,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                    Container(
+                      width: double.infinity,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [orangeColor.withOpacity(0.8), orangeColor],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: orangeColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator()
-                          : const Text('SAVE METRICS', style: TextStyle(fontSize: 16)),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(15),
+                          onTap: _isLoading ? null : _saveMetrics,
+                          child: Center(
+                            child: _isLoading
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.save_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Text(
+                                        "SAVE METRICS",
+                                        style: TextStyle(
+                                          fontFamily: 'Fredoka-SemiBold',
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    required TextInputType keyboardType,
+    required List<TextInputFormatter> inputFormatters,
+    required String? Function(String?) validator,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 5),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: labelText,
+          labelStyle: TextStyle(
+            fontFamily: 'Inter',
+            color: Colors.grey[700],
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: orangeColor,
+            size: 20,
+          ),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        style: TextStyle(
+          fontFamily: 'Inter',
+          color: Colors.black87,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        validator: validator,
+      ),
     );
   }
 }

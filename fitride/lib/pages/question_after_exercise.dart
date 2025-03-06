@@ -27,6 +27,10 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   bool _isCalculatingLunch = false;
   bool _isCalculatingDinner = false;
   bool _isSubmitting = false;
+  
+  // Define the orange color from profile page
+  final Color orangeColor = const Color(0xffFFA500);
+  final Color darkGrey = const Color(0xFF303030);
 
   @override
   void dispose() {
@@ -39,38 +43,56 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Daily Food Diary'),
+        backgroundColor: Colors.grey[900],
+        elevation: 0,
+        title: const Text(
+          "Daily Food Diary",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            color: Color(0xffFFA500),
+            fontSize: 22,
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back_ios, color: orangeColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'What did you eat today?',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Row(
+                children: [
+                  Text(
+                    'What did you eat today?',
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      color: Colors.black,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Text(
+                  DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[400],
-                ),
-              ),
-              SizedBox(height: 24),
+              SizedBox(height: 20),
               
               // Breakfast Section
               _buildMealSection(
@@ -78,6 +100,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 controller: _breakfastController,
                 calories: _breakfastCalories,
                 isCalculating: _isCalculatingBreakfast,
+                icon: Icons.breakfast_dining,
                 onCalculate: () async {
                   if (_breakfastController.text.isEmpty) return;
                   
@@ -101,6 +124,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 controller: _lunchController,
                 calories: _lunchCalories,
                 isCalculating: _isCalculatingLunch,
+                icon: Icons.lunch_dining,
                 onCalculate: () async {
                   if (_lunchController.text.isEmpty) return;
                   
@@ -124,6 +148,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 controller: _dinnerController,
                 calories: _dinnerCalories,
                 isCalculating: _isCalculatingDinner,
+                icon: Icons.dinner_dining,
                 onCalculate: () async {
                   if (_dinnerController.text.isEmpty) return;
                   
@@ -145,27 +170,57 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
               Container(
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[800]!),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.grey.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Calories:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: orangeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.local_fire_department,
+                            color: orangeColor,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Total Calories:',
+                          style: TextStyle(
+                            fontFamily: 'Fredoka-SemiBold',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       '${(_breakfastCalories + _lunchCalories + _dinnerCalories).toStringAsFixed(0)} kcal',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: orangeColor,
                       ),
                     ),
                   ],
@@ -174,31 +229,57 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
               SizedBox(height: 32),
               
               // Submit Button
-              SizedBox(
+              Container(
                 width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: (_isCalculatingBreakfast || 
-                             _isCalculatingLunch || 
-                             _isCalculatingDinner || 
-                             _isSubmitting) ? null : _saveToFirestore,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    disabledBackgroundColor: Colors.grey,
+                height: 55,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [orangeColor.withOpacity(0.8), orangeColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: _isSubmitting
-                      ? CircularProgressIndicator(color: Colors.black)
-                      : Text(
-                          'Save Food Diary',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: orangeColor.withOpacity(0.5),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(15),
+                    onTap: (_isCalculatingBreakfast || 
+                          _isCalculatingLunch || 
+                          _isCalculatingDinner || 
+                          _isSubmitting) ? null : _saveToFirestore,
+                    child: Center(
+                      child: _isSubmitting
+                          ? CircularProgressIndicator(color: Colors.white)
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.save_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  "SAVE FOOD DIARY",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -214,82 +295,138 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     required double calories,
     required bool isCalculating,
     required VoidCallback onCalculate,
+    required IconData icon,
   }) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[800]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 12,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            mealTitle,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: orangeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: orangeColor,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                mealTitle,
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
           SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: controller,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'What did you eat?',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.1),
+                      width: 1,
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.white),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[800],
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter what you ate';
-                    }
-                    return null;
-                  },
+                  child: TextFormField(
+                    controller: controller,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: Colors.black87,
+                      fontSize: 15,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'What did you eat?',
+                      hintStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter what you ate';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
               ),
               SizedBox(width: 8),
-              SizedBox(
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: isCalculating ? null : onCalculate,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              Container(
+                height: 50,
+                width: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isCalculating 
+                        ? [Colors.grey.withOpacity(0.8), Colors.grey] 
+                        : [orangeColor.withOpacity(0.8), orangeColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: orangeColor.withOpacity(0.4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: isCalculating ? null : onCalculate,
+                    child: Center(
+                      child: isCalculating
+                          ? SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Icon(
+                              Icons.calculate,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                     ),
                   ),
-                  child: isCalculating
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Icon(Icons.calculate),
                 ),
               ),
             ],
@@ -301,14 +438,18 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
               Text(
                 'Calories: ',
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  fontFamily: 'Inter',
+                  color: Colors.grey[600],
+                  fontSize: 14,
                 ),
               ),
               Text(
                 '${calories.toStringAsFixed(0)} kcal',
                 style: TextStyle(
-                  color: Colors.green,
+                  fontFamily: 'Inter',
+                  color: orangeColor,
                   fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -378,7 +519,10 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You must be logged in to save food data')),
+        SnackBar(
+          content: Text('You must be logged in to save food data'),
+          backgroundColor: Colors.red,
+        ),
       );
       setState(() {
         _isSubmitting = false;
@@ -427,14 +571,20 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Food diary saved successfully!')),
+        SnackBar(
+          content: Text('Food diary saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
 
       Navigator.of(context).pop();
     } catch (e) {
       print('Error saving food data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving food data: $e')),
+        SnackBar(
+          content: Text('Error saving food data: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
