@@ -3351,7 +3351,7 @@ void _generateSeasonalAdvice() {
             series: <ChartSeries>[
               SplineSeries<MetricData, String>(
                 dataSource: chartData,
-                xValueMapper: (MetricData data, _) => data.date,
+                xValueMapper: (MetricData data, _) => data.date.toString(),
                 yValueMapper: (MetricData data, _) => data.value,
                 color: Color(0xff2196F3), // Blue for weight
                 width: 3,
@@ -3661,6 +3661,7 @@ void _generateSeasonalAdvice() {
       case 'High Intensity Cycling':
         goalGraphs.add(_buildWeightOverTimeGraph());
         goalGraphs.add(_buildBodyFatOverTimeGraph());
+        goalGraphs.add(_buildBMRTrendGraph());
         break;
       default:
         goalGraphs.add(
@@ -4189,7 +4190,142 @@ void _generateSeasonalAdvice() {
       ),
     );
   }
+Widget _buildBMRTrendGraph() {
+  return FutureBuilder<QuerySnapshot>(
+    future: FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(10) // Get the last 10 entries
+        .get(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
+      if (snapshot.hasError ||
+          !snapshot.hasData ||
+          snapshot.data!.docs.isEmpty) {
+        return _buildEmptyGraph("No BMR tracking data available");
+      }
+
+      List<MetricData> chartData = [];
+      
+      // Check if we have at least 2 entries to show a trend
+      if (snapshot.data!.docs.length < 2) {
+        return _buildEmptyGraph("Need more data to show BMR trend");
+      }
+
+      // Process the data in chronological order (oldest first)
+      for (var doc in snapshot.data!.docs.reversed) {
+        var data = doc.data() as Map<String, dynamic>;
+        if (data.containsKey('basalMetabolicRate')) {
+          double bmr = safeParseDouble(data['basalMetabolicRate']);
+          
+          // Get the timestamp for the x-axis
+          Timestamp timestamp = data['timestamp'];
+          DateTime date = timestamp.toDate();
+          
+          // Format date for display
+          String dateLabel = DateFormat('MM/dd HH:mm').format(date);
+          
+          if (bmr > 0) { // Only add valid BMR readings
+            chartData.add(MetricData(dateLabel, bmr));
+          }
+        }
+      }
+      
+      // If after filtering we don't have enough data
+      if (chartData.length < 2) {
+        return _buildEmptyGraph("Need more BMR data to show trend");
+      }
+
+      return _buildGraphContainer(
+        title: "Basal Metabolic Rate Trend",
+        subtitle: "Changes over time",
+        child: SfCartesianChart(
+          margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
+          primaryXAxis: CategoryAxis(
+            majorGridLines: MajorGridLines(width: 0),
+            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+            labelRotation: 0,
+          ),
+          primaryYAxis: NumericAxis(
+            majorGridLines: MajorGridLines(
+              width: 0.5,
+              color: Colors.grey[200],
+              dashArray: <double>[3, 3],
+            ),
+            axisLine: AxisLine(width: 0),
+            labelFormat: '{value} kcal',
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10,
+            ),
+          ),
+          tooltipBehavior: TooltipBehavior(
+            enable: true,
+            color: Colors.grey[800],
+            textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            format: 'BMR: point.y kcal\nDate: point.x',
+          ),
+          series: <ChartSeries>[
+            SplineSeries<MetricData, String>(
+              dataSource: chartData,
+              xValueMapper: (MetricData data, _) => data.date,
+              yValueMapper: (MetricData data, _) => data.value,
+              color: Colors.orange, // Purple for BMR
+              width: 3,
+              markerSettings: MarkerSettings(
+                isVisible: true,
+                shape: DataMarkerType.circle,
+                color: Colors.orange,
+                borderColor: Colors.white,
+                borderWidth: 2,
+                height: 8,
+                width: 8,
+              ),
+              dataLabelSettings: DataLabelSettings(
+                isVisible: true,
+                textStyle: TextStyle(
+                  color: Colors.black87,
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                labelAlignment: ChartDataLabelAlignment.top,
+                useSeriesColor: true,
+              ),
+            ),
+          ],
+          // Add annotations to highlight important information
+          annotations: <CartesianChartAnnotation>[
+            CartesianChartAnnotation(
+              widget: Container(
+                padding: EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: Colors.orange[200]!, width: 1),
+                ),
+              ),
+              coordinateUnit: CoordinateUnit.point,
+              x: chartData[chartData.length ~/ 2].date,
+              y: chartData.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 0.9,
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 Widget _buildWeeklySummaryGraph() {
 
   double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
@@ -4328,18 +4464,6 @@ Widget _buildWeeklySummaryGraph() {
                   ),
                 ),
               ],
-            ),
-
-            SizedBox(height: 16),
-
-            // Caloric balance visualization
-            Text(
-              "Weekly Caloric Balance:",
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
             ),
             SizedBox(height: 8),
 
