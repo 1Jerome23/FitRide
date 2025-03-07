@@ -149,6 +149,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String bodyFat = "0";
   String basalMetabolicRate = "0";
 
+  // BMR-related metrics
+  double calculatedBMR = 0.0;
+  double calculatedTDEE = 0.0;
+  double recommendedCalorieIntake = 0.0;
+  double metabolicEfficiency = 0.0;
+  double metabolicHealthScore = 0.0;
+
   // Activity data
   String levelOfExertion = "0";
   String averageHeartrate = "0";
@@ -951,6 +958,7 @@ Widget _buildSubgoalSelectionCard() {
     ),
   );
 }
+
 
 void _calculateBaselines() {
   // We specifically want to calculate weekly averages
@@ -2394,49 +2402,59 @@ Future<void> _resetCompletedSubgoal() async {
     return consecutiveImprovement >= 2; // At least 3 consecutive improvements
   }
 
-  void _generateRecommendation() {
-    print("Starting recommendation generation");
-    print("Goal type: $goalType");
-    print("Recent data count: ${recentData.length}");
-    print("Activity data count: ${activityData.length}");
+ void _generateRecommendation() {
+  print("Starting recommendation generation");
+  print("Goal type: $goalType");
+  print("Recent data count: ${recentData.length}");
+  print("Activity data count: ${activityData.length}");
 
-    if (activityData.isEmpty) {
-      setState(() {
-        recommendation = "No activity data available.";
-        feedback =
-            "Please sync your Strava data or record some activities to generate recommendations.";
-      });
-      return;
-    }
-
-    // Clear previous recommendations
-    trainingRecommendations = [];
-    nutritionRecommendations = [];
-    healthRecommendations = [];
-    equipmentRecommendations = [];
-    progressRecommendations = [];
-
-    // Generate recommendations based on goal type
-    switch (goalType) {
-      case "Leisure":
-        _generateLeisureRecommendations();
-        break;
-      case "High Intensity Cycling":
-        _generateWeightManagementRecommendations();
-        break;
-      case "Endurance":
-        _generateCyclingEnduranceRecommendations();
-        break;
-      default:
-        setState(() {
-          recommendation = "No goal type selected.";
-          feedback = "Please set a goal in the app.";
-        });
-    }
-
-    // Add historical trend analysis to progress recommendations
-    _addHistoricalTrendRecommendations();
+  if (activityData.isEmpty) {
+    setState(() {
+      recommendation = "No activity data available.";
+      feedback =
+          "Please sync your Strava data or record some activities to generate recommendations.";
+    });
+    return;
   }
+
+  // Clear previous recommendations
+  trainingRecommendations = [];
+  nutritionRecommendations = [];
+  healthRecommendations = [];
+  equipmentRecommendations = [];
+  progressRecommendations = [];
+
+  // Calculate BMR-related metrics first to use in all recommendation types
+  _calculateDailyCalorieNeeds();
+  _analyzeMetabolicHealth();
+
+  // Generate recommendations based on goal type
+  switch (goalType) {
+    case "Leisure":
+      _generateLeisureRecommendations();
+      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
+      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      break;
+    case "High Intensity Cycling":
+      _generateWeightManagementRecommendations();
+      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
+      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      break;
+    case "Endurance":
+      _generateCyclingEnduranceRecommendations();
+      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
+      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      break;
+    default:
+      setState(() {
+        recommendation = "No goal type selected.";
+        feedback = "Please set a goal in the app.";
+      });
+  }
+
+  // Add historical trend analysis to progress recommendations
+  _addHistoricalTrendRecommendations();
+}
 
   // Add recommendations based on historical trends
   void _addHistoricalTrendRecommendations() {
@@ -2791,12 +2809,27 @@ Future<void> _resetCompletedSubgoal() async {
             "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
       });
     } else {
-      setState(() {
-        recommendation = "ℹ️ Building Baseline";
-        feedback =
-            "Track metrics consistently for personalized recommendations.";
-      });
-    }
+  // Check if we have current weight and body fat data
+  if (latestWeight > 0 && latestBodyFat > 0) {
+    setState(() {
+      recommendation = "ℹ️ Monitoring Progress";
+      feedback =
+          "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. Continue tracking for trend analysis.";
+    });
+  } else if (safeParseDouble(weight) > 0 && safeParseDouble(bodyFat) > 0) {
+    setState(() {
+      recommendation = "ℹ️ Starting Point Established";
+      feedback =
+          "Your profile metrics: ${weight} kg weight and ${bodyFat}% body fat. Record post-workout data to see progress.";
+    });
+  } else {
+    setState(() {
+      recommendation = "ℹ️ Building Baseline";
+      feedback =
+          "Track metrics consistently for personalized recommendations.";
+    });
+  }
+}
 
     // Historical heart rate analysis
     if (heartrateProgression.length >= 3) {
@@ -4307,7 +4340,7 @@ Future<void> _resetCompletedSubgoal() async {
       case 'High Intensity Cycling':
         goalGraphs.add(_buildWeightOverTimeGraph());
         goalGraphs.add(_buildBodyFatOverTimeGraph());
-        goalGraphs.add(_buildCalorieBalanceGraph());
+        goalGraphs.add(_buildCalorieBalanceGraphWithBMR());
         break;
       default:
         goalGraphs.add(
@@ -4532,6 +4565,8 @@ Future<void> _resetCompletedSubgoal() async {
       ),
     );
   }
+
+  
 
   Widget _buildDurationPerSessionGraph() {
     List<ActivitySessionData> chartData = [];
@@ -5058,145 +5093,462 @@ Future<void> _resetCompletedSubgoal() async {
     );
   }
 
-  Widget _buildCalorieBalanceGraph() {
-    // Calculate daily calorie data based on activity and nutrition data
-    List<Map<String, dynamic>> dailyData = [];
-    DateTime now = DateTime.now();
-
-    // Generate last 7 days data
-    for (int i = 6; i >= 0; i--) {
-      DateTime date = now.subtract(Duration(days: i));
-      String dayLabel = DateFormat('E').format(date);
-
-      // Find activities on this day
-      double dayCaloriesBurned = 0;
-      for (var activity in activityData) {
-        if (activity['start_date'] != null) {
-          DateTime activityDate = activity['start_date'].toDate();
-          if (activityDate.year == date.year &&
-              activityDate.month == date.month &&
-              activityDate.day == date.day) {
-            dayCaloriesBurned += safeParseDouble(activity['calories_burned']);
-          }
-        }
-      }
-
-      // Find nutrition data for this day
-      double dayCaloriesConsumed = 0;
-      for (var nutrition in nutritionData) {
-        if (nutrition['timestamp'] != null) {
-          DateTime nutritionDate = nutrition['timestamp'].toDate();
-          if (nutritionDate.year == date.year &&
-              nutritionDate.month == date.month &&
-              nutritionDate.day == date.day) {
-            dayCaloriesConsumed +=
-                safeParseDouble(nutrition['caloriesConsumed']);
-          }
-        }
-      }
-
-      // Add BMR to calories burned (estimated using basalMetabolicRate if available)
-      double bmrValue = safeParseDouble(basalMetabolicRate);
-      double totalBurn = dayCaloriesBurned +
-          (bmrValue > 0 ? bmrValue : 1500); // Default 1500 if not available
-
-      dailyData.add({
-        'day': dayLabel,
-        'caloriesBurned': totalBurn,
-        'caloriesConsumed':
-            dayCaloriesConsumed > 0 ? dayCaloriesConsumed : null,
-        'balance':
-            totalBurn - (dayCaloriesConsumed > 0 ? dayCaloriesConsumed : 0)
-      });
-    }
-
-    return _buildGraphContainer(
-        title: "Calorie Balance",
-        subtitle: "Last 7 days",
-        height: 600, // Slightly taller
-        child: SingleChildScrollView(
-            child: Container(
-          height: 260, // Fixed height for the chart
-          child: SfCartesianChart(
-            primaryXAxis: CategoryAxis(
-              majorGridLines: MajorGridLines(width: 0),
-              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            primaryYAxis: NumericAxis(
-              majorGridLines: MajorGridLines(
-                width: 0.5,
-                color: Colors.grey[200],
-                dashArray: <double>[3, 3],
-              ),
-              axisLine: AxisLine(width: 0),
-              labelFormat: '{value} kcal',
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 10,
-              ),
-            ),
-            legend: Legend(
-              isVisible: true,
-              position: LegendPosition.bottom,
-              overflowMode: LegendItemOverflowMode.wrap,
-            ),
-            tooltipBehavior: TooltipBehavior(
-              enable: true,
-              color: Colors.grey[800],
-              textStyle: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            series: <ChartSeries>[
-              // Calories Burned
-              ColumnSeries<Map<String, dynamic>, String>(
-                name: 'Calories Burned',
-                dataSource: dailyData,
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['caloriesBurned'],
-                color: Colors.green[500],
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              // Calories Consumed
-              ColumnSeries<Map<String, dynamic>, String>(
-                name: 'Calories Consumed',
-                dataSource: dailyData
-                    .where((d) => d['caloriesConsumed'] != null)
-                    .toList(),
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['caloriesConsumed'],
-                color: Colors.orange[500],
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              // Calorie Balance (Net)
-              LineSeries<Map<String, dynamic>, String>(
-                name: 'Net Balance',
-                dataSource: dailyData
-                    .where((d) => d['caloriesConsumed'] != null)
-                    .toList(),
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['balance'],
-                color: Colors.blue[700],
-                width: 2,
-                markerSettings: MarkerSettings(
-                  isVisible: true,
-                  shape: DataMarkerType.circle,
-                  color: Colors.blue[700],
-                  borderColor: Colors.white,
-                  borderWidth: 2,
-                  height: 6,
-                  width: 6,
-                ),
-              ),
-            ],
-          ),
-        )));
+  void _analyzeMetabolicHealth() {
+  double bmrValue = safeParseDouble(basalMetabolicRate);
+  if (bmrValue <= 0) {
+    _calculateDailyCalorieNeeds();
+    bmrValue = calculatedBMR;
   }
+  
+  double weightKg = safeParseDouble(weight);
+  double bodyFatPercentage = safeParseDouble(bodyFat);
+  
+  // Calculate lean body mass
+  double leanBodyMass = 0;
+  if (weightKg > 0 && bodyFatPercentage > 0) {
+    leanBodyMass = weightKg * (1 - (bodyFatPercentage / 100));
+  }
+  
+  // Calculate BMR per kg of lean body mass (metabolic efficiency)
+  double bmrPerLeanKg = 0;
+  if (leanBodyMass > 0) {
+    bmrPerLeanKg = bmrValue / leanBodyMass;
+  }
+  
+  // Calculate heart rate recovery (if available)
+  double heartRateRecovery = 0;
+  if (activityData.length >= 2) {
+    // This would be more accurate with actual recovery data
+    double avgRestingHR = 0;
+    double avgMaxHR = 0;
+    
+    // Use this as a placeholder for heart rate recovery analysis
+    if (latestAverageHeartrate > 0 && previousAverageHeartrate > 0) {
+      avgRestingHR = math.min(latestAverageHeartrate, previousAverageHeartrate);
+      avgMaxHR = math.max(latestAverageHeartrate, previousAverageHeartrate);
+      heartRateRecovery = avgMaxHR - avgRestingHR;
+    }
+  }
+  
+  // Set states for metabolic health indicators
+  setState(() {
+    metabolicEfficiency = bmrPerLeanKg;
+    metabolicHealthScore = _calculateMetabolicHealthScore(
+      bmrPerLeanKg: bmrPerLeanKg,
+      heartRateRecovery: heartRateRecovery,
+      weeklyActivityCount: weeklyActivityCount,
+      bodyFatPercentage: bodyFatPercentage
+    );
+    
+    // Generate recommendations based on metabolic health score
+    if (metabolicHealthScore > 80) {
+      healthRecommendations.add(
+        "Excellent metabolic health! Your BMR of ${bmrValue.toInt()} kcal indicates efficient metabolism. Continue your current training pattern."
+      );
+    } else if (metabolicHealthScore > 60) {
+      healthRecommendations.add(
+        "Good metabolic health. Your BMR (${bmrValue.toInt()} kcal) shows good efficiency. Add 1-2 Zone 2 sessions weekly to further improve metabolism."
+      );
+    } else {
+      healthRecommendations.add(
+        "Room for metabolic improvement. Focus on consistency with 3-4 Zone 2 sessions weekly to increase your metabolic rate from current ${bmrValue.toInt()} kcal baseline."
+      );
+    }
+  });
+}
+
+// Helper function to calculate metabolic health score
+double _calculateMetabolicHealthScore({
+  required double bmrPerLeanKg,
+  required double heartRateRecovery,
+  required int weeklyActivityCount,
+  required double bodyFatPercentage
+}) {
+  // Basic scoring system - this could be refined with more clinical data
+  double score = 50; // Base score
+  
+  // BMR per lean kg scoring (26-28 is considered good)
+  if (bmrPerLeanKg >= 28) score += 25;
+  else if (bmrPerLeanKg >= 26) score += 20;
+  else if (bmrPerLeanKg >= 24) score += 15;
+  else if (bmrPerLeanKg >= 22) score += 10;
+  else score += 5;
+  
+  // Heart rate recovery scoring (higher is better, to a point)
+  if (heartRateRecovery >= 50) score += 15;
+  else if (heartRateRecovery >= 40) score += 12;
+  else if (heartRateRecovery >= 30) score += 8;
+  else if (heartRateRecovery >= 20) score += 5;
+  
+  // Weekly activity scoring
+  if (weeklyActivityCount >= 5) score += 15;
+  else if (weeklyActivityCount >= 3) score += 10;
+  else if (weeklyActivityCount >= 1) score += 5;
+  
+  // Body fat percentage adjustment
+  if (gender.toLowerCase() == "male") {
+    if (bodyFatPercentage <= 15) score += 10;
+    else if (bodyFatPercentage <= 20) score += 5;
+    else if (bodyFatPercentage >= 30) score -= 10;
+    else if (bodyFatPercentage >= 25) score -= 5;
+  } else {
+    if (bodyFatPercentage <= 22) score += 10;
+    else if (bodyFatPercentage <= 27) score += 5;
+    else if (bodyFatPercentage >= 37) score -= 10;
+    else if (bodyFatPercentage >= 32) score -= 5;
+  }
+  
+  // Ensure score stays within 0-100 range
+  return math.min(100, math.max(0, score));
+}
+
+void _calculateDailyCalorieNeeds() {
+  double bmrValue = safeParseDouble(basalMetabolicRate);
+  
+  // If BMR is not available, estimate it
+  if (bmrValue <= 0) {
+    // Estimate BMR using Mifflin-St Jeor Equation
+    double weightKg = safeParseDouble(weight);
+    double heightCm = safeParseDouble(height);
+    
+    if (weightKg > 0 && heightCm > 0 && age > 0) {
+      if (gender.toLowerCase() == "male") {
+        bmrValue = (10 * weightKg) + (6.25 * heightCm) - (5 * age) + 5;
+      } else {
+        bmrValue = (10 * weightKg) + (6.25 * heightCm) - (5 * age) - 161;
+      }
+    } else {
+      // Default fallback if data is missing
+      bmrValue = gender.toLowerCase() == "male" ? 1800 : 1400;
+    }
+  }
+  
+  // Calculate TDEE (Total Daily Energy Expenditure) with activity level
+  double activityMultiplier = 1.2; // Sedentary default
+  
+  // Adjust multiplier based on weekly activity count
+  if (weeklyActivityCount >= 5) {
+    activityMultiplier = 1.725; // Very active (6-7 times per week)
+  } else if (weeklyActivityCount >= 3) {
+    activityMultiplier = 1.55; // Moderate activity (3-5 times per week)
+  } else if (weeklyActivityCount >= 1) {
+    activityMultiplier = 1.375; // Light activity (1-3 times per week)
+  }
+  
+  double tdee = bmrValue * activityMultiplier;
+  
+  // Store these calculated values for use in recommendations
+  setState(() {
+    calculatedBMR = bmrValue;
+    calculatedTDEE = tdee;
+    
+    // Calculate deficit or surplus based on goal type
+    if (goalType == "High Intensity Cycling") {
+      // For weight loss, calculate recommended deficit
+      recommendedCalorieIntake = tdee - 500; // 500 calorie deficit for weight loss
+      
+      // Set minimum calorie floor based on gender to avoid unhealthy restriction
+      double minimumCalories = gender.toLowerCase() == "male" ? 1500 : 1200;
+      if (recommendedCalorieIntake < minimumCalories) {
+        recommendedCalorieIntake = minimumCalories;
+      }
+    } else if (goalType == "Endurance") {
+      // For endurance, calculate recommended surplus or maintenance
+      recommendedCalorieIntake = tdee + 300; // Slight surplus for energy needs
+    } else {
+      // For leisure, maintenance is appropriate
+      recommendedCalorieIntake = tdee;
+    }
+  });
+}
+
+// 2. Enhanced nutrition recommendations based on BMR
+void _generateBMRBasedNutritionRecommendations() {
+  // Make sure we have calculated the values
+  if (calculatedBMR <= 0) {
+    _calculateDailyCalorieNeeds();
+  }
+  
+  // Clear existing nutrition recommendations
+  nutritionRecommendations.clear();
+  
+  // Add BMR-based nutrition recommendations
+  if (goalType == "High Intensity Cycling") {
+    nutritionRecommendations.add(
+      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily intake for weight loss."
+    );
+    
+    double proteinNeeds = safeParseDouble(weight) * 1.8; // 1.8g per kg for high intensity
+    nutritionRecommendations.add(
+      "Consume ${proteinNeeds.toInt()}g of protein daily to preserve muscle during weight loss."
+    );
+    
+    // Calculate calorie target for different days
+    double trainingDayCalories = recommendedCalorieIntake + 200;
+    double restDayCalories = recommendedCalorieIntake - 100;
+    nutritionRecommendations.add(
+      "Cycling days: ${trainingDayCalories.toInt()} kcal. Rest days: ${restDayCalories.toInt()} kcal."
+    );
+    
+    // Add more specific nutrition timing recommendations
+    nutritionRecommendations.add(
+      "For optimal fat loss, consume 25% of daily calories before rides and 30% within 2 hours after."
+    );
+  } 
+  else if (goalType == "Endurance") {
+    nutritionRecommendations.add(
+      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily for endurance training."
+    );
+    
+    // Calculate carb recommendations for endurance
+    double carbsInGrams = (recommendedCalorieIntake * 0.6) / 4; // 60% calories from carbs, 4 calories per gram
+    nutritionRecommendations.add(
+      "Consume ${carbsInGrams.toInt()}g of carbs daily, with higher intake (${(carbsInGrams * 0.4).toInt()}g) before long rides."
+    );
+    
+    // Calculate time-based nutrition windows
+    int rideDuration = safeParseDouble(sessionDuration).toInt() ~/ 60; // Convert seconds to minutes
+    if (rideDuration > 90) {
+      int carbsPerHour = (rideDuration > 150) ? 90 : 60; // Higher intake for rides over 2.5 hours
+      nutritionRecommendations.add(
+        "For your ${rideDuration} minute rides, consume ${carbsPerHour}g carbs per hour during activity."
+      );
+    }
+  } 
+  else { // Leisure
+    nutritionRecommendations.add(
+      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily to maintain weight."
+    );
+    
+    nutritionRecommendations.add(
+      "For leisure rides, proper hydration is more important than nutrition timing. Aim for 500ml of water per hour of riding."
+    );
+  }
+  
+  // Add general BMR-related nutrition advice
+  nutritionRecommendations.add(
+    "Never eat below your BMR of ${calculatedBMR.toInt()} kcal to maintain proper organ function and metabolic health."
+  );
+  
+  // Adjust recommendations based on day of week patterns
+  if (mostFrequentDay.isNotEmpty) {
+    nutritionRecommendations.add(
+      "Increase carbohydrate intake the day before your typical ${mostFrequentDay} rides for better performance."
+    );
+  }
+}
+
+// 3. Enhanced training recommendations using BMR for optimal intensity
+void _generateBMRBasedTrainingRecommendations() {
+  // Clear existing training recommendations
+  trainingRecommendations.clear();
+  
+  // Calculate target heart rate zones based on BMR efficiency
+  double bmrPerKg = calculatedBMR / safeParseDouble(weight);
+  
+  // BMR efficiency can indicate metabolic health - higher BMR/kg generally indicates better metabolic health
+  bool efficientMetabolism = bmrPerKg > 24; // Benchmark value
+  
+  if (goalType == "High Intensity Cycling") {
+    if (efficientMetabolism) {
+      trainingRecommendations.add(
+        "Your BMR of ${calculatedBMR.toInt()} kcal indicates efficient metabolism. Focus on higher intensity intervals (Zone 4-5) for fat loss."
+      );
+      
+      // Recommend more anaerobic work for those with efficient metabolism
+      trainingRecommendations.add(
+        "Include 2 HIIT sessions weekly: 30s all-out effort, 90s recovery, 8-10 repeats."
+      );
+    } else {
+      trainingRecommendations.add(
+        "Your BMR of ${calculatedBMR.toInt()} kcal suggests room for metabolic improvement. Build base with Zone 2 (${zone2HeartRate} bpm) training."
+      );
+      
+      // Recommend more aerobic work to improve metabolic efficiency
+      trainingRecommendations.add(
+        "Focus on 45-60 min Zone 2 rides (${zone2HeartRate} bpm) to increase metabolic efficiency before adding intense intervals."
+      );
+    }
+    
+    // Calculate optimal workout duration based on BMR
+    int optimalDuration = (calculatedBMR * 0.012).toInt(); // Rough formula
+    trainingRecommendations.add(
+      "Based on your metabolic rate, aim for approximately ${optimalDuration} minute workouts for optimal fat burning."
+    );
+  } 
+  else if (goalType == "Endurance") {
+    // For endurance, calculate ideal training zones based on metabolic efficiency
+    if (efficientMetabolism) {
+      trainingRecommendations.add(
+        "Your efficient metabolism (BMR ${calculatedBMR.toInt()} kcal) supports high training volume. Aim for weekly increases of 10% to total distance."
+      );
+    } else {
+      trainingRecommendations.add(
+        "With your BMR of ${calculatedBMR.toInt()} kcal, focus on building metabolic efficiency. Limit Zone 3+ work to 20% of your total training volume."
+      );
+    }
+    
+    // Calculate ideal long ride duration based on BMR and weight
+    double maxRecommendedRideDuration = calculatedBMR * 0.1 / safeParseDouble(weight) * 60; // Convert to minutes
+    trainingRecommendations.add(
+      "Your longest weekly ride should build toward ${maxRecommendedRideDuration.toInt()} minutes as your endurance improves."
+    );
+  }
+  else { // Leisure
+    trainingRecommendations.add(
+      "For leisure riding with your BMR of ${calculatedBMR.toInt()} kcal, aim for 3-4 weekly rides of 30-45 minutes in Zone 2 (${zone2HeartRate} bpm)."
+    );
+  }
+  
+  // Add recovery recommendations based on metabolic rate
+  int recommendedRecoveryHours = efficientMetabolism ? 24 : 36;
+  trainingRecommendations.add(
+    "With your metabolic rate, allow ${recommendedRecoveryHours} hours between high-intensity sessions for proper recovery."
+  );
+}
+
+  Widget _buildCalorieBalanceGraphWithBMR() {
+  // Define the data for the graph including BMR line
+  List<Map<String, dynamic>> dailyData = [];
+  DateTime now = DateTime.now();
+  
+  // Make sure BMR is calculated
+  double bmrValue = calculatedBMR > 0 ? calculatedBMR : safeParseDouble(basalMetabolicRate);
+  if (bmrValue <= 0) {
+    _calculateDailyCalorieNeeds();
+    bmrValue = calculatedBMR;
+  }
+  
+  // Generate last 7 days data
+  for (int i = 6; i >= 0; i--) {
+    DateTime date = now.subtract(Duration(days: i));
+    String dayLabel = DateFormat('E').format(date);
+    
+    // Find activities on this day
+    double dayCaloriesBurned = 0;
+    for (var activity in activityData) {
+      if (activity['start_date'] != null) {
+        DateTime activityDate = activity['start_date'].toDate();
+        if (activityDate.year == date.year && activityDate.month == date.month && activityDate.day == date.day) {
+          dayCaloriesBurned += safeParseDouble(activity['calories_burned']);
+        }
+      }
+    }
+    
+    // Find nutrition data for this day
+    double dayCaloriesConsumed = 0;
+    for (var nutrition in nutritionData) {
+      if (nutrition['timestamp'] != null) {
+        DateTime nutritionDate = nutrition['timestamp'].toDate();
+        if (nutritionDate.year == date.year && nutritionDate.month == date.month && nutritionDate.day == date.day) {
+          dayCaloriesConsumed += safeParseDouble(nutrition['caloriesConsumed']);
+        }
+      }
+    }
+    
+    // Add to daily data with BMR included
+    dailyData.add({
+      'day': dayLabel,
+      'caloriesBurned': dayCaloriesBurned,
+      'tdee': bmrValue + dayCaloriesBurned, // Total daily energy expenditure
+      'bmr': bmrValue, // Base metabolic rate line
+      'caloriesConsumed': dayCaloriesConsumed > 0 ? dayCaloriesConsumed : null,
+      'balance': (bmrValue + dayCaloriesBurned) - (dayCaloriesConsumed > 0 ? dayCaloriesConsumed : 0)
+    });
+  }
+  
+  return _buildGraphContainer(
+    title: "Energy Balance with BMR",
+    subtitle: "Last 7 days",
+    height: 320,
+    child: SfCartesianChart(
+      primaryXAxis: CategoryAxis(
+        majorGridLines: MajorGridLines(width: 0),
+        axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+        labelStyle: TextStyle(
+          color: Colors.grey[700],
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      primaryYAxis: NumericAxis(
+        majorGridLines: MajorGridLines(
+          width: 0.5,
+          color: Colors.grey[200],
+          dashArray: <double>[3, 3],
+        ),
+        axisLine: AxisLine(width: 0),
+        labelFormat: '{value} kcal',
+        labelStyle: TextStyle(
+          color: Colors.grey[700],
+          fontFamily: 'Inter',
+          fontSize: 10,
+        ),
+      ),
+      legend: Legend(
+        isVisible: true,
+        position: LegendPosition.bottom,
+        overflowMode: LegendItemOverflowMode.wrap,
+      ),
+      tooltipBehavior: TooltipBehavior(
+        enable: true,
+        color: Colors.grey[800],
+        textStyle: TextStyle(color: Colors.white, fontSize: 12),
+      ),
+      series: <ChartSeries>[
+        // BMR base line
+        LineSeries<Map<String, dynamic>, String>(
+          name: 'BMR (${bmrValue.toInt()} kcal)',
+          dataSource: dailyData,
+          xValueMapper: (data, _) => data['day'],
+          yValueMapper: (data, _) => data['bmr'],
+          color: Colors.purple[700],
+          width: 2,
+          dashArray: <double>[5, 5], // Dashed line
+        ),
+        // Total Daily Energy Expenditure (BMR + Activity)
+        AreaSeries<Map<String, dynamic>, String>(
+          name: 'TDEE',
+          dataSource: dailyData,
+          xValueMapper: (data, _) => data['day'],
+          yValueMapper: (data, _) => data['tdee'],
+          color: Colors.green[400]!.withOpacity(0.5),
+          borderColor: Colors.green[600],
+          borderWidth: 2,
+        ),
+        // Calories Consumed
+        ColumnSeries<Map<String, dynamic>, String>(
+          name: 'Calories Consumed',
+          dataSource: dailyData.where((d) => d['caloriesConsumed'] != null).toList(),
+          xValueMapper: (data, _) => data['day'],
+          yValueMapper: (data, _) => data['caloriesConsumed'],
+          color: Colors.orange[500],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+        ),
+        // Calorie Balance (Net)
+        LineSeries<Map<String, dynamic>, String>(
+          name: 'Net Balance',
+          dataSource: dailyData.where((d) => d['caloriesConsumed'] != null).toList(),
+          xValueMapper: (data, _) => data['day'],
+          yValueMapper: (data, _) => data['balance'],
+          color: Colors.blue[700],
+          width: 2,
+          markerSettings: MarkerSettings(
+            isVisible: true,
+            shape: DataMarkerType.circle,
+            color: Colors.blue[700],
+            borderColor: Colors.white,
+            borderWidth: 2,
+            height: 6,
+            width: 6,
+          ),
+        ),
+      ],
+    )
+  );
+}
+
 bool _isSubgoalCompleted() {
   if (!hasActiveSubgoal) return false;
   
