@@ -58,6 +58,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
+  TextEditingController _updateMetabolicRateController = TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -2191,6 +2192,164 @@ Widget _buildActiveSubgoalCard() {
     }
   }
 
+  void _showUpdateWeightDialog() {
+  _updateWeightController.text = "";
+  _updateBodyFatController.text = "";
+  _updateMetabolicRateController.text = "";
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          "Update Your Progress",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 22,
+            color: primaryBlack,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _updateWeightController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                labelText: "Current Weight (kg)",
+                labelStyle: const TextStyle(color: Colors.black),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _updateBodyFatController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                labelText: "Body Fat Percentage (%)",
+                labelStyle: const TextStyle(color: Colors.black),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          SizedBox(height: 16),
+            TextField(
+              controller: _updateMetabolicRateController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                labelText: "Metabolic Rate",
+                labelStyle: const TextStyle(color: Colors.black),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text(
+              "Cancel",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                color: primaryGray,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _updateUserMetrics();
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryOrange,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text(
+              "Save",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _updateUserMetrics() async {
+  try {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    
+    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
+    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+    double newMetabolicRate = double.tryParse(_updateMetabolicRateController.text) ?? 0;
+    
+    final userDataQuery = await FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: uid)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+    
+    Map<String, dynamic> newData = {
+      'uid': uid,
+      'timestamp': FieldValue.serverTimestamp(),
+      'weight': newWeight,
+      'bodyFat': newBodyFat,
+      'basalMetabolicRate': newMetabolicRate,	
+    };
+    
+    if (userDataQuery.docs.isNotEmpty) {
+      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
+      existingData.forEach((key, value) {
+        if (key != 'uid' && key != 'timestamp' && key != 'weight' && key != 'bodyFat') {
+          newData[key] = value;
+        }
+      });
+    }
+    
+    await FirebaseFirestore.instance
+        .collection('userData')
+        .add(newData);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Progress updated successfully!'))
+    );
+    
+    await _loadUserGoalAndActivities();
+    
+  } catch (e) {
+    print('Error updating metrics: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to update progress: $e'))
+    );
+  }
+}
+
 Widget _buildProgressCard(String title, double progress, double target, String unit, Color color, IconData icon, {String? helpText}) {
   final percentage = (progress / target).clamp(0.0, 1.0);
 
@@ -2468,11 +2627,36 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       durationHelperText = "Excellent! You're meeting your duration targets.";
     }
 
-     if (goalType == 'High Intensity Cycling') {
+      if (goalType == 'High Intensity Cycling') {
   return FadeTransition(
     opacity: _fadeAnimation,
     child: Column(
       children: [
+        // Update Weight Button
+        Container(
+          margin: const EdgeInsets.only(bottom: 5, top: 15),
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _showUpdateWeightDialog,
+            icon: const Icon(Icons.update, color: Colors.white),
+            label: const Text(
+              "Update Weight & Body Fat",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryOrange,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        
         // Add the subgoal card here
         if (hasActiveSubgoal) _buildActiveSubgoalCard(),
         
