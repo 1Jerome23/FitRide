@@ -169,7 +169,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String humidity = "0";
   String weatherCondition = "-";
   String airQuality = "Good"; // Air Quality Index category or value
-  int airQualityIndex = 0; // Numerical AQI value
 
   // Nutrition data
   String foodIntake = "-";
@@ -198,8 +197,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double previousAverageSpeed = 0.0;
   double latestAverageHeartrate = 0.0;
   double previousAverageHeartrate = 0.0;
-  int latestAirQualityIndex = 0;
-  int previousAirQualityIndex = 0;
 
   // Historical trend analysis
   Map<String, dynamic> trendAnalysis = {};
@@ -436,6 +433,7 @@ Future<void> _fetchFoodDiaryData() async {
     print("Error fetching food diary data: $e");
   }
 }
+
 void _generateNutritionRecommendationsFromFoodDiary() {
   // Clear previous recommendations
   nutritionRecommendations.clear();
@@ -455,15 +453,6 @@ void _generateNutritionRecommendationsFromFoodDiary() {
   
   // Calculate caloric needs based on activity level and goal
   double bmr = safeParseDouble(basalMetabolicRate);
-  if (bmr == 0) {
-    // Estimate BMR if not available
-    if (gender.toLowerCase() == "male") {
-      bmr = 88.362 + (13.397 * safeParseDouble(weight)) + (4.799 * safeParseDouble(height)) - (5.677 * age);
-    } else {
-      bmr = 447.593 + (9.247 * safeParseDouble(weight)) + (3.098 * safeParseDouble(height)) - (4.330 * age);
-    }
-  }
-  
   // Activity factor based on goal type
   double activityFactor = 1.2; // Base sedentary
   if (goalType == "Leisure") {
@@ -492,10 +481,28 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.add("Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than recommended. Aim for 20-25% of daily calories at breakfast for sustained energy.");
   }
   
+  // Lunch-specific recommendations
+  if (lunchPercent < 25 && totalCalories > 0) {
+    nutritionRecommendations.add("Your lunch (${lunchPercent.toInt()}% of daily calories) is smaller than ideal. Aim for 25-30% of daily calories at lunch to fuel afternoon activities.");
+  } else if (lunchPercent > 45 && totalCalories > 0) {
+    nutritionRecommendations.add("Your lunch (${lunchPercent.toInt()}% of daily calories) is quite large. Consider a more moderate portion to avoid afternoon energy slumps.");
+  }
+  
+  // Tailored lunch content recommendations based on goal type
+  if (goalType == "Endurance") {
+    nutritionRecommendations.add("For endurance training, include a balanced lunch with lean protein, complex carbs, and healthy fats. Good options include whole grain sandwiches with lean protein, pasta with vegetables, or grain bowls.");
+    // If an afternoon ride is likely
+    nutritionRecommendations.add("If cycling in the afternoon, have a lunch rich in complex carbs 2-3 hours before your ride, and include easily digestible foods.");
+  } else if (goalType == "High Intensity Cycling") {
+    nutritionRecommendations.add("For high-intensity training, your lunch should include quality protein (chicken, fish, tofu, legumes) paired with complex carbs and plenty of vegetables.");
+    nutritionRecommendations.add("If training within 2 hours after lunch, keep the meal lighter and focus on easily digestible carbs with moderate protein.");
+  } else if (goalType == "Leisure") {
+    nutritionRecommendations.add("For leisure cycling, focus on balanced lunches with colorful vegetables, lean proteins, and whole grains. This supports general health and provides steady energy for casual rides.");
+  }
+  
   if (dinnerPercent > 50 && totalCalories > 0) {
     nutritionRecommendations.add("Your dinner makes up ${dinnerPercent.toInt()}% of your daily calories. Try to shift more calories to earlier meals for better energy distribution throughout the day.");
   }
-  
   // Activity-specific recommendations
   if (goalType == "Endurance") {
     nutritionRecommendations.add("For endurance training, focus on complex carbs (50-60% of calories) like whole grains, fruits, and starchy vegetables.");
@@ -511,7 +518,6 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.add("For leisure cycling, maintain balanced nutrition with plenty of fruits and vegetables (5+ servings/day).");
   }
   
-  // Hydration reminder - always valuable
   nutritionRecommendations.add("Remember to stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
 }
 
@@ -593,13 +599,10 @@ Widget _buildFoodItem(String meal, String description, String calories) {
 Widget _buildSubgoalSelectionCard() {
   if (hasActiveSubgoal || goalType != "High Intensity Cycling") return SizedBox.shrink();
   
-  // Get the number of days per week from the user's goal
   int targetDaysPerWeek = int.tryParse(daysPerWeek) ?? 0;
   
-  // Check if the user has completed their weekly commitment
   bool hasCompletedWeeklyCommitment = weeklyActivityCount >= targetDaysPerWeek;
   
-  // If the user hasn't completed their weekly commitment, show a message instead
   if (!hasCompletedWeeklyCommitment || targetDaysPerWeek == 0) {
     return Container(
       margin: EdgeInsets.only(top: 20, bottom: 20),
@@ -740,12 +743,10 @@ Widget _buildSubgoalSelectionCard() {
     );
   }
   
-  // Calculate baseline if it hasn't been calculated yet
   if (baselineDistance == 0.0) {
     _calculateBaselines();
   }
   
-  // Make sure we have sufficient activity data from the past week
   if (activityData.isEmpty || weeklyActivityCount < 2) {
     return Container(
       margin: EdgeInsets.only(top: 20, bottom: 20),
@@ -815,17 +816,14 @@ Widget _buildSubgoalSelectionCard() {
     );
   }
   
-  // Define goal options based on user's current weekly average performance
-  double distanceOption1 = math.max(baselineDistance * 1.1, baselineDistance + 1).roundToDouble(); // 10% increase or +1km
-  double distanceOption2 = math.max(baselineDistance * 1.2, baselineDistance + 2).roundToDouble(); // 20% increase or +2km
+  double distanceOption1 = math.max(baselineDistance * 1.1, baselineDistance + 1).roundToDouble(); 
+  double distanceOption2 = math.max(baselineDistance * 1.2, baselineDistance + 2).roundToDouble(); 
   
-  // For pace, lower is better (faster pace)
   double paceOption1 = baselinePace > 0 ? math.max(baselinePace * 0.95, baselinePace - 0.5) : 0;
   double paceOption2 = baselinePace > 0 ? math.max(baselinePace * 0.9, baselinePace - 1) : 0;
   
-  // For duration, longer is more challenging
-  double durationOption1 = math.max(baselineDuration * 1.1, baselineDuration + 10).roundToDouble(); // 10% increase or +10 min
-  double durationOption2 = math.max(baselineDuration * 1.2, baselineDuration + 15).roundToDouble(); // 20% increase or +15 min
+  double durationOption1 = math.max(baselineDuration * 1.1, baselineDuration + 10).roundToDouble(); 
+  double durationOption2 = math.max(baselineDuration * 1.2, baselineDuration + 15).roundToDouble(); 
   
   return Container(
     margin: EdgeInsets.only(top: 20, bottom: 20),
@@ -881,7 +879,6 @@ Widget _buildSubgoalSelectionCard() {
         ),
         SizedBox(height: 16),
         
-        // Current weekly averages information box
         Container(
           padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -1009,7 +1006,6 @@ Widget _buildSubgoalSelectionCard() {
         
         SizedBox(height: 16),
         
-        // Pace option (if baseline pace is available)
         if (baselinePace > 0) ...[
           _buildSubgoalOptionTitle("Weekly Average Pace", Icons.speed_outlined),
           SizedBox(height: 8),
@@ -1040,7 +1036,6 @@ Widget _buildSubgoalSelectionCard() {
         
         SizedBox(height: 16),
         
-        // Duration option
         _buildSubgoalOptionTitle("Weekly Average Duration", Icons.timer_outlined),
         SizedBox(height: 8),
         Row(
@@ -1069,7 +1064,6 @@ Widget _buildSubgoalSelectionCard() {
         
         SizedBox(height: 16),
         
-        // Maintain current performance
         _buildSubgoalOptionTitle("Maintain Current Level", Icons.equalizer_outlined),
         SizedBox(height: 8),
         InkWell(
@@ -1112,7 +1106,6 @@ Widget _buildSubgoalSelectionCard() {
         
         SizedBox(height: 16),
         
-        // Weekly average explanation
         Container(
           padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -1138,9 +1131,7 @@ Widget _buildSubgoalSelectionCard() {
   );
 }
 
-
 void _calculateBaselines() {
-  // We specifically want to calculate weekly averages
   if (activityData.isEmpty) return;
   
   List<double> distances = [];
@@ -1160,14 +1151,12 @@ void _calculateBaselines() {
     }
   }
   
-  // If no activities this week, fall back to the most recent activities
   if (thisWeeksActivities.isEmpty) {
     // Get last 5 activities or fewer if less data is available
     int count = math.min(activityData.length, 5);
     thisWeeksActivities = activityData.sublist(0, count);
   }
   
-  // Calculate metrics from activities
   for (var activity in thisWeeksActivities) {
     double distance = safeParseDouble(activity['distance']);
     double durationSeconds = safeParseDouble(activity['elapsed_time']);
@@ -1176,14 +1165,12 @@ void _calculateBaselines() {
     if (distance > 0) distances.add(distance);
     if (durationMinutes > 0) durations.add(durationMinutes);
     
-    // Calculate pace (minutes per km)
     if (distance > 0 && durationMinutes > 0) {
       double pace = durationMinutes / distance;
       paces.add(pace);
     }
   }
   
-  // Calculate averages - these represent the weekly averages
   if (distances.isNotEmpty) {
     baselineDistance = distances.reduce((a, b) => a + b) / distances.length;
   }
@@ -1197,7 +1184,6 @@ void _calculateBaselines() {
   }
 }
 
-// Section title widget helper
 Widget _buildSubgoalOptionTitle(String title, IconData icon) {
   return Row(
     children: [
@@ -1215,7 +1201,6 @@ Widget _buildSubgoalOptionTitle(String title, IconData icon) {
   );
 }
 
-// Option button widget helper
 Widget _buildSubgoalOptionButton(
   String title, 
   String value, 
@@ -1265,713 +1250,6 @@ Widget _buildSubgoalOptionButton(
     ),
   );
 }
-
-// Widget to display active subgoal
-Widget _buildActiveSubgoalCard() {
-  if (!hasActiveSubgoal) return SizedBox.shrink();
-  
-  // Calculate days remaining
-  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
-  if (daysRemaining < 0) daysRemaining = 0;
-  
-  // Calculate current week's average performance
-  double currentWeekAvgDistance = 0.0;
-  double currentWeekAvgPace = 0.0;
-  double currentWeekAvgDuration = 0.0;
-  
-  // Get activities from the current week for calculating current averages
-  DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
-  List<double> currentWeekDistances = [];
-  List<double> currentWeekPaces = [];
-  List<double> currentWeekDurations = [];
-  
-  for (var activity in activityData) {
-    if (activity['start_date'] != null) {
-      DateTime activityDate = activity['start_date'].toDate();
-      if (activityDate.isAfter(oneWeekAgo)) {
-        double distance = safeParseDouble(activity['distance']);
-        double durationSeconds = safeParseDouble(activity['elapsed_time']);
-        double durationMinutes = durationSeconds / 60.0;
-        
-        if (distance > 0) currentWeekDistances.add(distance);
-        if (durationMinutes > 0) currentWeekDurations.add(durationMinutes);
-        
-        // Calculate pace (minutes per km)
-        if (distance > 0 && durationMinutes > 0) {
-          double pace = durationMinutes / distance;
-          currentWeekPaces.add(pace);
-        }
-      }
-    }
-  }
-  
-  // Calculate current week's averages
-  if (currentWeekDistances.isNotEmpty) {
-    currentWeekAvgDistance = currentWeekDistances.reduce((a, b) => a + b) / currentWeekDistances.length;
-  } else {
-    // Fall back to latest activity if no weekly data
-    currentWeekAvgDistance = latestDistance; 
-  }
-  
-  if (currentWeekPaces.isNotEmpty) {
-    currentWeekAvgPace = currentWeekPaces.reduce((a, b) => a + b) / currentWeekPaces.length;
-  } else if (latestDistance > 0 && safeParseDouble(sessionDuration) > 0) {
-    // Fall back to latest activity if no weekly data
-    currentWeekAvgPace = (safeParseDouble(sessionDuration) / 60) / latestDistance;
-  } else {
-    currentWeekAvgPace = baselinePace;
-  }
-  
-  if (currentWeekDurations.isNotEmpty) {
-    currentWeekAvgDuration = currentWeekDurations.reduce((a, b) => a + b) / currentWeekDurations.length;
-  } else {
-    // Fall back to latest activity if no weekly data
-    currentWeekAvgDuration = safeParseDouble(sessionDuration) / 60;
-  }
-  
-  // Calculate progress based on subgoal type using weekly averages
-  double progressPercent = 0.0;
-  String currentValueText = "";
-  String targetValueText = "";
-  String baselineValueText = "";
-  bool isCompleted = false;
-  
-  switch (subgoalType) {
-    case "distance":
-      // Calculate progress using weekly averages
-      double baselineDistance = this.baselineDistance; // Average distance from previous week
-      double targetDistance = subgoalTargetValue;      // Target average distance for this week
-      
-      // Calculate progress as a percentage of the additional distance needed
-      if (targetDistance > baselineDistance) {
-        // Progress is how much of the gap between baseline and target has been covered
-        progressPercent = (currentWeekAvgDistance - baselineDistance) / (targetDistance - baselineDistance);
-        
-        // Check if goal is completed
-        isCompleted = currentWeekAvgDistance >= targetDistance;
-        
-        // Cap progress between 0-100%
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        // If target is somehow lower than baseline, show 100% progress
-        progressPercent = 1.0;
-        isCompleted = true;
-      }
-      
-      currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
-      baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
-      targetValueText = "${targetDistance.toStringAsFixed(1)} km";
-      break;
-      
-    case "pace":
-      // For pace, lower is better (faster)
-      double baselinePace = this.baselinePace;     // Average pace from previous week
-      double targetPace = subgoalTargetValue;      // Target average pace for this week
-      
-      // Calculate progress from baseline to target (remember, for pace lower is better)
-      if (baselinePace > targetPace) {
-        // Progress is how much of the gap between baseline and target has been covered
-        progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - targetPace);
-        
-        // Check if goal is completed
-        isCompleted = currentWeekAvgPace <= targetPace;
-        
-        // Cap progress between 0-100%
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        // If baseline is somehow faster than target, show 100% progress
-        progressPercent = 1.0;
-        isCompleted = true;
-      }
-      
-      currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
-      baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
-      targetValueText = "${targetPace.toStringAsFixed(1)} min/km";
-      break;
-      
-    case "duration":
-      double baselineDuration = this.baselineDuration;  // Average duration from previous week
-      double targetDuration = subgoalTargetValue;       // Target average duration for this week
-      
-      // Calculate progress from baseline to target
-      if (targetDuration > baselineDuration) {
-        // Progress is how much of the gap between baseline and target has been covered
-        progressPercent = (currentWeekAvgDuration - baselineDuration) / (targetDuration - baselineDuration);
-        
-        // Check if goal is completed
-        isCompleted = currentWeekAvgDuration >= targetDuration;
-        
-        // Cap progress between 0-100%
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        // If target is somehow shorter than baseline, show 100% progress
-        progressPercent = 1.0;
-        isCompleted = true;
-      }
-      
-      currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
-      baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
-      targetValueText = "${targetDuration.toStringAsFixed(0)} min";
-      break;
-      
-    case "maintain":
-      // For maintenance, we calculate how close the current average is to the baseline
-      double baseline = 0.0;
-      double current = 0.0;
-      double tolerance = 0.0;
-      
-      switch (subgoalTargetValue.toInt()) {
-        case 1: // Maintain distance
-          baseline = baselineDistance;
-          current = currentWeekAvgDistance;
-          tolerance = baseline * 0.1; // 10% tolerance
-          break;
-        case 2: // Maintain pace
-          baseline = baselinePace;
-          current = currentWeekAvgPace;
-          tolerance = baseline * 0.1; // 10% tolerance
-          break;
-        case 3: // Maintain duration
-          baseline = baselineDuration;
-          current = currentWeekAvgDuration;
-          tolerance = baseline * 0.1; // 10% tolerance
-          break;
-        default:
-          baseline = baselineDistance;
-          current = currentWeekAvgDistance;
-          tolerance = baseline * 0.1;
-      }
-      
-      // Calculate how far the current value is from baseline, as a percentage of tolerance
-      double deviation = math.cos(current - baseline) / tolerance;
-      
-      // Convert to a progress percentage (closer to baseline = higher progress)
-      progressPercent = 1.0 - math.min(deviation, 1.0);
-      
-      // For maintain goal, consider it completed after a week of maintenance
-      isCompleted = currentWeekDistances.length >= 3 && progressPercent >= 0.8;
-      
-      currentValueText = "Current: ${currentWeekAvgDistance.toStringAsFixed(1)} km";
-      baselineValueText = "Target: Maintain baseline";
-      targetValueText = "";
-      break;
-  }
-  
-  // Get goal title
-  String goalTitle = "";
-  
-  switch (subgoalType) {
-    case "distance":
-      goalTitle = "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
-      break;
-    case "pace":
-      goalTitle = "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
-      break;
-    case "duration":
-      goalTitle = "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
-      break;
-    case "maintain":
-      goalTitle = "Maintain current cycling performance";
-      break;
-  }
-  
-  Color progressColor = progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
-  
-  // If the goal is completed, show completion card
-  if (isCompleted && progressPercent >= 1.0) {
-    return Container(
-      margin: EdgeInsets.only(top: 20, bottom: 20),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Goal Achieved!",
-                style: GoogleFonts.roboto(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.green[300]!, width: 1),
-                ),
-                child: Text(
-                  "100% Complete",
-                  style: GoogleFonts.lato(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[700],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
-          Text(
-            "Congratulations! You've achieved your weekly goal:",
-            style: GoogleFonts.lato(
-              fontSize: 16,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            goalTitle,
-            style: GoogleFonts.lato(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              // Reset the subgoal
-              _resetCompletedSubgoal();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[600],
-              padding: EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                "Set New Goal",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // If not completed, show the regular progress card
-  return Container(
-    margin: EdgeInsets.only(top: 20, bottom: 20),
-    padding: EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 2,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "This Week's Cycling Goal",
-              style: GoogleFonts.roboto(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.orange[300]!, width: 1),
-              ),
-              child: Text(
-                "$daysRemaining days left",
-                style: GoogleFonts.lato(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 12),
-        
-        // Goal description - clarify this is based on weekly averages
-        Text(
-          goalTitle,
-          style: GoogleFonts.lato(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        
-        SizedBox(height: 16),
-        
-        // Progress visualization with baseline included
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subgoalType != "maintain") ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Last Week's Avg: $baselineValueText",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  Text(
-                    "Target Avg: $targetValueText",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Current Avg: $currentValueText",
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-            ] else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    currentValueText,
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-            ],
-            Stack(
-              children: [
-                Container(
-                  height: 8,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Container(
-                  height: 8,
-                  width: MediaQuery.of(context).size.width * 0.7 * progressPercent,
-                  decoration: BoxDecoration(
-                    color: progressColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              subgoalType == "maintain" 
-                  ? "Maintaining consistent performance"
-                  : "${(progressPercent * 100).toInt()}% of goal achieved",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            if (currentWeekDistances.length > 0) ...[
-              SizedBox(height: 4),
-              Text(
-                "Based on ${currentWeekDistances.length} activities this week",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ],
-        ),
-        
-        SizedBox(height: 16),
-        
-        // Divider
-        Divider(),
-        
-        // Suggestions title
-        Text(
-          "Action Plan:",
-          style: GoogleFonts.lato(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        
-        SizedBox(height: 8),
-        
-        // Suggestions list
-        Column(
-          children: subgoalSuggestions.map((suggestion) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.check_circle_outline, size: 16, color: Colors.green[700]),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    suggestion,
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                ),
-              ],
-            ),
-          )).toList(),
-        ),
-        
-        // Warnings if available
-        if (subgoalWarnings.isNotEmpty) ...[
-          SizedBox(height: 12),
-          Text(
-            "Important Notes:",
-            style: GoogleFonts.lato(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Column(
-            children: subgoalWarnings.map((warning) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.warning_amber_outlined, size: 16, color: Colors.orange[700]),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      warning,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
-          ),
-        ],
-      ],
-    ),
-  );
-}
-
-// Add this method to reset the subgoal
-Future<void> _resetCompletedSubgoal() async {
-  if (userId == null) return;
-  
-  try {
-    // First, mark the completed subgoal as completed in Firestore
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: userId)
-        .where('endDate', isGreaterThan: DateTime.now())
-        .orderBy('endDate', descending: false)
-        .limit(1)
-        .get();
-    
-    if (subgoalQuery.docs.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('cycling_subgoals')
-          .doc(subgoalQuery.docs.first.id)
-          .update({
-            'completedAt': DateTime.now(),
-            'endDate': DateTime.now(), // Set end date to now so it won't show up in future queries
-            'isCompleted': true
-          });
-    }
-    
-    // Reset local state
-    setState(() {
-      hasActiveSubgoal = false;
-      subgoalType = "";
-      subgoalTargetValue = 0.0;
-      subgoalSuggestions = [];
-      subgoalWarnings = [];
-    });
-    
-    // Recalculate baselines for the next subgoal
-    _calculateBaselines();
-  } catch (e) {
-    print("Error resetting completed subgoal: $e");
-  }
-}
-
-  void _calculateBaselineComparison() {
-    if (activityData.length < 4) return;
-
-    // Split data into baseline period (first half) and current period (second half)
-    int midpoint = activityData.length ~/ 2;
-    List<Map<String, dynamic>> baselineActivities =
-        activityData.sublist(midpoint);
-    List<Map<String, dynamic>> currentActivities =
-        activityData.sublist(0, midpoint);
-
-    // Calculate activity metrics
-    Map<String, dynamic> activityComparison = {};
-
-    // Distance comparison
-    double baselineAvgDistance = baselineActivities
-            .map((a) => safeParseDouble(a['distance']))
-            .reduce((a, b) => a + b) /
-        baselineActivities.length;
-
-    double currentAvgDistance = currentActivities
-            .map((a) => safeParseDouble(a['distance']))
-            .reduce((a, b) => a + b) /
-        currentActivities.length;
-
-    double distanceChange =
-        ((currentAvgDistance - baselineAvgDistance) / baselineAvgDistance) *
-            100;
-
-    // Speed comparison
-    double baselineAvgSpeed = baselineActivities
-            .map((a) => safeParseDouble(a['average_speed']))
-            .reduce((a, b) => a + b) /
-        baselineActivities.length;
-
-    double currentAvgSpeed = currentActivities
-            .map((a) => safeParseDouble(a['average_speed']))
-            .reduce((a, b) => a + b) /
-        currentActivities.length;
-
-    double speedChange =
-        ((currentAvgSpeed - baselineAvgSpeed) / baselineAvgSpeed) * 100;
-
-    // Heart rate comparison
-    double baselineAvgHeartRate = baselineActivities
-            .map((a) => safeParseDouble(a['average_heartrate']))
-            .reduce((a, b) => a + b) /
-        baselineActivities.length;
-
-    double currentAvgHeartRate = currentActivities
-            .map((a) => safeParseDouble(a['average_heartrate']))
-            .reduce((a, b) => a + b) /
-        currentActivities.length;
-
-    double heartRateChange =
-        ((currentAvgHeartRate - baselineAvgHeartRate) / baselineAvgHeartRate) *
-            100;
-
-    activityComparison = {
-      'baselineAvgDistance': baselineAvgDistance,
-      'currentAvgDistance': currentAvgDistance,
-      'distanceChange': distanceChange,
-      'baselineAvgSpeed': baselineAvgSpeed,
-      'currentAvgSpeed': currentAvgSpeed,
-      'speedChange': speedChange,
-      'baselineAvgHeartRate': baselineAvgHeartRate,
-      'currentAvgHeartRate': currentAvgHeartRate,
-      'heartRateChange': heartRateChange,
-    };
-
-    // For High Intensity goal, add body composition metrics
-    if (goalType == "High Intensity Cycling" && recentData.length >= 4) {
-      Map<String, dynamic> bodyComparison = {};
-
-      // Split body data for baseline and current periods
-      List<Map<String, dynamic>> baselineBody =
-          recentData.sublist(recentData.length ~/ 2);
-      List<Map<String, dynamic>> currentBody =
-          recentData.sublist(0, recentData.length ~/ 2);
-
-      // Weight comparison
-      double baselineWeight = baselineBody
-              .map((b) => safeParseDouble(b['weight']))
-              .reduce((a, b) => a + b) /
-          baselineBody.length;
-
-      double currentWeight = currentBody
-              .map((b) => safeParseDouble(b['weight']))
-              .reduce((a, b) => a + b) /
-          currentBody.length;
-
-      double weightChange =
-          ((currentWeight - baselineWeight) / baselineWeight) * 100;
-
-      // Body fat comparison
-      double baselineBodyFat = baselineBody
-              .map((b) => safeParseDouble(b['bodyFat']))
-              .reduce((a, b) => a + b) /
-          baselineBody.length;
-
-      double currentBodyFat = currentBody
-              .map((b) => safeParseDouble(b['bodyFat']))
-              .reduce((a, b) => a + b) /
-          currentBody.length;
-
-      double bodyFatChange =
-          ((currentBodyFat - baselineBodyFat) / baselineBodyFat) * 100;
-
-      bodyComparison = {
-        'baselineWeight': baselineWeight,
-        'currentWeight': currentWeight,
-        'weightChange': weightChange,
-        'baselineBodyFat': baselineBodyFat,
-        'currentBodyFat': currentBodyFat,
-        'bodyFatChange': bodyFatChange,
-      };
-
-      baselineComparison = {
-        'activity': activityComparison,
-        'body': bodyComparison,
-      };
-    } else {
-      baselineComparison = {
-        'activity': activityComparison,
-      };
-    }
-  }
 
   Future<void> _fetchUserData() async {
     if (userId == null) return;
@@ -2037,13 +1315,12 @@ Future<void> _resetCompletedSubgoal() async {
         print("Error fetching Strava User ID: $e");
       }
 
-      // Fetch MORE activities data for historical analysis (increased limit from 10 to 30)
       QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
           .collection('activities')
           .where('uid', isEqualTo: userId)
           .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
           .orderBy('start_date', descending: true)
-          .limit(30) // Increased to get more historical data
+          .limit(30) 
           .get();
 
       if (activitiesQuery.docs.isNotEmpty) {
@@ -2055,13 +1332,10 @@ Future<void> _resetCompletedSubgoal() async {
           newActivityData.add({
             "documentId": doc.id,
             "average_heartrate": data['average_heartrate'],
-            "max_heartrate": data['max_heartrate'] ?? "0",
             "average_speed": data['average_speed'],
-            "max_speed": data['max_speed'] ?? "0",
             "calories_burned": data['calories_burned'],
             "distance": data['distance'],
             "elapsed_time": data['elapsed_time'],
-            "elevation_gain": data['elevation_gain'] ?? "0",
             "name": data['name'],
             "start_date": data['start_date'],
             "type": data['type'],
@@ -2119,7 +1393,6 @@ Future<void> _resetCompletedSubgoal() async {
 
         setState(() {
           age = int.tryParse(data['age']?.toString() ?? '30') ?? 30;
-          gender = data['gender'] ?? "-";
           healthCondition = data['healthCondition'] ?? "-";
 
           // Parse health conditions into specific types
@@ -2164,7 +1437,7 @@ Future<void> _resetCompletedSubgoal() async {
             .collection('after_exercise')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
-            .limit(20) // Increased for better historical analysis
+            .limit(20)
             .get();
 
         print(
@@ -2179,16 +1452,9 @@ Future<void> _resetCompletedSubgoal() async {
             newRecentData.add({
               "documentId": doc.id,
               "currentLevel": data['currentLevel'],
-              "estimatedCalories": data['estimatedCalories'],
-              "foodTaken": data['foodTaken'] ?? "-",
-              "hydration": data['hydration'],
-              "levelOfExertion": data['levelOfExertion'],
               "timestamp": data['timestamp'],
               "userId": data['userId'],
               "weight": data['weight'] ?? weight,
-              "bodyFat": data['bodyFat'] ?? bodyFat,
-              "sleepHours": data['sleepHours'] ?? "0",
-              "recoveryScore": data['recoveryScore'] ?? "0",
             });
           }
 
@@ -2209,10 +1475,10 @@ Future<void> _resetCompletedSubgoal() async {
       // Fetch weather and air quality data
       try {
         QuerySnapshot weatherSnapshot = await FirebaseFirestore.instance
-            .collection('weather')
+            .collection('weatherData')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
-            .limit(5) // Get more weather history
+            .limit(5) 
             .get();
 
         if (weatherSnapshot.docs.isNotEmpty) {
@@ -2225,9 +1491,7 @@ Future<void> _resetCompletedSubgoal() async {
               "documentId": doc.id,
               "temperature": data['temperature'] ?? "0",
               "humidity": data['humidity'] ?? "0",
-              "weatherCondition": data['weatherCondition'] ?? "-",
               "airQuality": data['airQuality'] ?? "Good",
-              "airQualityIndex": data['airQualityIndex'] ?? 0,
               "timestamp": data['timestamp'],
             });
           }
@@ -2237,26 +1501,8 @@ Future<void> _resetCompletedSubgoal() async {
             if (weatherData.isNotEmpty) {
               temperature = weatherData[0]['temperature'].toString();
               humidity = weatherData[0]['humidity'].toString();
-              weatherCondition = weatherData[0]['weatherCondition'];
               airQuality = weatherData[0]['airQuality'];
-              airQualityIndex = weatherData[0]['airQualityIndex'] is int
-                  ? weatherData[0]['airQualityIndex']
-                  : int.tryParse(
-                          weatherData[0]['airQualityIndex'].toString()) ??
-                      0;
 
-              // Store for comparison if we have multiple weather entries
-              latestAirQualityIndex = airQualityIndex;
-              if (weatherData.length > 1) {
-                previousAirQualityIndex =
-                    weatherData[1]['airQualityIndex'] is int
-                        ? weatherData[1]['airQualityIndex']
-                        : int.tryParse(
-                                weatherData[1]['airQualityIndex'].toString()) ??
-                            0;
-              }
-
-              // Determine seasonal advice based on current weather
               _generateSeasonalAdvice();
             }
           });
@@ -2264,11 +1510,9 @@ Future<void> _resetCompletedSubgoal() async {
       } catch (e) {
         print("Weather data collection may not exist: $e");
       }
-
-      // Fetch nutrition data - assuming a 'nutrition' collection exists
       try {
         QuerySnapshot nutritionSnapshot = await FirebaseFirestore.instance
-            .collection('nutrition')
+            .collection('food_entries')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
             .limit(7) // Get a week's worth of nutrition data
@@ -2282,54 +1526,35 @@ Future<void> _resetCompletedSubgoal() async {
 
             newNutritionData.add({
               "documentId": doc.id,
-              "foodIntake": data['foodIntake'] ?? "-",
-              "foodType": data['foodType'] ?? "-",
-              "caloriesConsumed": data['caloriesConsumed'] ?? "0",
-              "proteinIntake": data['proteinIntake'] ?? "0",
-              "carbIntake": data['carbIntake'] ?? "0",
-              "fatIntake": data['fatIntake'] ?? "0",
+              "breakfast_calories": data['breakfast_calories'] ?? "-",
+              "lunch_calories": data['lunch_calories'] ?? "-",
+              "dinner_calories": data['dinner_calories'] ?? "0",
+              "total_calories": data['total_calories'] ?? "0",
               "timestamp": data['timestamp'],
             });
-          }
-
-          setState(() {
-            nutritionData = newNutritionData;
-            if (nutritionData.isNotEmpty) {
-              foodIntake = nutritionData[0]['foodIntake'];
-              foodType = nutritionData[0]['foodType'];
-              caloriesConsumed =
-                  nutritionData[0]['caloriesConsumed'].toString();
+              }
             }
+          } catch (e) {
+            print("Nutrition data collection may not exist: $e");
+          }
+          await _fetchFoodDiaryData();
+          // Generate recommendations based on the fetched data
+          _generateRecommendation();
+          if (goalType == "High Intensity Cycling") {
+            _calculateBaselines(); 
+            await _fetchActiveSubgoal(); 
+          }
+          setState(() {
+            _isLoadingGraphs = false;
           });
-        }
-      } catch (e) {
-        print("Nutrition data collection may not exist: $e");
-      }
-await _fetchFoodDiaryData();
-      // Generate recommendations based on the fetched data
-      _generateRecommendation();
-
-      _calculateBaselineComparison();
-      if (goalType == "High Intensity Cycling") {
-        _calculateBaselines(); // Calculate baseline metrics
-        await _fetchActiveSubgoal(); // Check for any active subgoals
-      }
-      setState(() {
-        _isLoadingGraphs = false;
-      });
     } catch (e) {
-      setState(() {
-        recommendation = "Error fetching data.";
-      });
       print("Error fetching user data: $e");
     }
   }
-
   // New method to analyze historical trends across all activities
   void _analyzeHistoricalTrends() {
     if (activityData.length < 2) return;
 
-    // Extract all values for analysis
     List<double> distances = [];
     List<double> speeds = [];
     List<double> heartRates = [];
@@ -2358,7 +1583,7 @@ await _fetchFoodDiaryData();
 
     // Sort dates and calculate gaps between activities
     if (dates.length >= 2) {
-      dates.sort((a, b) => b.compareTo(a)); // Sort descending
+      dates.sort((a, b) => b.compareTo(a)); 
       for (int i = 0; i < dates.length - 1; i++) {
         int gap = dates[i].difference(dates[i + 1]).inDays;
         if (gap > 0) dayGaps.add(gap);
@@ -2383,14 +1608,14 @@ await _fetchFoodDiaryData();
       averageDistanceAllTime =
           distances.reduce((a, b) => a + b) / distances.length;
       distanceVariability = _calculateCoeffOfVariation(distances);
-      distanceProgression = distances.reversed.toList(); // Chronological order
+      distanceProgression = distances.reversed.toList();
     }
 
     if (speeds.isNotEmpty) {
       bestSpeed = speeds.reduce(math.max);
       averageSpeedAllTime = speeds.reduce((a, b) => a + b) / speeds.length;
       speedVariability = _calculateCoeffOfVariation(speeds);
-      speedProgression = speeds.reversed.toList(); // Chronological order
+      speedProgression = speeds.reversed.toList();
     }
 
     if (heartRates.isNotEmpty) {
@@ -2399,7 +1624,7 @@ await _fetchFoodDiaryData();
           heartRates.reduce((a, b) => a + b) / heartRates.length;
       heartrateVariability = _calculateCoeffOfVariation(heartRates);
       heartrateProgression =
-          heartRates.reversed.toList(); // Chronological order
+          heartRates.reversed.toList(); 
     }
 
     // Find best performance date (highest distance or speed)
@@ -2410,7 +1635,7 @@ await _fetchFoodDiaryData();
       for (int i = 0; i < activityData.length; i++) {
         double distance = safeParseDouble(activityData[i]['distance']);
         double speed = safeParseDouble(activityData[i]['average_speed']);
-        double combined = distance * speed; // Simple combined metric
+        double combined = distance * speed; 
 
         if (combined > bestMetric) {
           bestMetric = combined;
@@ -2426,7 +1651,6 @@ await _fetchFoodDiaryData();
     // Check for improvement trends
     isImprovingOverTime = _checkImprovementTrend();
 
-    // Check consistency
     isConsistent = dayGaps.isNotEmpty &&
         _calculateCoeffOfVariation(dayGaps.map((g) => g.toDouble()).toList()) <
             0.5;
@@ -2484,7 +1708,6 @@ await _fetchFoodDiaryData();
   void _analyzeBodyCompositionTrends() {
     if (recentData.length < 2) return;
 
-    // Extract weight and body fat data over time
     List<double> weights = [];
     List<double> bodyFats = [];
 
@@ -2521,38 +1744,41 @@ await _fetchFoodDiaryData();
   }
 
   // Generate seasonal advice based on current weather
-  void _generateSeasonalAdvice() {
-    double temp = safeParseDouble(temperature);
+void _generateSeasonalAdvice() {
+  double temp = safeParseDouble(temperature);
+  double humid = safeParseDouble(humidity);
+  
+  // Check if it's indoor training season
+  isIndoorSeason = temp < 5 || 
+      temp > 35 || 
+      (airQuality != "Good" && airQuality != "Moderate") || 
+      humid > 85;  
 
-    // Check if it's indoor training season
-    isIndoorSeason = temp < 5 ||
-        temp > 35 ||
-        weatherCondition.toLowerCase().contains("rain") ||
-        weatherCondition.toLowerCase().contains("snow") ||
-        airQualityIndex > 150;
-
-    if (isIndoorSeason) {
-      if (temp < 5) {
-        seasonalAdvice =
-            "Cold weather season: Consider indoor training options or proper cold-weather gear.";
-      } else if (temp > 35) {
-        seasonalAdvice =
-            "Hot weather season: Early morning rides or indoor training recommended to avoid heat stress.";
-      } else if (weatherCondition.toLowerCase().contains("rain") ||
-          weatherCondition.toLowerCase().contains("snow")) {
-        seasonalAdvice =
-            "Inclement weather: Indoor training recommended. If riding outdoors, use appropriate gear.";
-      } else if (airQualityIndex > 150) {
-        seasonalAdvice =
-            "Poor air quality season: Consider indoor training to protect respiratory health.";
-      }
+  if (isIndoorSeason) {
+    if (temp < 5) {
+      seasonalAdvice = 
+          "Cold weather season: Consider indoor training options or proper cold-weather gear.";
+    } else if (temp > 35) {
+      seasonalAdvice = 
+          "Hot weather season: Early morning rides or indoor training recommended to avoid heat stress.";
+    } else if (airQuality == "Poor" || airQuality == "Very Poor" || airQuality == "Extremely Poor") {
+      seasonalAdvice = 
+          "Poor air quality: Consider indoor training to protect respiratory health.";
+    } else if (humid > 85) {
+      seasonalAdvice = 
+          "High humidity: Consider indoor training or early morning rides. Stay hydrated!";
+    }
+  } else {
+    // Good conditions
+    if (temp >= 15 && temp <= 25 && airQuality == "Good" && humid < 70) {
+      seasonalAdvice = 
+          "Perfect cycling conditions! Enjoy your outdoor ride.";
     } else {
-      seasonalAdvice =
-          "Current weather conditions are favorable for outdoor cycling.";
+      seasonalAdvice = 
+          "Current weather conditions are acceptable for outdoor cycling.";
     }
   }
-
-  // Calculate coefficient of variation (statistical measure of relative variability)
+}
   double _calculateCoeffOfVariation(List<double> values) {
     if (values.isEmpty || values.length < 2) return 0.0;
 
@@ -2568,17 +1794,16 @@ await _fetchFoodDiaryData();
   bool _checkImprovementTrend() {
     if (distanceProgression.length < 3) return false;
 
-    // Count consecutive improvements
     consecutiveImprovement = 0;
     for (int i = 1; i < distanceProgression.length; i++) {
       if (distanceProgression[i] > distanceProgression[i - 1]) {
         consecutiveImprovement++;
       } else {
-        break; // Reset on any decline
+        break; 
       }
     }
 
-    return consecutiveImprovement >= 2; // At least 3 consecutive improvements
+    return consecutiveImprovement >= 2; 
   }
 
  void _generateRecommendation() {
@@ -2603,26 +1828,19 @@ await _fetchFoodDiaryData();
   equipmentRecommendations = [];
   progressRecommendations = [];
 
-  // Calculate BMR-related metrics first to use in all recommendation types
-  _calculateDailyCalorieNeeds();
-  _analyzeMetabolicHealth();
-
   // Generate recommendations based on goal type
   switch (goalType) {
     case "Leisure":
       _generateLeisureRecommendations();
-      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
-      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      _generateNutritionRecommendationsFromFoodDiary();
       break;
     case "High Intensity Cycling":
       _generateWeightManagementRecommendations();
-      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
-      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      _generateNutritionRecommendationsFromFoodDiary();
       break;
     case "Endurance":
       _generateCyclingEnduranceRecommendations();
-      _generateBMRBasedTrainingRecommendations(); // Add BMR-specific training recommendations
-      _generateBMRBasedNutritionRecommendations(); // Add BMR-specific nutrition recommendations
+      _generateNutritionRecommendationsFromFoodDiary();
       break;
     default:
       setState(() {
@@ -2640,7 +1858,6 @@ await _fetchFoodDiaryData();
     // Only provide trend recommendations if we have enough data
     if (activityData.length < 3) return;
 
-    // General consistency recommendations
     if (!isConsistent && activityData.length >= 5) {
       progressRecommendations.add(
           "Your cycling schedule shows some inconsistency. Try establishing a regular weekly routine for better results.");
@@ -2662,12 +1879,10 @@ await _fetchFoodDiaryData();
       }
     }
 
-    // Speed progress
     if (speedProgression.length >= 3) {
       double recentAverage = 0;
       double earlierAverage = 0;
 
-      // Compare recent vs earlier speeds
       if (speedProgression.length >= 6) {
         int midpoint = speedProgression.length ~/ 2;
         recentAverage =
@@ -2852,33 +2067,6 @@ await _fetchFoodDiaryData();
             .add("Dress in layers with gloves for cold weather.");
       }
 
-      // Air quality recommendations
-      if (airQualityIndex > 0) {
-        if (airQualityIndex <= 50) {
-          healthRecommendations
-              .add("AQI: ${airQualityIndex} - Good air quality for riding.");
-        } else if (airQualityIndex <= 100) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Moderate. Most can ride without issues.");
-        } else if (airQualityIndex <= 150) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Unhealthy for sensitive groups. Consider indoor cycling.");
-          if (respiratoryCondition == "Yes") {
-            healthRecommendations.add(
-                "With respiratory condition, avoid outdoor cycling when AQI > 100.");
-          }
-        } else if (airQualityIndex <= 200) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Unhealthy. Consider indoor cycling or wear a mask.");
-        } else {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Very unhealthy. Indoor cycling recommended.");
-        }
-      }
-
-      if (weatherCondition.toLowerCase().contains("rain")) {
-        equipmentRecommendations.add("Rain expected. Use fenders and lights.");
-      }
     }
 
     // Health condition recommendations
@@ -2909,257 +2097,252 @@ await _fetchFoodDiaryData();
     equipmentRecommendations.add("Consider padded shorts for longer rides.");
   }
 
-  void _generateWeightManagementRecommendations() {
-    // Weight management through high intensity cycling needs specific guidelines
-    double targetWeightValue = safeParseDouble(targetWeight);
-    double currentWeightValue = safeParseDouble(weight);
-    double bmr = safeParseDouble(basalMetabolicRate);
-    double bodyFatPercentage = safeParseDouble(bodyFat);
-    double totalCaloriesBurned = safeParseDouble(caloriesBurned);
+ void _generateWeightManagementRecommendations() {
+  // Weight management through high intensity cycling needs specific guidelines
+  double targetWeightValue = safeParseDouble(targetWeight);
+  double currentWeightValue = safeParseDouble(weight);
+  double bmr = safeParseDouble(basalMetabolicRate);
+  double bodyFatPercentage = safeParseDouble(bodyFat);
+  double totalCaloriesBurned = safeParseDouble(caloriesBurned);
 
-    // Calculate heart rate zones for weight management
-    double maxHeartRate = 220 - age.toDouble();
-    double fatBurningZoneLower = maxHeartRate * 0.7; // 70% of max HR
-    double fatBurningZoneUpper = maxHeartRate * 0.85; // 85% of max HR
+  // Calculate heart rate zones for weight management
+  double maxHeartRate = 220 - age.toDouble();
+  double fatBurningZoneLower = maxHeartRate * 0.7; 
+  double fatBurningZoneUpper = maxHeartRate * 0.85; 
 
-    // Get latest values
-    double latestHeartRate = safeParseDouble(averageHeartrate);
+  double latestHeartRate = safeParseDouble(averageHeartrate);
 
-    // Primary feedback based on weight/body fat trends
-    if (latestWeight < previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "✅ Great Progress";
-        feedback =
-            "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
-      });
-    } else if (latestWeight < previousWeight &&
-        latestBodyFat >= previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "⚠️ Mixed Results";
-        feedback =
-            "Losing weight but not body fat. Add interval training and hill climbs to your routine.";
-      });
-    } else if (latestWeight > previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "✅ Gaining Muscle";
-        feedback =
-            "Gaining weight while reducing body fat suggests muscle building. Great work!";
-      });
-    } else if (latestWeight == previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "✅ Body Recomposition";
-        feedback =
-            "Stable weight with reduced body fat means you're building muscle. Keep it up!";
-      });
-    } else if (latestWeight >= previousWeight &&
-        latestBodyFat >= previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "⚠️ Needs Adjustment";
-        feedback =
-            "Adjust your training and nutrition strategy to kickstart fat loss.";
-      });
-    } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
-      setState(() {
-        recommendation = "ℹ️ In Progress";
-        feedback =
-            "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
-      });
-    } else {
-  // Check if we have current weight and body fat data
-  if (latestWeight > 0 && latestBodyFat > 0) {
+  // Primary feedback based on weight/body fat trends
+  if (latestWeight < previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
     setState(() {
-      recommendation = "ℹ️ Monitoring Progress";
+      recommendation = "✅ Great Progress";
       feedback =
-          "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. Continue tracking for trend analysis.";
+          "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
     });
-  } else if (safeParseDouble(weight) > 0 && safeParseDouble(bodyFat) > 0) {
+  } else if (latestWeight < previousWeight &&
+      latestBodyFat >= previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
     setState(() {
-      recommendation = "ℹ️ Starting Point Established";
+      recommendation = "⚠️ Mixed Results";
       feedback =
-          "Your profile metrics: ${weight} kg weight and ${bodyFat}% body fat. Record post-workout data to see progress.";
+          "Losing weight but not body fat. Add interval training and hill climbs to your routine.";
+    });
+  } else if (latestWeight > previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "✅ Gaining Muscle";
+      feedback =
+          "Gaining weight while reducing body fat suggests muscle building. Great work!";
+    });
+  } else if (latestWeight == previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "✅ Body Recomposition";
+      feedback =
+          "Stable weight with reduced body fat means you're building muscle. Keep it up!";
+    });
+  } else if (latestWeight >= previousWeight &&
+      latestBodyFat >= previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "⚠️ Needs Adjustment";
+      feedback =
+          "Adjust your training and nutrition strategy to kickstart fat loss.";
+    });
+  } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
+    setState(() {
+      recommendation = "ℹ️ In Progress";
+      feedback =
+          "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
     });
   } else {
-    setState(() {
-      recommendation = "ℹ️ Building Baseline";
-      feedback =
-          "Track metrics consistently for personalized recommendations.";
-    });
+    if (latestWeight > 0 && latestBodyFat > 0) {
+      setState(() {
+        recommendation = "ℹ️ Monitoring Progress";
+        feedback =
+            "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. Continue tracking for trend analysis.";
+      });
+    } else if (safeParseDouble(weight) > 0 && safeParseDouble(bodyFat) > 0) {
+      setState(() {
+        recommendation = "ℹ️ Starting Point Established";
+        feedback =
+            "Your profile metrics: ${weight} kg weight and ${bodyFat}% body fat. Record post-workout data to see progress.";
+      });
+    } else {
+      setState(() {
+        recommendation = "ℹ️ Building Baseline";
+        feedback =
+            "Track metrics consistently for personalized recommendations.";
+      });
+    }
   }
-}
-
-    // Historical heart rate analysis
-    if (heartrateProgression.length >= 3) {
-      double avgHistoricalHR = heartrateProgression.reduce((a, b) => a + b) /
-          heartrateProgression.length;
-
-      if (avgHistoricalHR < fatBurningZoneLower) {
-        trainingRecommendations.add(
-            "Your historical average heart rate (${avgHistoricalHR.toInt()} bpm) is below optimal fat-burning zone. Increase intensity in future workouts.");
-      } else if (avgHistoricalHR > fatBurningZoneUpper) {
-        trainingRecommendations.add(
-            "Your historical heart rates average ${avgHistoricalHR.toInt()} bpm, which is quite high. Mix in some Zone 2 (${zone2HeartRate} bpm) training for recovery.");
-      }
-    }
-
-    // Heart rate recommendations for current workout
-    if (latestHeartRate > 0) {
-      if (latestHeartRate < fatBurningZoneLower) {
-        trainingRecommendations.add(
-            "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning.");
-      } else if (latestHeartRate > fatBurningZoneUpper) {
-        trainingRecommendations
-            .add("Try intervals between high intensity and recovery periods.");
-      } else {
-        trainingRecommendations
-            .add("Perfect fat-burning zone! Maintain this intensity.");
-      }
-    }
-
-    // Training structure based on historical data
-    int totalHighIntensitySessions = 0;
-    List<int> lastFiveHeartRates = [];
-
-    // Count high intensity sessions from historical data
-    for (int i = 0; i < math.min(activityData.length, 10); i++) {
-      double hr = safeParseDouble(activityData[i]['average_heartrate']);
-      if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
-
-      if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
-    }
-
-    if (totalHighIntensitySessions < 3 && activityData.length >= 5) {
+  if (totalCaloriesBurned > 0) {
+    double weeklyDeficitNeeded = 3500;
+    double dailyDeficitNeeded = weeklyDeficitNeeded / 7;
+    
+    if (totalCaloriesBurned < dailyDeficitNeeded / 2 && activityData.isNotEmpty) {
       trainingRecommendations.add(
-          "Of your last ${math.min(activityData.length, 10)} rides, only $totalHighIntensitySessions were at high intensity. Aim for at least 3 per week for weight management.");
-    }
-
-    if (lastFiveHeartRates.length >= 3) {
-      String hrTrend = lastFiveHeartRates.join(" → ");
+          "Your recent average of ${totalCaloriesBurned.toInt()} kcal burned per session may be insufficient for your goals. Try increasing duration by 15-20 minutes.");
+    } else if (totalCaloriesBurned > dailyDeficitNeeded) {
       trainingRecommendations.add(
-          "Your recent heart rate trend (bpm): $hrTrend. Aim for consistent intensity in the fat-burning zone.");
+          "You're burning ${totalCaloriesBurned.toInt()} kcal per session, which is excellent for weight loss. Ensure proper recovery and nutrition.");
     }
+  }
 
-    // Standard training recommendations
+  if (bmr > 0) {
+    // Calculate daily calorie targets
+    double maintenanceCalories = bmr * 1.2;
+    double weightLossTarget = maintenanceCalories - 500; 
+    
     trainingRecommendations.add(
-        "Aim for 3-5 sessions/week with 4-6 intervals (2-3 min high intensity, 2-3 min recovery).");
-
-    if (weeklyActivityCount < 3) {
+        "Based on your BMR of ${bmr.toInt()} kcal, aim for a daily intake of ${weightLossTarget.toInt()} kcal to support weight loss while maintaining energy for cycling.");
+    
+    if (bmr > 1800) {
       trainingRecommendations.add(
-          "Increase to at least 3 sessions per week for weight management.");
+          "With your higher metabolic rate, incorporate 1-2 longer steady-state rides (60+ min) weekly to maximize fat utilization.");
+    } else if (bmr < 1400) {
+      trainingRecommendations.add(
+          "With your current metabolic rate, focus on building muscle through resistance training 2x weekly to boost your BMR.");
     }
-
-    // Calorie recommendations with historical context
-    if (bmr > 0 && activityData.length >= 3) {
-      // Calculate average calories burned per session
-      List<double> allCalories = [];
-      for (var activity in activityData) {
-        double cals = safeParseDouble(activity['calories_burned']);
-        if (cals > 0) allCalories.add(cals);
-      }
-
-      if (allCalories.isNotEmpty) {
-        double avgCaloriesPerSession =
-            allCalories.reduce((a, b) => a + b) / allCalories.length;
-        double weeklyCalorieBurn = avgCaloriesPerSession * weeklyActivityCount;
-        double dailyDeficitFromExercise = weeklyCalorieBurn / 7.0;
-
-        if (dailyDeficitFromExercise < 250) {
-          trainingRecommendations.add(
-              "Your average workout burns ${avgCaloriesPerSession.toInt()} kcal. Aim for 400-500 kcal daily deficit through longer/intense rides.");
-        } else if (dailyDeficitFromExercise > 1000) {
-          trainingRecommendations.add(
-              "You're burning an average of ${avgCaloriesPerSession.toInt()} kcal per workout, creating a ${dailyDeficitFromExercise.toInt()} kcal daily deficit. Ensure proper fueling.");
-        }
-      }
-    }
-
-    // Weather and air quality
-    if (weatherData.isNotEmpty) {
-      double currentTemp = safeParseDouble(temperature);
-
-      if (currentTemp > 30) {
-        trainingRecommendations.add(
-            "Hot weather: Exercise early morning for better fat burning efficiency.");
-        nutritionRecommendations
-            .add("Drink 750ml-1L fluid/hour with electrolytes in hot weather.");
-      }
-
-      // Air quality for weight management
-      if (airQualityIndex > 0) {
-        if (airQualityIndex <= 50) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Ideal for high-intensity training.");
-        } else if (airQualityIndex <= 100) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Monitor breathing during intervals.");
-        } else if (airQualityIndex <= 150) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Consider moderate-intensity instead of intervals.");
-          if (respiratoryCondition == "Yes") {
-            healthRecommendations.add(
-                "With respiratory condition, train indoors when AQI > 100.");
-          }
-        } else {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Switch to indoor cycling for today.");
-        }
-      }
-    }
-
-    // Health condition recommendations
-    if (respiratoryCondition == "Yes") {
-      healthRecommendations.add(
-          "Use shorter intervals (30s-1min) with longer recovery periods.");
-    }
-
-    if (cardiovascularCondition == "Yes") {
-      healthRecommendations.add(
-          "Focus on moderate intensity (60-70% max HR) for longer durations.");
-    }
-
-    // Nutrition recommendations
-    nutritionRecommendations
-        .add("Try fasted morning rides (30-45 min) at moderate intensity.");
-    nutritionRecommendations
-        .add("Stay well-hydrated for metabolism and recovery.");
-    nutritionRecommendations.add(
-        "Time carbs around workouts - more on training days, less on rest days.");
-
-    // Health recommendations
-    healthRecommendations
-        .add("Include 2 rest days weekly to prevent hormonal imbalances.");
-    healthRecommendations
-        .add("Aim for 7-9 hours sleep to regulate hunger hormones.");
-
-    // Equipment recommendations
-    equipmentRecommendations
-        .add("Ensure proper bike fit to prevent injury during hard efforts.");
-    equipmentRecommendations
-        .add("Use a heart rate monitor for optimal fat-burning zone training.");
   }
 
+  // Historical heart rate analysis
+  if (heartrateProgression.length >= 3) {
+    double avgHistoricalHR = heartrateProgression.reduce((a, b) => a + b) /
+        heartrateProgression.length;
+
+    if (avgHistoricalHR < fatBurningZoneLower) {
+      trainingRecommendations.add(
+          "Your historical average heart rate (${avgHistoricalHR.toInt()} bpm) is below optimal fat-burning zone. Increase intensity in future workouts.");
+    } else if (avgHistoricalHR > fatBurningZoneUpper) {
+      trainingRecommendations.add(
+          "Your historical heart rates average ${avgHistoricalHR.toInt()} bpm, which is quite high. Mix in some Zone 2 (${zone2HeartRate} bpm) training for recovery.");
+    }
+  }
+
+  // Heart rate recommendations for current workout
+  if (latestHeartRate > 0) {
+    if (latestHeartRate < fatBurningZoneLower) {
+      trainingRecommendations.add(
+          "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning.");
+    } else if (latestHeartRate > fatBurningZoneUpper) {
+      trainingRecommendations
+          .add("Try intervals between high intensity and recovery periods.");
+    } else {
+      trainingRecommendations
+          .add("Perfect fat-burning zone! Maintain this intensity.");
+    }
+  }
+
+  // Training structure based on historical data
+  int totalHighIntensitySessions = 0;
+  List<int> lastFiveHeartRates = [];
+
+  // Count high intensity sessions from historical data
+  for (int i = 0; i < math.min(activityData.length, 10); i++) {
+    double hr = safeParseDouble(activityData[i]['average_heartrate']);
+    if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
+
+    if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
+  }
+
+  if (totalHighIntensitySessions < 3 && activityData.length >= 5) {
+    trainingRecommendations.add(
+        "Of your last ${math.min(activityData.length, 10)} rides, only $totalHighIntensitySessions were at high intensity. Aim for at least 3 per week for weight management.");
+  }
+
+  if (lastFiveHeartRates.length >= 3) {
+    String hrTrend = lastFiveHeartRates.join(" → ");
+    trainingRecommendations.add(
+        "Your recent heart rate trend (bpm): $hrTrend. Aim for consistent intensity in the fat-burning zone.");
+  }
+
+  // Standard training recommendations
+  trainingRecommendations.add(
+      "Aim for 3-5 sessions/week with 4-6 intervals (2-3 min high intensity, 2-3 min recovery).");
+
+  if (weeklyActivityCount < 3) {
+    trainingRecommendations.add(
+        "Increase to at least 3 sessions per week for weight management.");
+  }
+
+  // Calorie recommendations with historical context
+  if (bmr > 0 && activityData.length >= 3) {
+    List<double> allCalories = [];
+    for (var activity in activityData) {
+      double cals = safeParseDouble(activity['calories_burned']);
+      if (cals > 0) allCalories.add(cals);
+    }
+
+    if (allCalories.isNotEmpty) {
+      double avgCaloriesPerSession =
+          allCalories.reduce((a, b) => a + b) / allCalories.length;
+      double weeklyCalorieBurn = avgCaloriesPerSession * weeklyActivityCount;
+      double dailyDeficitFromExercise = weeklyCalorieBurn / 7.0;
+
+      if (dailyDeficitFromExercise < 250) {
+        trainingRecommendations.add(
+            "Your average workout burns ${avgCaloriesPerSession.toInt()} kcal. Aim for 400-500 kcal daily deficit through longer/intense rides.");
+      } else if (dailyDeficitFromExercise > 1000) {
+        trainingRecommendations.add(
+            "You're burning an average of ${avgCaloriesPerSession.toInt()} kcal per workout, creating a ${dailyDeficitFromExercise.toInt()} kcal daily deficit. Ensure proper fueling.");
+      }
+    }
+  }
+
+  // Weather and air quality
+  if (weatherData.isNotEmpty) {
+    double currentTemp = safeParseDouble(temperature);
+
+    if (currentTemp > 30) {
+      trainingRecommendations.add(
+          "Hot weather: Exercise early morning for better fat burning efficiency.");
+    }
+  }
+
+  // Health condition recommendations
+  if (respiratoryCondition == "Yes") {
+    healthRecommendations.add(
+        "Use shorter intervals (30s-1min) with longer recovery periods.");
+  }
+
+  if (cardiovascularCondition == "Yes") {
+    healthRecommendations.add(
+        "Focus on moderate intensity (60-70% max HR) for longer durations.");
+  }
+  
+  // Health recommendations
+  healthRecommendations
+      .add("Include 2 rest days weekly to prevent hormonal imbalances.");
+  healthRecommendations
+      .add("Aim for 7-9 hours sleep to regulate hunger hormones.");
+
+  // Equipment recommendations
+  equipmentRecommendations
+      .add("Ensure proper bike fit to prevent injury during hard efforts.");
+  equipmentRecommendations
+      .add("Use a heart rate monitor for optimal fat-burning zone training.");
+}
+  
   void _generateCyclingEnduranceRecommendations() {
     // Basic data
     double targetDistanceValue = safeParseDouble(targetDistance);
@@ -3347,43 +2530,6 @@ await _fetchFoodDiaryData();
       if (currentTemp > 30) {
         trainingRecommendations.add(
             "Hot weather: Lower heart rate target by 5-10% and hydrate more.");
-        nutritionRecommendations
-            .add("In heat, increase electrolyte intake to prevent cramping.");
-      }
-
-      // Air quality for endurance
-      if (airQualityIndex > 0) {
-        if (airQualityIndex <= 50) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Excellent for long endurance rides.");
-        } else if (airQualityIndex <= 100) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Suitable for training. Shorten very long rides if uncomfortable.");
-        } else if (airQualityIndex <= 150) {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Consider shorter rides or indoor training.");
-
-          if (targetDistanceValue > 80) {
-            trainingRecommendations
-                .add("With AQI > 100, do shorter rides or train indoors.");
-          }
-        } else {
-          healthRecommendations.add(
-              "AQI: ${airQualityIndex} - Switch to indoor training today.");
-        }
-
-        // Air quality improvement/deterioration
-        if (previousAirQualityIndex > 0 &&
-            latestAirQualityIndex < previousAirQualityIndex &&
-            latestAirQualityIndex < 100) {
-          healthRecommendations
-              .add("Air quality improved - good day for a longer session.");
-        } else if (previousAirQualityIndex > 0 &&
-            latestAirQualityIndex > previousAirQualityIndex &&
-            latestAirQualityIndex > 100) {
-          healthRecommendations
-              .add("Air quality worsened - adjust training plan accordingly.");
-        }
       }
     }
 
@@ -3401,20 +2547,6 @@ await _fetchFoodDiaryData();
       healthRecommendations
           .add("Be extra cautious when AQI > 100 with your condition.");
     }
-
-    // Nutrition recommendations
-    nutritionRecommendations
-        .add("Rides < 90 mins: water only. Longer rides: 30-60g carbs/hour.");
-    nutritionRecommendations
-        .add("Practice nutrition strategy during training for events.");
-    nutritionRecommendations
-        .add("Start fueling early - within first 30 minutes of long rides.");
-
-    if (currentDurationValue > 120) {
-      nutritionRecommendations.add(
-          "For ${currentDurationValue.toStringAsFixed(0)}-minute rides: ${(currentDurationValue * 0.5).toStringAsFixed(0)}g carbs + electrolytes.");
-    }
-
     // Health recommendations
     healthRecommendations
         .add("Balance training stress with recovery between sessions.");
@@ -3432,10 +2564,6 @@ await _fetchFoodDiaryData();
     equipmentRecommendations
         .add("Quality padded shorts and chamois cream for rides > 2 hours.");
 
-    if (airQualityIndex > 100) {
-      equipmentRecommendations.add(
-          "Consider pollution mask if outdoor training is necessary in poor air quality.");
-    }
   }
 
   double safeParseDouble(dynamic value) {
@@ -3721,13 +2849,6 @@ await _fetchFoodDiaryData();
                               "Calories",
                               "${safeParseDouble(data['calories_burned']).toInt()} kcal",
                               Icons.local_fire_department_outlined,
-                            ),
-                            _buildActivityMetric(
-                              "Air Quality",
-                              airQualityIndex > 0
-                                  ? "AQI: ${airQualityIndex}"
-                                  : "N/A",
-                              Icons.air_outlined,
                             ),
                           ],
                         ),
@@ -4519,7 +3640,6 @@ await _fetchFoodDiaryData();
       case 'High Intensity Cycling':
         goalGraphs.add(_buildWeightOverTimeGraph());
         goalGraphs.add(_buildBodyFatOverTimeGraph());
-        goalGraphs.add(_buildCalorieBalanceGraphWithBMR());
         break;
       default:
         goalGraphs.add(
@@ -4586,7 +3706,7 @@ await _fetchFoodDiaryData();
   }
 
   Widget _buildSessionsPerWeekGraph() {
-    // Map to store session count per day
+
     Map<String, int> sessionsPerDay = {
       'Mon': 0,
       'Tue': 0,
@@ -4597,13 +3717,11 @@ await _fetchFoodDiaryData();
       'Sun': 0,
     };
 
-    // Process activity data to count sessions per day
     for (var activity in activityData) {
       if (activity['start_date'] != null) {
         Timestamp timestamp = activity['start_date'];
         DateTime date = timestamp.toDate();
 
-        // Get day of week
         String dayOfWeek = DateFormat('E').format(date);
         sessionsPerDay[dayOfWeek] = (sessionsPerDay[dayOfWeek] ?? 0) + 1;
       }
@@ -4672,9 +3790,7 @@ await _fetchFoodDiaryData();
     List<ActivitySessionData> chartData = [];
     int sessionCount = 1;
 
-    // Process activity data to extract distance per session
     for (var activity in activityData.reversed) {
-      // Use reversed to show oldest to newest
       double distance = safeParseDouble(activity['distance']);
 
       chartData.add(ActivitySessionData("S$sessionCount", distance));
@@ -4745,18 +3861,13 @@ await _fetchFoodDiaryData();
     );
   }
 
-  
-
   Widget _buildDurationPerSessionGraph() {
     List<ActivitySessionData> chartData = [];
     int sessionCount = 1;
 
-    // Process activity data to extract duration per session
     for (var activity in activityData.reversed) {
-      // Use reversed to show oldest to newest
-      // Assuming duration is stored in seconds
+  
       double duration = safeParseDouble(activity['elapsed_time']);
-      // Convert to minutes
       duration = (duration / 60).roundToDouble();
 
       chartData.add(ActivitySessionData("S$sessionCount", duration));
@@ -4801,7 +3912,7 @@ await _fetchFoodDiaryData();
             dataSource: chartData,
             xValueMapper: (ActivitySessionData data, _) => data.session,
             yValueMapper: (ActivitySessionData data, _) => data.value,
-            color: Color(0xff4CAF50), // Different color from distance graph
+            color: Color(0xff4CAF50), 
             width: 3,
             markerSettings: MarkerSettings(
               isVisible: true,
@@ -4831,7 +3942,7 @@ await _fetchFoodDiaryData();
     required String title,
     required String subtitle,
     required Widget child,
-    double height = 280, // Increase default height from 250 to 280
+    double height = 280,
   }) {
     return Container(
       height: height,
@@ -4855,7 +3966,6 @@ await _fetchFoodDiaryData();
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
-                // Added Flexible here
                 child: Text(
                   title,
                   style: TextStyle(
@@ -4864,7 +3974,7 @@ await _fetchFoodDiaryData();
                     color: Colors.black87,
                   ),
                   overflow:
-                      TextOverflow.ellipsis, // Handle overflow with ellipsis
+                      TextOverflow.ellipsis, 
                 ),
               ),
               Container(
@@ -4887,7 +3997,7 @@ await _fetchFoodDiaryData();
           ),
           SizedBox(height: 10),
           Expanded(
-            child: ErrorBoundary(child: child), // Wrap in ErrorBoundary
+            child: ErrorBoundary(child: child), 
           ),
         ],
       ),
@@ -4958,7 +4068,7 @@ await _fetchFoodDiaryData();
     return _buildGraphContainer(
       title: "Baseline Comparison",
       subtitle: "Progress from initial week",
-      height: 300, // Taller to accommodate the chart and annotations
+      height: 300, 
       child: SfCartesianChart(
         primaryXAxis: CategoryAxis(
           majorGridLines: MajorGridLines(width: 0),
@@ -5331,567 +4441,6 @@ Widget _buildWeeklySummaryGraph() {
     );
   }
 
-  void _analyzeMetabolicHealth() {
-  double bmrValue = safeParseDouble(basalMetabolicRate);
-  if (bmrValue <= 0) {
-    _calculateDailyCalorieNeeds();
-    bmrValue = calculatedBMR;
-  }
-  
-  double weightKg = safeParseDouble(weight);
-  double bodyFatPercentage = safeParseDouble(bodyFat);
-  
-  // Calculate lean body mass
-  double leanBodyMass = 0;
-  if (weightKg > 0 && bodyFatPercentage > 0) {
-    leanBodyMass = weightKg * (1 - (bodyFatPercentage / 100));
-  }
-  
-  // Calculate BMR per kg of lean body mass (metabolic efficiency)
-  double bmrPerLeanKg = 0;
-  if (leanBodyMass > 0) {
-    bmrPerLeanKg = bmrValue / leanBodyMass;
-  }
-  
-  // Calculate heart rate recovery (if available)
-  double heartRateRecovery = 0;
-  if (activityData.length >= 2) {
-    // This would be more accurate with actual recovery data
-    double avgRestingHR = 0;
-    double avgMaxHR = 0;
-    
-    // Use this as a placeholder for heart rate recovery analysis
-    if (latestAverageHeartrate > 0 && previousAverageHeartrate > 0) {
-      avgRestingHR = math.min(latestAverageHeartrate, previousAverageHeartrate);
-      avgMaxHR = math.max(latestAverageHeartrate, previousAverageHeartrate);
-      heartRateRecovery = avgMaxHR - avgRestingHR;
-    }
-  }
-  
-  // Set states for metabolic health indicators
-  setState(() {
-    metabolicEfficiency = bmrPerLeanKg;
-    metabolicHealthScore = _calculateMetabolicHealthScore(
-      bmrPerLeanKg: bmrPerLeanKg,
-      heartRateRecovery: heartRateRecovery,
-      weeklyActivityCount: weeklyActivityCount,
-      bodyFatPercentage: bodyFatPercentage
-    );
-    
-    // Generate recommendations based on metabolic health score
-    if (metabolicHealthScore > 80) {
-      healthRecommendations.add(
-        "Excellent metabolic health! Your BMR of ${bmrValue.toInt()} kcal indicates efficient metabolism. Continue your current training pattern."
-      );
-    } else if (metabolicHealthScore > 60) {
-      healthRecommendations.add(
-        "Good metabolic health. Your BMR (${bmrValue.toInt()} kcal) shows good efficiency. Add 1-2 Zone 2 sessions weekly to further improve metabolism."
-      );
-    } else {
-      healthRecommendations.add(
-        "Room for metabolic improvement. Focus on consistency with 3-4 Zone 2 sessions weekly to increase your metabolic rate from current ${bmrValue.toInt()} kcal baseline."
-      );
-    }
-  });
-}
-
-// Helper function to calculate metabolic health score
-double _calculateMetabolicHealthScore({
-  required double bmrPerLeanKg,
-  required double heartRateRecovery,
-  required int weeklyActivityCount,
-  required double bodyFatPercentage
-}) {
-  // Basic scoring system - this could be refined with more clinical data
-  double score = 50; // Base score
-  
-  // BMR per lean kg scoring (26-28 is considered good)
-  if (bmrPerLeanKg >= 28) score += 25;
-  else if (bmrPerLeanKg >= 26) score += 20;
-  else if (bmrPerLeanKg >= 24) score += 15;
-  else if (bmrPerLeanKg >= 22) score += 10;
-  else score += 5;
-  
-  // Heart rate recovery scoring (higher is better, to a point)
-  if (heartRateRecovery >= 50) score += 15;
-  else if (heartRateRecovery >= 40) score += 12;
-  else if (heartRateRecovery >= 30) score += 8;
-  else if (heartRateRecovery >= 20) score += 5;
-  
-  // Weekly activity scoring
-  if (weeklyActivityCount >= 5) score += 15;
-  else if (weeklyActivityCount >= 3) score += 10;
-  else if (weeklyActivityCount >= 1) score += 5;
-  
-  // Body fat percentage adjustment
-  if (gender.toLowerCase() == "male") {
-    if (bodyFatPercentage <= 15) score += 10;
-    else if (bodyFatPercentage <= 20) score += 5;
-    else if (bodyFatPercentage >= 30) score -= 10;
-    else if (bodyFatPercentage >= 25) score -= 5;
-  } else {
-    if (bodyFatPercentage <= 22) score += 10;
-    else if (bodyFatPercentage <= 27) score += 5;
-    else if (bodyFatPercentage >= 37) score -= 10;
-    else if (bodyFatPercentage >= 32) score -= 5;
-  }
-  
-  // Ensure score stays within 0-100 range
-  return math.min(100, math.max(0, score));
-}
-
-void _calculateDailyCalorieNeeds() {
-  double bmrValue = safeParseDouble(basalMetabolicRate);
-  
-  // If BMR is not available, estimate it
-  if (bmrValue <= 0) {
-    // Estimate BMR using Mifflin-St Jeor Equation
-    double weightKg = safeParseDouble(weight);
-    double heightCm = safeParseDouble(height);
-    
-    if (weightKg > 0 && heightCm > 0 && age > 0) {
-      if (gender.toLowerCase() == "male") {
-        bmrValue = (10 * weightKg) + (6.25 * heightCm) - (5 * age) + 5;
-      } else {
-        bmrValue = (10 * weightKg) + (6.25 * heightCm) - (5 * age) - 161;
-      }
-    } else {
-      // Default fallback if data is missing
-      bmrValue = gender.toLowerCase() == "male" ? 1800 : 1400;
-    }
-  }
-  
-  // Calculate TDEE (Total Daily Energy Expenditure) with activity level
-  double activityMultiplier = 1.2; // Sedentary default
-  
-  // Adjust multiplier based on weekly activity count
-  if (weeklyActivityCount >= 5) {
-    activityMultiplier = 1.725; // Very active (6-7 times per week)
-  } else if (weeklyActivityCount >= 3) {
-    activityMultiplier = 1.55; // Moderate activity (3-5 times per week)
-  } else if (weeklyActivityCount >= 1) {
-    activityMultiplier = 1.375; // Light activity (1-3 times per week)
-  }
-  
-  double tdee = bmrValue * activityMultiplier;
-  
-  // Store these calculated values for use in recommendations
-  setState(() {
-    calculatedBMR = bmrValue;
-    calculatedTDEE = tdee;
-    
-    // Calculate deficit or surplus based on goal type
-    if (goalType == "High Intensity Cycling") {
-      // For weight loss, calculate recommended deficit
-      recommendedCalorieIntake = tdee - 500; // 500 calorie deficit for weight loss
-      
-      // Set minimum calorie floor based on gender to avoid unhealthy restriction
-      double minimumCalories = gender.toLowerCase() == "male" ? 1500 : 1200;
-      if (recommendedCalorieIntake < minimumCalories) {
-        recommendedCalorieIntake = minimumCalories;
-      }
-    } else if (goalType == "Endurance") {
-      // For endurance, calculate recommended surplus or maintenance
-      recommendedCalorieIntake = tdee + 300; // Slight surplus for energy needs
-    } else {
-      // For leisure, maintenance is appropriate
-      recommendedCalorieIntake = tdee;
-    }
-  });
-}
-
-// 2. Enhanced nutrition recommendations based on BMR
-void _generateBMRBasedNutritionRecommendations() {
-  // Make sure we have calculated the values
-  if (calculatedBMR <= 0) {
-    _calculateDailyCalorieNeeds();
-  }
-  
-  // Clear existing nutrition recommendations
-  nutritionRecommendations.clear();
-  
-  // Add BMR-based nutrition recommendations
-  if (goalType == "High Intensity Cycling") {
-    nutritionRecommendations.add(
-      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily intake for weight loss."
-    );
-    
-    double proteinNeeds = safeParseDouble(weight) * 1.8; // 1.8g per kg for high intensity
-    nutritionRecommendations.add(
-      "Consume ${proteinNeeds.toInt()}g of protein daily to preserve muscle during weight loss."
-    );
-    
-    // Calculate calorie target for different days
-    double trainingDayCalories = recommendedCalorieIntake + 200;
-    double restDayCalories = recommendedCalorieIntake - 100;
-    nutritionRecommendations.add(
-      "Cycling days: ${trainingDayCalories.toInt()} kcal. Rest days: ${restDayCalories.toInt()} kcal."
-    );
-    
-    // Add more specific nutrition timing recommendations
-    nutritionRecommendations.add(
-      "For optimal fat loss, consume 25% of daily calories before rides and 30% within 2 hours after."
-    );
-  } 
-  else if (goalType == "Endurance") {
-    nutritionRecommendations.add(
-      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily for endurance training."
-    );
-    
-    // Calculate carb recommendations for endurance
-    double carbsInGrams = (recommendedCalorieIntake * 0.6) / 4; // 60% calories from carbs, 4 calories per gram
-    nutritionRecommendations.add(
-      "Consume ${carbsInGrams.toInt()}g of carbs daily, with higher intake (${(carbsInGrams * 0.4).toInt()}g) before long rides."
-    );
-    
-    // Calculate time-based nutrition windows
-    int rideDuration = safeParseDouble(sessionDuration).toInt() ~/ 60; // Convert seconds to minutes
-    if (rideDuration > 90) {
-      int carbsPerHour = (rideDuration > 150) ? 90 : 60; // Higher intake for rides over 2.5 hours
-      nutritionRecommendations.add(
-        "For your ${rideDuration} minute rides, consume ${carbsPerHour}g carbs per hour during activity."
-      );
-    }
-  } 
-  else { // Leisure
-    nutritionRecommendations.add(
-      "With your BMR of ${calculatedBMR.toInt()} kcal, aim for ${recommendedCalorieIntake.toInt()} kcal daily to maintain weight."
-    );
-    
-    nutritionRecommendations.add(
-      "For leisure rides, proper hydration is more important than nutrition timing. Aim for 500ml of water per hour of riding."
-    );
-  }
-  
-  // Add general BMR-related nutrition advice
-  nutritionRecommendations.add(
-    "Never eat below your BMR of ${calculatedBMR.toInt()} kcal to maintain proper organ function and metabolic health."
-  );
-  
-  // Adjust recommendations based on day of week patterns
-  if (mostFrequentDay.isNotEmpty) {
-    nutritionRecommendations.add(
-      "Increase carbohydrate intake the day before your typical ${mostFrequentDay} rides for better performance."
-    );
-  }
-}
-
-// 3. Enhanced training recommendations using BMR for optimal intensity
-void _generateBMRBasedTrainingRecommendations() {
-  // Clear existing training recommendations
-  trainingRecommendations.clear();
-  
-  // Calculate target heart rate zones based on BMR efficiency
-  double bmrPerKg = calculatedBMR / safeParseDouble(weight);
-  
-  // BMR efficiency can indicate metabolic health - higher BMR/kg generally indicates better metabolic health
-  bool efficientMetabolism = bmrPerKg > 24; // Benchmark value
-  
-  if (goalType == "High Intensity Cycling") {
-    if (efficientMetabolism) {
-      trainingRecommendations.add(
-        "Your BMR of ${calculatedBMR.toInt()} kcal indicates efficient metabolism. Focus on higher intensity intervals (Zone 4-5) for fat loss."
-      );
-      
-      // Recommend more anaerobic work for those with efficient metabolism
-      trainingRecommendations.add(
-        "Include 2 HIIT sessions weekly: 30s all-out effort, 90s recovery, 8-10 repeats."
-      );
-    } else {
-      trainingRecommendations.add(
-        "Your BMR of ${calculatedBMR.toInt()} kcal suggests room for metabolic improvement. Build base with Zone 2 (${zone2HeartRate} bpm) training."
-      );
-      
-      // Recommend more aerobic work to improve metabolic efficiency
-      trainingRecommendations.add(
-        "Focus on 45-60 min Zone 2 rides (${zone2HeartRate} bpm) to increase metabolic efficiency before adding intense intervals."
-      );
-    }
-    
-    // Calculate optimal workout duration based on BMR
-    int optimalDuration = (calculatedBMR * 0.012).toInt(); // Rough formula
-    trainingRecommendations.add(
-      "Based on your metabolic rate, aim for approximately ${optimalDuration} minute workouts for optimal fat burning."
-    );
-  } 
-  else if (goalType == "Endurance") {
-    // For endurance, calculate ideal training zones based on metabolic efficiency
-    if (efficientMetabolism) {
-      trainingRecommendations.add(
-        "Your efficient metabolism (BMR ${calculatedBMR.toInt()} kcal) supports high training volume. Aim for weekly increases of 10% to total distance."
-      );
-    } else {
-      trainingRecommendations.add(
-        "With your BMR of ${calculatedBMR.toInt()} kcal, focus on building metabolic efficiency. Limit Zone 3+ work to 20% of your total training volume."
-      );
-    }
-    
-    // Calculate ideal long ride duration based on BMR and weight
-    double maxRecommendedRideDuration = calculatedBMR * 0.1 / safeParseDouble(weight) * 60; // Convert to minutes
-    trainingRecommendations.add(
-      "Your longest weekly ride should build toward ${maxRecommendedRideDuration.toInt()} minutes as your endurance improves."
-    );
-  }
-  else { // Leisure
-    trainingRecommendations.add(
-      "For leisure riding with your BMR of ${calculatedBMR.toInt()} kcal, aim for 3-4 weekly rides of 30-45 minutes in Zone 2 (${zone2HeartRate} bpm)."
-    );
-  }
-  
-  // Add recovery recommendations based on metabolic rate
-  int recommendedRecoveryHours = efficientMetabolism ? 24 : 36;
-  trainingRecommendations.add(
-    "With your metabolic rate, allow ${recommendedRecoveryHours} hours between high-intensity sessions for proper recovery."
-  );
-}
-
-  Widget _buildCalorieBalanceGraphWithBMR() {
-  // Define the data for the graph including BMR line
-  List<Map<String, dynamic>> dailyData = [];
-  DateTime now = DateTime.now();
-  
-  // Make sure BMR is calculated
-  double bmrValue = calculatedBMR > 0 ? calculatedBMR : safeParseDouble(basalMetabolicRate);
-  if (bmrValue <= 0) {
-    _calculateDailyCalorieNeeds();
-    bmrValue = calculatedBMR;
-  }
-  
-  // Generate last 7 days data
-  for (int i = 6; i >= 0; i--) {
-    DateTime date = now.subtract(Duration(days: i));
-    String dayLabel = DateFormat('E').format(date);
-    
-    // Find activities on this day
-    double dayCaloriesBurned = 0;
-    for (var activity in activityData) {
-      if (activity['start_date'] != null) {
-        DateTime activityDate = activity['start_date'].toDate();
-        if (activityDate.year == date.year && activityDate.month == date.month && activityDate.day == date.day) {
-          dayCaloriesBurned += safeParseDouble(activity['calories_burned']);
-        }
-      }
-    }
-    
-    // Find nutrition data for this day
-    double dayCaloriesConsumed = 0;
-    for (var nutrition in nutritionData) {
-      if (nutrition['timestamp'] != null) {
-        DateTime nutritionDate = nutrition['timestamp'].toDate();
-        if (nutritionDate.year == date.year && nutritionDate.month == date.month && nutritionDate.day == date.day) {
-          dayCaloriesConsumed += safeParseDouble(nutrition['caloriesConsumed']);
-        }
-      }
-    }
-    
-    // Add to daily data with BMR included
-    dailyData.add({
-      'day': dayLabel,
-      'caloriesBurned': dayCaloriesBurned,
-      'tdee': bmrValue + dayCaloriesBurned, // Total daily energy expenditure
-      'bmr': bmrValue, // Base metabolic rate line
-      'caloriesConsumed': dayCaloriesConsumed > 0 ? dayCaloriesConsumed : null,
-      'balance': (bmrValue + dayCaloriesBurned) - (dayCaloriesConsumed > 0 ? dayCaloriesConsumed : 0)
-    });
-  }
-  
-  return _buildGraphContainer(
-    title: "Energy Balance with BMR",
-    subtitle: "Last 7 days",
-    height: 320,
-    child: SfCartesianChart(
-      primaryXAxis: CategoryAxis(
-        majorGridLines: MajorGridLines(width: 0),
-        axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-        labelStyle: TextStyle(
-          color: Colors.grey[700],
-          fontFamily: 'Inter',
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      primaryYAxis: NumericAxis(
-        majorGridLines: MajorGridLines(
-          width: 0.5,
-          color: Colors.grey[200],
-          dashArray: <double>[3, 3],
-        ),
-        axisLine: AxisLine(width: 0),
-        labelFormat: '{value} kcal',
-        labelStyle: TextStyle(
-          color: Colors.grey[700],
-          fontFamily: 'Inter',
-          fontSize: 10,
-        ),
-      ),
-      legend: Legend(
-        isVisible: true,
-        position: LegendPosition.bottom,
-        overflowMode: LegendItemOverflowMode.wrap,
-      ),
-      tooltipBehavior: TooltipBehavior(
-        enable: true,
-        color: Colors.grey[800],
-        textStyle: TextStyle(color: Colors.white, fontSize: 12),
-      ),
-      series: <ChartSeries>[
-        // BMR base line
-        LineSeries<Map<String, dynamic>, String>(
-          name: 'BMR (${bmrValue.toInt()} kcal)',
-          dataSource: dailyData,
-          xValueMapper: (data, _) => data['day'],
-          yValueMapper: (data, _) => data['bmr'],
-          color: Colors.purple[700],
-          width: 2,
-          dashArray: <double>[5, 5], // Dashed line
-        ),
-        // Total Daily Energy Expenditure (BMR + Activity)
-        AreaSeries<Map<String, dynamic>, String>(
-          name: 'TDEE',
-          dataSource: dailyData,
-          xValueMapper: (data, _) => data['day'],
-          yValueMapper: (data, _) => data['tdee'],
-          color: Colors.green[400]!.withOpacity(0.5),
-          borderColor: Colors.green[600],
-          borderWidth: 2,
-        ),
-        // Calories Consumed
-        ColumnSeries<Map<String, dynamic>, String>(
-          name: 'Calories Consumed',
-          dataSource: dailyData.where((d) => d['caloriesConsumed'] != null).toList(),
-          xValueMapper: (data, _) => data['day'],
-          yValueMapper: (data, _) => data['caloriesConsumed'],
-          color: Colors.orange[500],
-          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-        ),
-        // Calorie Balance (Net)
-        LineSeries<Map<String, dynamic>, String>(
-          name: 'Net Balance',
-          dataSource: dailyData.where((d) => d['caloriesConsumed'] != null).toList(),
-          xValueMapper: (data, _) => data['day'],
-          yValueMapper: (data, _) => data['balance'],
-          color: Colors.blue[700],
-          width: 2,
-          markerSettings: MarkerSettings(
-            isVisible: true,
-            shape: DataMarkerType.circle,
-            color: Colors.blue[700],
-            borderColor: Colors.white,
-            borderWidth: 2,
-            height: 6,
-            width: 6,
-          ),
-        ),
-      ],
-    )
-  );
-}
-
-bool _isSubgoalCompleted() {
-  if (!hasActiveSubgoal) return false;
-  
-  // Get current week's performance metrics
-  double currentWeekAvgDistance = 0.0;
-  double currentWeekAvgPace = 0.0;
-  double currentWeekAvgDuration = 0.0;
-  
-  // Calculate current week stats from activities
-  if (activityData.isNotEmpty) {
-    List<double> distances = [];
-    List<double> durations = [];
-    List<double> paces = [];
-    
-    // Get activities from the current week
-    DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
-    
-    for (var activity in activityData) {
-      if (activity['start_date'] != null) {
-        DateTime activityDate = activity['start_date'].toDate();
-        if (activityDate.isAfter(oneWeekAgo)) {
-          double distance = safeParseDouble(activity['distance']);
-          double durationSeconds = safeParseDouble(activity['elapsed_time']);
-          double durationMinutes = durationSeconds / 60.0;
-          
-          if (distance > 0) distances.add(distance);
-          if (durationMinutes > 0) durations.add(durationMinutes);
-          
-          // Calculate pace (minutes per km)
-          if (distance > 0 && durationMinutes > 0) {
-            double pace = durationMinutes / distance;
-            paces.add(pace);
-          }
-        }
-      }
-    }
-    
-    // Calculate averages
-    if (distances.isNotEmpty) {
-      currentWeekAvgDistance = distances.reduce((a, b) => a + b) / distances.length;
-    }
-    
-    if (durations.isNotEmpty) {
-      currentWeekAvgDuration = durations.reduce((a, b) => a + b) / durations.length;
-    }
-    
-    if (paces.isNotEmpty) {
-      currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
-    }
-  }
-  Future<void> _resetCompletedSubgoal() async {
-  if (userId == null) return;
-  
-  try {
-    // First, mark the completed subgoal as completed in Firestore
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: userId)
-        .where('endDate', isGreaterThan: DateTime.now())
-        .orderBy('endDate', descending: false)
-        .limit(1)
-        .get();
-    
-    if (subgoalQuery.docs.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('cycling_subgoals')
-          .doc(subgoalQuery.docs.first.id)
-          .update({
-            'completedAt': DateTime.now(),
-            'endDate': DateTime.now(), // Set end date to now so it won't show up in future queries
-            'isCompleted': true
-          });
-    }
-    
-    // Reset local state
-    setState(() {
-      hasActiveSubgoal = false;
-      subgoalType = "";
-      subgoalTargetValue = 0.0;
-      subgoalSuggestions = [];
-      subgoalWarnings = [];
-    });
-    
-    // Recalculate baselines for the next subgoal
-    _calculateBaselines();
-  } catch (e) {
-    print("Error resetting completed subgoal: $e");
-  }
-}
-  // Check completion based on subgoal type
-  switch (subgoalType) {
-    case "distance":
-      return currentWeekAvgDistance >= subgoalTargetValue;
-    case "pace":
-      // For pace, lower is better (faster)
-      return currentWeekAvgPace <= subgoalTargetValue;
-    case "duration":
-      return currentWeekAvgDuration >= subgoalTargetValue;
-    case "maintain":
-      // Maintain goals are considered complete after a week
-      return subgoalEndDate.isBefore(DateTime.now());
-    default:
-      return false;
-  }
-}
   Color _getRecommendationColor(String recommendation) {
     if (recommendation.contains("✅") ||
         recommendation.contains("Good") ||
@@ -5963,4 +4512,3 @@ void _onItemTapped(int index) {
   }
 }
 
-//updated recommendation page without sub-goals
