@@ -234,6 +234,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   void initState() {
     super.initState();
     _fetchUserData();
+    
   }
 
   @override
@@ -861,38 +862,26 @@ Widget _buildSubgoalSelectionCard() {
         ),
       ],
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Wrap the Text in Expanded to prevent overflow
+          Expanded(
+            child: Text(
               "Set Your Next Week's Goal",
               style: GoogleFonts.roboto(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
+              overflow: TextOverflow.ellipsis, // Truncate if too long
             ),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.green[300]!, width: 1),
-              ),
-              child: Text(
-                "Weekly Goal Completed!",
-                style: GoogleFonts.lato(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
         SizedBox(height: 8),
         Text(
           "Set a goal for your weekly average cycling metrics based on your data from this week.",
@@ -1858,6 +1847,7 @@ void _generateSeasonalAdvice() {
     case "High Intensity Cycling":
       _generateWeightManagementRecommendations();
       _generateNutritionRecommendationsFromFoodDiary();
+      _generateSeasonalAdvice();
       break;
     case "Endurance":
       _generateCyclingEnduranceRecommendations();
@@ -2699,19 +2689,6 @@ void _generateSeasonalAdvice() {
             _buildSubgoalSelectionCard(),
             ],
             _buildRecommendationCarousel(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Your Goal Progress",
-                  style: GoogleFonts.roboto(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
-            ),
             SizedBox(height: 16),
             _buildGoalBasedGraphs(),
             SizedBox(height: 24),
@@ -3072,7 +3049,7 @@ void _generateSeasonalAdvice() {
         return Column(
           children: [
             Container(
-              height: 280, // Fixed height for carousel
+              height: 350, // Fixed height for carousel
               child: PageView.builder(
                 controller: pageController,
                 itemCount: recommendationCategories.length,

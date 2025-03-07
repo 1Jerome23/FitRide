@@ -123,23 +123,23 @@ Future<void> _fetchActiveSubgoal() async {
 }
   DateTime _getWeekStartDate() {
     DateTime now = DateTime.now();
-    // Get Monday at 00:00:00 (midnight)
+
     return DateTime(
       now.year, 
       now.month, 
-      now.day - (now.weekday - 1), // Go back to Monday
-      0, 0, 0, 0 // Set time to 00:00:00.000
+      now.day - (now.weekday - 1), 
+      0, 0, 0, 0 
     );
   }
 
   DateTime _getWeekEndDate() {
     DateTime now = DateTime.now();
-    // Get Sunday at 23:59:59
+
     return DateTime(
       now.year,
       now.month,
-      now.day + (7 - now.weekday), // Go forward to Sunday
-      23, 59, 59, 999 // Set time to 23:59:59.999
+      now.day + (7 - now.weekday), 
+      23, 59, 59, 999 
     );
   }
 
@@ -225,7 +225,6 @@ Future<void> _fetchActiveSubgoal() async {
         );
         break;
       case 2:
-      // Current page
         break;
       case 3:
         Navigator.pushReplacement(
@@ -559,7 +558,7 @@ Widget _buildActiveSubgoalCard() {
       if (activity['elapsed_time'] != null) {
         var timeValue = activity['elapsed_time'];
         if (timeValue is int) {
-          duration = timeValue.toDouble() / 60.0; // Convert seconds to minutes
+          duration = timeValue.toDouble() / 60.0; 
         } else if (timeValue is double) {
           duration = timeValue / 60.0;
         } else if (timeValue is String) {
@@ -591,10 +590,8 @@ Widget _buildActiveSubgoalCard() {
     case "distance":
       // Calculate progress using weekly averages
       if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
-        // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (currentWeekAvgDistance - baselineDistance) / (subgoalTargetValue - baselineDistance);
         
-        // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
@@ -607,12 +604,9 @@ Widget _buildActiveSubgoalCard() {
       break;
       
     case "pace":
-      // For pace, lower is better (faster)
       if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
-        // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - subgoalTargetValue);
         
-        // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
@@ -626,10 +620,8 @@ Widget _buildActiveSubgoalCard() {
       
     case "duration":
       if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
-        // Progress is how much of the gap between baseline and target has been covered
         progressPercent = (currentWeekAvgDuration - baselineDuration) / (subgoalTargetValue - baselineDuration);
         
-        // Cap progress between 0-100%
         if (progressPercent < 0) progressPercent = 0;
         if (progressPercent > 1) progressPercent = 1;
       } else {
@@ -642,8 +634,7 @@ Widget _buildActiveSubgoalCard() {
       break;
       
     case "maintain":
-      // For maintenance, we aim to keep within a certain range of the baseline
-      progressPercent = 0.75; // Default to good progress for maintenance
+      progressPercent = 0.75; 
       
       currentValueText = "Maintaining consistent performance";
       baselineValueText = "";
@@ -721,7 +712,6 @@ Widget _buildActiveSubgoalCard() {
         ),
         SizedBox(height: 12),
         
-        // Goal description - clarify this is based on weekly averages
         Text(
           goalTitle,
           style: TextStyle(
@@ -819,10 +809,8 @@ Widget _buildActiveSubgoalCard() {
         
         SizedBox(height: 16),
         
-        // Divider
         Divider(),
         
-        // Suggestions title
         Text(
           "Action Plan:",
           style: TextStyle(
@@ -1274,7 +1262,6 @@ Widget _buildActiveSubgoalCard() {
                             ),
                           ),
                           
-                          // Button
                           Container(
                             width: double.infinity,
                             padding: EdgeInsets.all(20),
@@ -2387,7 +2374,7 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
+              Expanded( // Prevents title from overflowing
                 child: Text(
                   title,
                   style: const TextStyle(
@@ -2395,8 +2382,11 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                     fontSize: 16,
                     color: primaryBlack,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 "${(percentage * 100).toStringAsFixed(0)}%",
                 style: TextStyle(
@@ -2409,6 +2399,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
             ],
           ),
           const SizedBox(height: 12),
+          
+          // Progress Bar
           Stack(
             children: [
               Container(
@@ -2419,86 +2411,109 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              Container(
-                height: 8,
-                width: min(
-                  MediaQuery.of(context).size.width * 0.7, 
-                  MediaQuery.of(context).size.width * percentage * 0.7,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  double barWidth = min(constraints.maxWidth * percentage, constraints.maxWidth);
+                  return Container(
+                    height: 8,
+                    width: barWidth,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [color, color.withOpacity(0.7)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  );
+                },
               ),
             ],
           ),
           const SizedBox(height: 8),
-          unit != "%" ? Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Current: ${progress.toStringAsFixed(1)} $unit",
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: primaryGray,
+
+          if (unit != "%")
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    "Current: ${progress.toStringAsFixed(1)} $unit",
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: primaryGray,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              Text(
-                "Target: ${target.toStringAsFixed(1)} $unit",
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: primaryGray,
+                Expanded(
+                  child: Text(
+                    "Target: ${target.toStringAsFixed(1)} $unit",
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: primaryGray,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                  ),
                 ),
-              ),
-            ],
-          ) : title == "Weight Progress" ? Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: primaryGray,
+              ],
+            ),
+          
+          // Special Case: Weight Progress
+          if (unit == "%" && title == "Weight Progress")
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: primaryGray,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              Text(
-                "Target: ${targetWeight.toStringAsFixed(1)} kg",
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: primaryGray,
+                Expanded(
+                  child: Text(
+                    "Target: ${targetWeight.toStringAsFixed(1)} kg",
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: primaryGray,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                  ),
                 ),
-              ),
-            ],
-          ) : Container(),
+              ],
+            ),
+
+          // Help Text (Prevent Overflow)
           if (helpText != null) ...[
             const SizedBox(height: 8),
             LayoutBuilder(
               builder: (context, constraints) {
-                // Calculate available width for text
                 return Container(
                   width: constraints.maxWidth,
                   child: Text(
                     helpText,
                     style: const TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 12, // Slightly smaller font
+                      fontSize: 12,
                       fontStyle: FontStyle.italic,
                       color: primaryGray,
                     ),
                     softWrap: true,
-                    overflow: TextOverflow.ellipsis, // Use ellipsis for overflow
-                    maxLines: 2, // Limit to 2 lines
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 );
-              }
+              },
             ),
           ],
         ],
@@ -2506,6 +2521,7 @@ Widget _buildProgressCard(String title, double progress, double target, String u
     ),
   );
 }
+
 
   Widget _buildGoalCard() {
     if (userGoal == null) {
