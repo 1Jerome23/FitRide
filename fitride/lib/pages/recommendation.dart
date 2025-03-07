@@ -117,10 +117,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<String> subgoalSuggestions = [];
   List<String> subgoalWarnings = [];
 
-  // Baseline values for comparisons
   double baselineDistance = 0.0;
-  double baselinePace = 0.0; // in min/km
-  double baselineDuration = 0.0; //
+  double baselinePace = 0.0; 
+  double baselineDuration = 0.0; 
 
   String recommendation = "Loading...";
   String feedback = "";
@@ -148,13 +147,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String weight = "0";
   String bodyFat = "0";
   String basalMetabolicRate = "0";
-
-  // BMR-related metrics
-  double calculatedBMR = 0.0;
-  double calculatedTDEE = 0.0;
-  double recommendedCalorieIntake = 0.0;
-  double metabolicEfficiency = 0.0;
-  double metabolicHealthScore = 0.0;
 
   // Activity data
   String levelOfExertion = "0";
@@ -207,21 +199,20 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double averageDistanceAllTime = 0.0;
   double averageSpeedAllTime = 0.0;
   double averageHeartrateAllTime = 0.0;
-  double distanceVariability = 0.0; // Coefficient of variation
+  double distanceVariability = 0.0; 
   double speedVariability = 0.0;
   double heartrateVariability = 0.0;
   double bestDistance = 0.0;
   double bestSpeed = 0.0;
   double lowestHeartRate = 0.0;
   DateTime bestPerformanceDate = DateTime.now();
-  
 
   // Activity patterns with extended analysis
   DateTime lastActivityDate = DateTime.now();
   int daysSinceLastActivity = 0;
   int weeklyActivityCount = 0;
   double weeklyDistanceTotal = 0.0;
-  List<int> activityGaps = []; // Days between activities
+  List<int> activityGaps = []; 
   bool hasRegularSchedule = false;
   String mostFrequentDay = "";
   List<double> distanceProgression = [];
@@ -250,7 +241,41 @@ class _RecommendationPageState extends State<RecommendationPage> {
     _pageController.dispose();
     super.dispose();
   }
+  // Helper method to calculate the weekly calories consumed
+double _calculateWeeklyCaloriesConsumed() {
+  if (nutritionData.isEmpty) return 0.0;
   
+  double weeklyCalories = 0.0;
+  
+  // Sum up calories from all food diary entries in the nutritionData list
+  for (var entry in nutritionData) {
+    double dailyCalories = safeParseDouble(entry['total_calories']);
+    weeklyCalories += dailyCalories;
+  }
+  
+  return weeklyCalories;
+}
+
+// Helper method to calculate the weekly calories burned from actual activity data
+double _calculateWeeklyCaloriesBurned() {
+  if (activityData.isEmpty) return 0.0;
+  
+  double weeklyCalories = 0.0;
+  DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
+  
+  // Sum up calories from all activities in the past week
+  for (var activity in activityData) {
+    if (activity['start_date'] != null) {
+      DateTime activityDate = activity['start_date'].toDate();
+      if (activityDate.isAfter(oneWeekAgo)) {
+        double caloriesBurned = safeParseDouble(activity['calories_burned']);
+        weeklyCalories += caloriesBurned;
+      }
+    }
+  }
+  
+  return weeklyCalories;
+}
 // Method to fetch active subgoal when loading the page
 Future<void> _fetchActiveSubgoal() async {
   if (userId == null) return;
@@ -269,13 +294,12 @@ Future<void> _fetchActiveSubgoal() async {
       var data = subgoalDoc.data() as Map<String, dynamic>;
       
       setState(() {
-        hasActiveSubgoal = true; // Make sure this is set to true
+        hasActiveSubgoal = true; 
         subgoalType = data['subgoalType'];
         subgoalTargetValue = data['targetValue'];
         subgoalStartDate = data['startDate'].toDate();
         subgoalEndDate = data['endDate'].toDate();
         
-        // Load stored suggestions and warnings
         if (data.containsKey('suggestions')) {
           subgoalSuggestions = List<String>.from(data['suggestions']);
         }
@@ -286,7 +310,6 @@ Future<void> _fetchActiveSubgoal() async {
       });
       print("Active subgoal found and loaded: $subgoalType");
     } else {
-      // Explicitly set hasActiveSubgoal to false if no active subgoal is found
       setState(() {
         hasActiveSubgoal = false;
       });
@@ -299,12 +322,10 @@ Future<void> _fetchActiveSubgoal() async {
 
 // Method to set a new cycling subgoal
 void _setCyclingSubgoal(String type, double targetValue) {
-  // Calculate baselines if not already done
   if (baselineDistance == 0.0) {
     _calculateBaselines();
   }
   
-  // Generate subgoal title and progress tracking info
   String title = "";
   List<String> suggestions = [];
   List<String> warnings = [];
@@ -3785,7 +3806,6 @@ void _generateSeasonalAdvice() {
       ),
     );
   }
-
   Widget _buildDistancePerSessionGraph() {
     List<ActivitySessionData> chartData = [];
     int sessionCount = 1;
@@ -4171,12 +4191,19 @@ void _generateSeasonalAdvice() {
   }
 
 Widget _buildWeeklySummaryGraph() {
+
+  double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+  double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+
+  double balanceRatio = weeklyCaloriesConsumed > 0 ? 
+  weeklyCaloriesBurned / weeklyCaloriesConsumed : 0.5;
+  balanceRatio = balanceRatio > 1 ? 1 : (balanceRatio < 0 ? 0 : balanceRatio);
+
   return _buildGraphContainer(
     title: "Weekly Summary",
     subtitle: "Comprehensive view",
-    height: 600, // Increase height for this specific graph
+    height: 600, 
     child: SingleChildScrollView(
-      // Add scrolling capability
       child: Container(
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -4243,14 +4270,7 @@ Widget _buildWeeklySummaryGraph() {
                 icon: Icons.restaurant_outlined,
                 color: Colors.green[600]!,
               ),
-              
-              // Calculate caloric balance
-              _buildSummaryItem(
-                "Caloric Balance",
-                "${(latestCaloriesBurned - safeParseDouble(caloriesConsumed)).toInt()} kcal",
-                icon: Icons.equalizer_outlined,
-                color: Colors.purple[400]!,
-              ),
+            
             ],
 
             Divider(height: 24),
@@ -4314,7 +4334,17 @@ Widget _buildWeeklySummaryGraph() {
 
             // Caloric balance visualization
             Text(
-              "Caloric Balance:",
+              "Weekly Caloric Balance:",
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8),
+
+            Text(
+              "Weekly Caloric Balance:",
               style: GoogleFonts.roboto(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -4324,10 +4354,10 @@ Widget _buildWeeklySummaryGraph() {
             SizedBox(height: 8),
 
             LinearProgressIndicator(
-              value: 0.5, // Should calculate from actual data
+              value: balanceRatio,
               backgroundColor: Colors.green[100],
               valueColor: AlwaysStoppedAnimation<Color>(
-                latestCaloriesBurned > safeParseDouble(caloriesConsumed)
+                weeklyCaloriesBurned > weeklyCaloriesConsumed
                     ? Colors.green
                     : Colors.orange,
               ),
@@ -4337,12 +4367,43 @@ Widget _buildWeeklySummaryGraph() {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "Burned: ${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
+                  "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
                   style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
                 Text(
-                  "Consumed: ${safeParseDouble(caloriesConsumed).toInt()} kcal",
+                  "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
                   style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+            // Add a net caloric balance row
+            SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                        ? Colors.green[50]
+                        : Colors.orange[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                          ? Colors.green.withOpacity(0.3)
+                          : Colors.orange.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).toInt()} kcal",
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      color: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                          ? Colors.green[700]
+                          : Colors.orange[700],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -4352,7 +4413,6 @@ Widget _buildWeeklySummaryGraph() {
     ),
   );
 }
-
 // Helper method for summary items
   Widget _buildSummaryItem(String label, String value,
       {required IconData icon, required Color color}) {
