@@ -1442,10 +1442,10 @@ Widget _buildSubgoalOptionButton(
 
       // Fetch after_exercise data - now with increased limit (20 instead of 10)
       if (goalType != "Leisure") {
-        print("Attempting to fetch after_exercise data...");
+        print("Attempting to fetch user data...");
         QuerySnapshot afterExerciseSnapshot = await FirebaseFirestore.instance
-            .collection('after_exercise')
-            .where('userId', isEqualTo: userId)
+            .collection('userData')
+            .where('uid', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
             .limit(20)
             .get();
@@ -1460,11 +1460,11 @@ Widget _buildSubgoalOptionButton(
             var data = doc.data() as Map<String, dynamic>;
 
             newRecentData.add({
-              "documentId": doc.id,
-              "currentLevel": data['currentLevel'],
               "timestamp": data['timestamp'],
               "userId": data['userId'],
               "weight": data['weight'] ?? weight,
+              "bodyFat": data['bodyFat'] ?? bodyFat,
+              "basalMetabolicRate": data['basalMetabolicRate'] ?? basalMetabolicRate,
             });
           }
 
@@ -2197,6 +2197,11 @@ void _generateSeasonalAdvice() {
         recommendation = "ℹ️ Starting Point Established";
         feedback =
             "Your profile metrics: ${weight} kg weight and ${bodyFat}% body fat. Record post-workout data to see progress.";
+            print("latestWeight: $latestWeight");
+            print("PreviousWeight: $previousWeight");
+            print("latestBodyFat: $latestBodyFat");
+            print("PreviousBodyFat: $previousBodyFat");
+
       });
     } else {
       setState(() {
