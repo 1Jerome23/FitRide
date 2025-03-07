@@ -378,6 +378,135 @@ void _setCyclingSubgoal(String type, double targetValue) {
   // Store in Firestore
   _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
 }
+Future<void> _fetchFoodDiaryData() async {
+  if (userId == null) return;
+  
+  try {
+    // Get the current date (without time)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final oneWeekAgo = today.subtract(Duration(days: 7));
+    
+    QuerySnapshot foodEntrySnapshot = await FirebaseFirestore.instance
+        .collection('food_entries')
+        .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(oneWeekAgo))
+        .orderBy('date', descending: true)
+        .limit(7) // Get a week's worth of food data
+        .get();
+
+    if (foodEntrySnapshot.docs.isNotEmpty) {
+      List<Map<String, dynamic>> newNutritionData = [];
+
+      for (var doc in foodEntrySnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        
+        newNutritionData.add({
+          "documentId": doc.id,
+          "breakfast": data['breakfast'] ?? "-",
+          "lunch": data['lunch'] ?? "-",
+          "dinner": data['dinner'] ?? "-",
+          "breakfast_calories": data['breakfast_calories'] ?? 0,
+          "lunch_calories": data['lunch_calories'] ?? 0,
+          "dinner_calories": data['dinner_calories'] ?? 0,
+          "total_calories": data['total_calories'] ?? 0,
+          "date": data['date'],
+          "timestamp": data['timestamp'],
+        });
+      }
+
+      setState(() {
+        nutritionData = newNutritionData;
+        if (nutritionData.isNotEmpty) {
+          // Update food data for recommendations
+          foodIntake = "${nutritionData[0]['breakfast']}, ${nutritionData[0]['lunch']}, ${nutritionData[0]['dinner']}";
+          caloriesConsumed = nutritionData[0]['total_calories'].toString();
+          print('Calories Consumed: $caloriesConsumed');
+        }
+      });
+    }
+  } catch (e) {
+    print("Error fetching food diary data: $e");
+  }
+}
+void _generateNutritionRecommendationsFromFoodDiary() {
+  // Clear previous recommendations
+  nutritionRecommendations.clear();
+  
+  // Check if we have recent nutrition data
+  if (nutritionData.isEmpty) {
+    nutritionRecommendations.add("Complete your food diary to get personalized nutrition recommendations.");
+    return;
+  }
+  
+  // Get latest food entry
+  var latestFoodEntry = nutritionData[0];
+  double totalCalories = safeParseDouble(latestFoodEntry['total_calories'].toString());
+  double breakfastCalories = safeParseDouble(latestFoodEntry['breakfast_calories'].toString());
+  double lunchCalories = safeParseDouble(latestFoodEntry['lunch_calories'].toString());
+  double dinnerCalories = safeParseDouble(latestFoodEntry['dinner_calories'].toString());
+  
+  // Calculate caloric needs based on activity level and goal
+  double bmr = safeParseDouble(basalMetabolicRate);
+  if (bmr == 0) {
+    // Estimate BMR if not available
+    if (gender.toLowerCase() == "male") {
+      bmr = 88.362 + (13.397 * safeParseDouble(weight)) + (4.799 * safeParseDouble(height)) - (5.677 * age);
+    } else {
+      bmr = 447.593 + (9.247 * safeParseDouble(weight)) + (3.098 * safeParseDouble(height)) - (4.330 * age);
+    }
+  }
+  
+  // Activity factor based on goal type
+  double activityFactor = 1.2; // Base sedentary
+  if (goalType == "Leisure") {
+    activityFactor = 1.375; // Lightly active
+  } else if (goalType == "Endurance") {
+    activityFactor = 1.55; // Moderately active
+  } else if (goalType == "High Intensity Cycling") {
+    activityFactor = 1.725; // Very active
+  }
+  
+  double dailyCalorieNeeds = bmr * activityFactor;
+  
+  // Generate recommendations based on meal distribution and overall intake
+  if (totalCalories < dailyCalorieNeeds * 0.7) {
+    nutritionRecommendations.add("Your calorie intake (${totalCalories.toInt()} kcal) is significantly below your estimated needs (${dailyCalorieNeeds.toInt()} kcal). Consider increasing your intake for optimal performance.");
+  } else if (totalCalories > dailyCalorieNeeds * 1.2 && goalType == "High Intensity Cycling") {
+    nutritionRecommendations.add("Your calorie intake exceeds your calculated needs by ${(totalCalories - dailyCalorieNeeds).toInt()} kcal. Adjust portion sizes to align with your weight management goals.");
+  }
+  
+  // Meal distribution recommendations
+  double breakfastPercent = totalCalories > 0 ? (breakfastCalories / totalCalories) * 100 : 0;
+  double lunchPercent = totalCalories > 0 ? (lunchCalories / totalCalories) * 100 : 0;
+  double dinnerPercent = totalCalories > 0 ? (dinnerCalories / totalCalories) * 100 : 0;
+  
+  if (breakfastPercent < 20 && totalCalories > 0) {
+    nutritionRecommendations.add("Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than recommended. Aim for 20-25% of daily calories at breakfast for sustained energy.");
+  }
+  
+  if (dinnerPercent > 50 && totalCalories > 0) {
+    nutritionRecommendations.add("Your dinner makes up ${dinnerPercent.toInt()}% of your daily calories. Try to shift more calories to earlier meals for better energy distribution throughout the day.");
+  }
+  
+  // Activity-specific recommendations
+  if (goalType == "Endurance") {
+    nutritionRecommendations.add("For endurance training, focus on complex carbs (50-60% of calories) like whole grains, fruits, and starchy vegetables.");
+    
+    // If activity data exists, add specific pre-ride recommendations
+    if (activityData.isNotEmpty) {
+      nutritionRecommendations.add("For rides longer than 90 minutes, consume 30-60g carbs/hour during your ride.");
+    }
+  } else if (goalType == "High Intensity Cycling") {
+    nutritionRecommendations.add("For high-intensity training, include adequate protein (1.2-1.6g per kg of body weight) to support muscle recovery.");
+    nutritionRecommendations.add("Timing matters: consume carbs and protein within 30 minutes after intense sessions.");
+  } else if (goalType == "Leisure") {
+    nutritionRecommendations.add("For leisure cycling, maintain balanced nutrition with plenty of fruits and vegetables (5+ servings/day).");
+  }
+  
+  // Hydration reminder - always valuable
+  nutritionRecommendations.add("Remember to stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
+}
 
 // Method to save the subgoal to Firestore
 void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String> suggestions, List<String> warnings) {
@@ -399,6 +528,56 @@ void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String
   } catch (e) {
     print("Error saving cycling subgoal: $e");
   }
+}
+
+Widget _buildFoodItem(String meal, String description, String calories) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            meal[0], // First letter
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
+            ),
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[800],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                calories,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // Widget to display subgoal selection options
@@ -2118,7 +2297,7 @@ Future<void> _resetCompletedSubgoal() async {
       } catch (e) {
         print("Nutrition data collection may not exist: $e");
       }
-
+await _fetchFoodDiaryData();
       // Generate recommendations based on the fetched data
       _generateRecommendation();
 
@@ -2418,21 +2597,22 @@ Future<void> _resetCompletedSubgoal() async {
 
     // Generate recommendations based on goal type
     switch (goalType) {
-      case "Leisure":
-        _generateLeisureRecommendations();
-        break;
-      case "High Intensity Cycling":
-        _generateWeightManagementRecommendations();
-        break;
-      case "Endurance":
-        _generateCyclingEnduranceRecommendations();
-        break;
-      default:
-        setState(() {
-          recommendation = "No goal type selected.";
-          feedback = "Please set a goal in the app.";
-        });
-    }
+    case "Leisure":
+      _generateLeisureRecommendations();
+      break;
+    case "High Intensity Cycling":
+      _generateWeightManagementRecommendations();
+      break;
+    case "Endurance":
+      _generateCyclingEnduranceRecommendations();
+      break;
+    default:
+      setState(() {
+        recommendation = "No goal type selected.";
+        feedback = "Please set a goal in the app.";
+      });
+  }
+
 
     // Add historical trend analysis to progress recommendations
     _addHistoricalTrendRecommendations();
@@ -4846,129 +5026,188 @@ Future<void> _resetCompletedSubgoal() async {
     );
   }
 
-  Widget _buildWeeklySummaryGraph() {
-    return _buildGraphContainer(
-        title: "Weekly Summary",
-        subtitle: "Comprehensive view",
-        height: 600, // Increase height for this specific graph
-        child: SingleChildScrollView(
-          // Add scrolling capability
-          child: Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[200]!, width: 1),
+Widget _buildWeeklySummaryGraph() {
+  return _buildGraphContainer(
+    title: "Weekly Summary",
+    subtitle: "Comprehensive view",
+    height: 600, // Increase height for this specific graph
+    child: SingleChildScrollView(
+      // Add scrolling capability
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Summary statistics
+            Text(
+              "Week Summary",
+              style: GoogleFonts.roboto(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            SizedBox(height: 16),
+
+            // Cycling sessions
+            _buildSummaryItem(
+              "Cycling Sessions",
+              "${weeklyActivityCount}",
+              icon: Icons.directions_bike_outlined,
+              color: Color(0xffFFA500),
+            ),
+
+            // Total calories burned
+            _buildSummaryItem(
+              "Calories Burned",
+              "${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
+              icon: Icons.local_fire_department_outlined,
+              color: Colors.red[400]!,
+            ),
+
+            // Average heart rate
+            _buildSummaryItem(
+              "Avg HR",
+              "${latestAverageHeartrate.toInt()} bpm",
+              icon: Icons.favorite_outline,
+              color: Colors.pink[400]!,
+            ),
+
+            // Add nutrition summary if available
+            if (nutritionData.isNotEmpty) ...[
+              Divider(height: 24),
+              
+              Text(
+                "Nutrition Summary",
+                style: GoogleFonts.roboto(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 12),
+              
+              // Latest food diary entry
+              _buildSummaryItem(
+                "Daily Calories",
+                "${safeParseDouble(caloriesConsumed).toInt()} kcal",
+                icon: Icons.restaurant_outlined,
+                color: Colors.green[600]!,
+              ),
+              
+              // Calculate caloric balance
+              _buildSummaryItem(
+                "Caloric Balance",
+                "${(latestCaloriesBurned - safeParseDouble(caloriesConsumed)).toInt()} kcal",
+                icon: Icons.equalizer_outlined,
+                color: Colors.purple[400]!,
+              ),
+            ],
+
+            Divider(height: 24),
+            
+            // Food diary summary if available
+            if (nutritionData.isNotEmpty) ...[
+              Text(
+                "Latest Food Diary",
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 8),
+              
+              if (nutritionData[0]['breakfast'] != "-")
+                _buildFoodItem("Breakfast", nutritionData[0]['breakfast'], 
+                  "${nutritionData[0]['breakfast_calories'].toInt()} kcal"),
+              
+              if (nutritionData[0]['lunch'] != "-")
+                _buildFoodItem("Lunch", nutritionData[0]['lunch'], 
+                  "${nutritionData[0]['lunch_calories'].toInt()} kcal"),
+              
+              if (nutritionData[0]['dinner'] != "-")
+                _buildFoodItem("Dinner", nutritionData[0]['dinner'], 
+                  "${nutritionData[0]['dinner_calories'].toInt()} kcal"),
+              
+              Divider(height: 24),
+            ],
+
+            // Body composition changes
+            Row(
               children: [
-                // Summary statistics
-                Text(
-                  "Week Summary",
-                  style: GoogleFonts.roboto(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Expanded(
+                  child: _buildChangeItem(
+                    "Weight",
+                    "$weight kg",
+                    previousWeight > 0
+                        ? "${(latestWeight - previousWeight).toStringAsFixed(1)} kg"
+                        : "N/A",
+                    isPositive: latestWeight < previousWeight,
+                    reverseColor: true,
                   ),
                 ),
-                SizedBox(height: 16),
-
-                // Cycling sessions
-                _buildSummaryItem(
-                  "Cycling Sessions",
-                  "${weeklyActivityCount}",
-                  icon: Icons.directions_bike_outlined,
-                  color: Color(0xffFFA500),
-                ),
-
-                // Total calories burned
-                _buildSummaryItem(
-                  "Calories Burned",
-                  "${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
-                  icon: Icons.local_fire_department_outlined,
-                  color: Colors.red[400]!,
-                ),
-
-                // Average heart rate
-                _buildSummaryItem(
-                  "Avg HR",
-                  "${latestAverageHeartrate.toInt()} bpm",
-                  icon: Icons.favorite_outline,
-                  color: Colors.pink[400]!,
-                ),
-
-                Divider(height: 24),
-
-                // Body composition changes
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildChangeItem(
-                        "Weight",
-                        "$weight kg",
-                        previousWeight > 0
-                            ? "${(latestWeight - previousWeight).toStringAsFixed(1)} kg"
-                            : "N/A",
-                        isPositive: latestWeight < previousWeight,
-                        reverseColor: true,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildChangeItem(
-                        "Body Fat",
-                        "$bodyFat%",
-                        previousBodyFat > 0
-                            ? "${(latestBodyFat - previousBodyFat).toStringAsFixed(1)}%"
-                            : "N/A",
-                        isPositive: latestBodyFat < previousBodyFat,
-                        reverseColor: true,
-                      ),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 16),
-
-                // Caloric balance visualization
-                Text(
-                  "Caloric Balance:",
-                  style: GoogleFonts.roboto(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Expanded(
+                  child: _buildChangeItem(
+                    "Body Fat",
+                    "$bodyFat%",
+                    previousBodyFat > 0
+                        ? "${(latestBodyFat - previousBodyFat).toStringAsFixed(1)}%"
+                        : "N/A",
+                    isPositive: latestBodyFat < previousBodyFat,
+                    reverseColor: true,
                   ),
-                ),
-                SizedBox(height: 8),
-
-                LinearProgressIndicator(
-                  value: 0.5, // Should calculate from actual data
-                  backgroundColor: Colors.green[100],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    latestCaloriesBurned > safeParseDouble(caloriesConsumed)
-                        ? Colors.green
-                        : Colors.orange,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Burned: ${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    ),
-                    Text(
-                      "Consumed: ${safeParseDouble(caloriesConsumed).toInt()} kcal",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    ),
-                  ],
                 ),
               ],
             ),
-          ),
-        ));
-  }
+
+            SizedBox(height: 16),
+
+            // Caloric balance visualization
+            Text(
+              "Caloric Balance:",
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8),
+
+            LinearProgressIndicator(
+              value: 0.5, // Should calculate from actual data
+              backgroundColor: Colors.green[100],
+              valueColor: AlwaysStoppedAnimation<Color>(
+                latestCaloriesBurned > safeParseDouble(caloriesConsumed)
+                    ? Colors.green
+                    : Colors.orange,
+              ),
+            ),
+            SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Burned: ${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+                Text(
+                  "Consumed: ${safeParseDouble(caloriesConsumed).toInt()} kcal",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 // Helper method for summary items
   Widget _buildSummaryItem(String label, String value,
@@ -5059,144 +5298,143 @@ Future<void> _resetCompletedSubgoal() async {
   }
 
   Widget _buildCalorieBalanceGraph() {
-    // Calculate daily calorie data based on activity and nutrition data
-    List<Map<String, dynamic>> dailyData = [];
-    DateTime now = DateTime.now();
+  // Calculate daily calorie data based on activity and food diary data
+  List<Map<String, dynamic>> dailyData = [];
+  DateTime now = DateTime.now();
 
-    // Generate last 7 days data
-    for (int i = 6; i >= 0; i--) {
-      DateTime date = now.subtract(Duration(days: i));
-      String dayLabel = DateFormat('E').format(date);
+  // Generate last 7 days data
+  for (int i = 6; i >= 0; i--) {
+    DateTime date = now.subtract(Duration(days: i));
+    String dayLabel = DateFormat('E').format(date);
 
-      // Find activities on this day
-      double dayCaloriesBurned = 0;
-      for (var activity in activityData) {
-        if (activity['start_date'] != null) {
-          DateTime activityDate = activity['start_date'].toDate();
-          if (activityDate.year == date.year &&
-              activityDate.month == date.month &&
-              activityDate.day == date.day) {
-            dayCaloriesBurned += safeParseDouble(activity['calories_burned']);
-          }
+    // Find activities on this day
+    double dayCaloriesBurned = 0;
+    for (var activity in activityData) {
+      if (activity['start_date'] != null) {
+        DateTime activityDate = activity['start_date'].toDate();
+        if (activityDate.year == date.year &&
+            activityDate.month == date.month &&
+            activityDate.day == date.day) {
+          dayCaloriesBurned += safeParseDouble(activity['calories_burned']);
         }
       }
-
-      // Find nutrition data for this day
-      double dayCaloriesConsumed = 0;
-      for (var nutrition in nutritionData) {
-        if (nutrition['timestamp'] != null) {
-          DateTime nutritionDate = nutrition['timestamp'].toDate();
-          if (nutritionDate.year == date.year &&
-              nutritionDate.month == date.month &&
-              nutritionDate.day == date.day) {
-            dayCaloriesConsumed +=
-                safeParseDouble(nutrition['caloriesConsumed']);
-          }
-        }
-      }
-
-      // Add BMR to calories burned (estimated using basalMetabolicRate if available)
-      double bmrValue = safeParseDouble(basalMetabolicRate);
-      double totalBurn = dayCaloriesBurned +
-          (bmrValue > 0 ? bmrValue : 1500); // Default 1500 if not available
-
-      dailyData.add({
-        'day': dayLabel,
-        'caloriesBurned': totalBurn,
-        'caloriesConsumed':
-            dayCaloriesConsumed > 0 ? dayCaloriesConsumed : null,
-        'balance':
-            totalBurn - (dayCaloriesConsumed > 0 ? dayCaloriesConsumed : 0)
-      });
     }
 
-    return _buildGraphContainer(
-        title: "Calorie Balance",
-        subtitle: "Last 7 days",
-        height: 600, // Slightly taller
-        child: SingleChildScrollView(
-            child: Container(
-          height: 260, // Fixed height for the chart
-          child: SfCartesianChart(
-            primaryXAxis: CategoryAxis(
-              majorGridLines: MajorGridLines(width: 0),
-              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            primaryYAxis: NumericAxis(
-              majorGridLines: MajorGridLines(
-                width: 0.5,
-                color: Colors.grey[200],
-                dashArray: <double>[3, 3],
-              ),
-              axisLine: AxisLine(width: 0),
-              labelFormat: '{value} kcal',
-              labelStyle: TextStyle(
-                color: Colors.grey[700],
-                fontFamily: 'Inter',
-                fontSize: 10,
-              ),
-            ),
-            legend: Legend(
-              isVisible: true,
-              position: LegendPosition.bottom,
-              overflowMode: LegendItemOverflowMode.wrap,
-            ),
-            tooltipBehavior: TooltipBehavior(
-              enable: true,
-              color: Colors.grey[800],
-              textStyle: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            series: <ChartSeries>[
-              // Calories Burned
-              ColumnSeries<Map<String, dynamic>, String>(
-                name: 'Calories Burned',
-                dataSource: dailyData,
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['caloriesBurned'],
-                color: Colors.green[500],
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              // Calories Consumed
-              ColumnSeries<Map<String, dynamic>, String>(
-                name: 'Calories Consumed',
-                dataSource: dailyData
-                    .where((d) => d['caloriesConsumed'] != null)
-                    .toList(),
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['caloriesConsumed'],
-                color: Colors.orange[500],
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-              // Calorie Balance (Net)
-              LineSeries<Map<String, dynamic>, String>(
-                name: 'Net Balance',
-                dataSource: dailyData
-                    .where((d) => d['caloriesConsumed'] != null)
-                    .toList(),
-                xValueMapper: (data, _) => data['day'],
-                yValueMapper: (data, _) => data['balance'],
-                color: Colors.blue[700],
-                width: 2,
-                markerSettings: MarkerSettings(
-                  isVisible: true,
-                  shape: DataMarkerType.circle,
-                  color: Colors.blue[700],
-                  borderColor: Colors.white,
-                  borderWidth: 2,
-                  height: 6,
-                  width: 6,
-                ),
-              ),
-            ],
-          ),
-        )));
+    // Find food diary entries for this day
+    double dayCaloriesConsumed = 0;
+    for (var entry in nutritionData) {
+      if (entry['date'] != null) {
+        DateTime entryDate = entry['date'].toDate();
+        if (entryDate.year == date.year &&
+            entryDate.month == date.month &&
+            entryDate.day == date.day) {
+          dayCaloriesConsumed += safeParseDouble(entry['total_calories'].toString());
+        }
+      }
+    }
+
+    // Add BMR to calories burned (estimated using basalMetabolicRate if available)
+    double bmrValue = safeParseDouble(basalMetabolicRate);
+    double totalBurn = dayCaloriesBurned +
+        (bmrValue > 0 ? bmrValue : 1500); // Default 1500 if not available
+
+    dailyData.add({
+      'day': dayLabel,
+      'caloriesBurned': totalBurn,
+      'caloriesConsumed': dayCaloriesConsumed > 0 ? dayCaloriesConsumed : null,
+      'balance': totalBurn - (dayCaloriesConsumed > 0 ? dayCaloriesConsumed : 0)
+    });
   }
+
+  return _buildGraphContainer(
+    title: "Calorie Balance",
+    subtitle: "Last 7 days",
+    height: 600, // Slightly taller
+    child: SingleChildScrollView(
+      child: Container(
+        height: 260, // Fixed height for the chart
+        child: SfCartesianChart(
+          primaryXAxis: CategoryAxis(
+            majorGridLines: MajorGridLines(width: 0),
+            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          primaryYAxis: NumericAxis(
+            majorGridLines: MajorGridLines(
+              width: 0.5,
+              color: Colors.grey[200],
+              dashArray: <double>[3, 3],
+            ),
+            axisLine: AxisLine(width: 0),
+            labelFormat: '{value} kcal',
+            labelStyle: TextStyle(
+              color: Colors.grey[700],
+              fontFamily: 'Inter',
+              fontSize: 10,
+            ),
+          ),
+          legend: Legend(
+            isVisible: true,
+            position: LegendPosition.bottom,
+            overflowMode: LegendItemOverflowMode.wrap,
+          ),
+          tooltipBehavior: TooltipBehavior(
+            enable: true,
+            color: Colors.grey[800],
+            textStyle: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          series: <ChartSeries>[
+            // Calories Burned
+            ColumnSeries<Map<String, dynamic>, String>(
+              name: 'Calories Burned',
+              dataSource: dailyData,
+              xValueMapper: (data, _) => data['day'],
+              yValueMapper: (data, _) => data['caloriesBurned'],
+              color: Colors.green[500],
+              borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+            ),
+            // Calories Consumed
+            ColumnSeries<Map<String, dynamic>, String>(
+              name: 'Calories Consumed',
+              dataSource: dailyData
+                  .where((d) => d['caloriesConsumed'] != null)
+                  .toList(),
+              xValueMapper: (data, _) => data['day'],
+              yValueMapper: (data, _) => data['caloriesConsumed'],
+              color: Colors.orange[500],
+              borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+            ),
+            // Calorie Balance (Net)
+            LineSeries<Map<String, dynamic>, String>(
+              name: 'Net Balance',
+              dataSource: dailyData
+                  .where((d) => d['caloriesConsumed'] != null)
+                  .toList(),
+              xValueMapper: (data, _) => data['day'],
+              yValueMapper: (data, _) => data['balance'],
+              color: Colors.blue[700],
+              width: 2,
+              markerSettings: MarkerSettings(
+                isVisible: true,
+                shape: DataMarkerType.circle,
+                color: Colors.blue[700],
+                borderColor: Colors.white,
+                borderWidth: 2,
+                height: 6,
+                width: 6,
+              ),
+            ),
+          ],
+        ),
+      )
+    )
+  );
+}
 bool _isSubgoalCompleted() {
   if (!hasActiveSubgoal) return false;
   

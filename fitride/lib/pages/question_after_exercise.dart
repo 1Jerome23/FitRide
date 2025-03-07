@@ -18,16 +18,16 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   final TextEditingController _breakfastController = TextEditingController();
   final TextEditingController _lunchController = TextEditingController();
   final TextEditingController _dinnerController = TextEditingController();
-  
+
   double _breakfastCalories = 0;
   double _lunchCalories = 0;
   double _dinnerCalories = 0;
-  
+
   bool _isCalculatingBreakfast = false;
   bool _isCalculatingLunch = false;
   bool _isCalculatingDinner = false;
   bool _isSubmitting = false;
-  
+
   // Define the orange color from profile page
   final Color orangeColor = const Color(0xffFFA500);
   final Color darkGrey = const Color(0xFF303030);
@@ -93,7 +93,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 ),
               ),
               SizedBox(height: 20),
-              
+
               // Breakfast Section
               _buildMealSection(
                 mealTitle: 'Breakfast',
@@ -103,13 +103,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 icon: Icons.breakfast_dining,
                 onCalculate: () async {
                   if (_breakfastController.text.isEmpty) return;
-                  
+
                   setState(() {
                     _isCalculatingBreakfast = true;
                   });
-                  
-                  final calories = await _getCaloriesFromUSDA(_breakfastController.text);
-                  
+
+                  final calories =
+                      await _getCaloriesFromUSDA(_breakfastController.text);
+
                   setState(() {
                     _breakfastCalories = calories;
                     _isCalculatingBreakfast = false;
@@ -117,7 +118,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 },
               ),
               SizedBox(height: 16),
-              
+
               // Lunch Section
               _buildMealSection(
                 mealTitle: 'Lunch',
@@ -127,13 +128,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 icon: Icons.lunch_dining,
                 onCalculate: () async {
                   if (_lunchController.text.isEmpty) return;
-                  
+
                   setState(() {
                     _isCalculatingLunch = true;
                   });
-                  
-                  final calories = await _getCaloriesFromUSDA(_lunchController.text);
-                  
+
+                  final calories =
+                      await _getCaloriesFromUSDA(_lunchController.text);
+
                   setState(() {
                     _lunchCalories = calories;
                     _isCalculatingLunch = false;
@@ -141,7 +143,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 },
               ),
               SizedBox(height: 16),
-              
+
               // Dinner Section
               _buildMealSection(
                 mealTitle: 'Dinner',
@@ -151,13 +153,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 icon: Icons.dinner_dining,
                 onCalculate: () async {
                   if (_dinnerController.text.isEmpty) return;
-                  
+
                   setState(() {
                     _isCalculatingDinner = true;
                   });
-                  
-                  final calories = await _getCaloriesFromUSDA(_dinnerController.text);
-                  
+
+                  final calories =
+                      await _getCaloriesFromUSDA(_dinnerController.text);
+
                   setState(() {
                     _dinnerCalories = calories;
                     _isCalculatingDinner = false;
@@ -165,7 +168,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 },
               ),
               SizedBox(height: 24),
-              
+
               // Total Calories
               Container(
                 padding: EdgeInsets.all(16),
@@ -227,7 +230,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 ),
               ),
               SizedBox(height: 32),
-              
+
               // Submit Button
               Container(
                 width: double.infinity,
@@ -251,10 +254,12 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(15),
-                    onTap: (_isCalculatingBreakfast || 
-                          _isCalculatingLunch || 
-                          _isCalculatingDinner || 
-                          _isSubmitting) ? null : _saveToFirestore,
+                    onTap: (_isCalculatingBreakfast ||
+                            _isCalculatingLunch ||
+                            _isCalculatingDinner ||
+                            _isSubmitting)
+                        ? null
+                        : _saveToFirestore,
                     child: Center(
                       child: _isSubmitting
                           ? CircularProgressIndicator(color: Colors.white)
@@ -288,7 +293,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       ),
     );
   }
-  
+
   Widget _buildMealSection({
     required String mealTitle,
     required TextEditingController controller,
@@ -373,7 +378,8 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                         fontSize: 14,
                       ),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -390,8 +396,8 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 width: 50,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: isCalculating 
-                        ? [Colors.grey.withOpacity(0.8), Colors.grey] 
+                    colors: isCalculating
+                        ? [Colors.grey.withOpacity(0.8), Colors.grey]
                         : [orangeColor.withOpacity(0.8), orangeColor],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -478,7 +484,8 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       food = match.group(2)!.trim();
     }
 
-    final url = Uri.parse("https://api.nal.usda.gov/fdc/v1/foods/search?query=$food&api_key=$apiKey");
+    final url = Uri.parse(
+        "https://api.nal.usda.gov/fdc/v1/foods/search?query=$food&api_key=$apiKey");
 
     try {
       final response = await http.get(url);
@@ -489,7 +496,8 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
           final firstFood = data["foods"][0];
 
           for (var nutrient in firstFood["foodNutrients"]) {
-            if (nutrient["nutrientName"] == "Energy" && nutrient["unitName"] == "KCAL") {
+            if (nutrient["nutrientName"] == "Energy" &&
+                nutrient["unitName"] == "KCAL") {
               double caloriesPerUnit = nutrient["value"].toDouble();
               return caloriesPerUnit * quantity;
             }
@@ -534,7 +542,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       // Get the current date (without time)
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
+
       // Create data entry
       final foodEntry = {
         'userId': user.uid,
@@ -548,27 +556,10 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
         'dinner': _dinnerController.text,
         'timestamp': FieldValue.serverTimestamp(),
       };
-
-      // Check if an entry already exists for today
-      final querySnapshot = await FirebaseFirestore.instance
-        .collection('food_entries')
-        .where('userId', isEqualTo: user.uid)
-        .where('date', isEqualTo: Timestamp.fromDate(today))
-        .limit(1)
-        .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        // Update existing entry
-        await FirebaseFirestore.instance
-          .collection('food_entries')
-          .doc(querySnapshot.docs.first.id)
-          .update(foodEntry);
-      } else {
-        // Create new entry
-        await FirebaseFirestore.instance
+      // Create new entry
+      await FirebaseFirestore.instance
           .collection('food_entries')
           .add(foodEntry);
-      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
