@@ -58,6 +58,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
+  TextEditingController _updateMetabolicRateController = TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -2194,7 +2195,8 @@ Widget _buildActiveSubgoalCard() {
   void _showUpdateWeightDialog() {
   _updateWeightController.text = "";
   _updateBodyFatController.text = "";
-  
+  _updateMetabolicRateController.text = "";
+
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -2233,6 +2235,20 @@ Widget _buildActiveSubgoalCard() {
               style: const TextStyle(color: Colors.black),
               decoration: InputDecoration(
                 labelText: "Body Fat Percentage (%)",
+                labelStyle: const TextStyle(color: Colors.black),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          SizedBox(height: 16),
+            TextField(
+              controller: _updateMetabolicRateController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(
+                labelText: "Metabolic Rate",
                 labelStyle: const TextStyle(color: Colors.black),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -2290,6 +2306,7 @@ Future<void> _updateUserMetrics() async {
     
     double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
     double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+    double newMetabolicRate = double.tryParse(_updateMetabolicRateController.text) ?? 0;
     
     final userDataQuery = await FirebaseFirestore.instance
         .collection('userData')
@@ -2303,6 +2320,7 @@ Future<void> _updateUserMetrics() async {
       'timestamp': FieldValue.serverTimestamp(),
       'weight': newWeight,
       'bodyFat': newBodyFat,
+      'basalMetabolicRate': newMetabolicRate,	
     };
     
     if (userDataQuery.docs.isNotEmpty) {
