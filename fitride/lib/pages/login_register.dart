@@ -43,23 +43,26 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> signInWithEmailAndPassword() async {
-    try {
-      await Auth().signInWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
-      );
+Future<void> signInWithEmailAndPassword() async {
+  try {
+    await Auth().signInWithEmailAndPassword(
+      email: _controllerEmail.text,
+      password: _controllerPassword.text,
+    );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = 'Invalid email or password.';
-      });
-    }
+    // Save FCM token after successful sign-in
+    await _onLoginSuccess();
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    setState(() {
+      errorMessage = 'Invalid email or password.';
+    });
   }
+}
 
   Future<void> createUserWithEmailAndPassword() async {
     try {
@@ -80,26 +83,61 @@ class _LoginPageState extends State<LoginPage> {
       });
     }
   }
-  Future _getFCMToken() async {
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
-      String? token = await messaging.getToken();
-      if (token != null) {
-        print("FCM Token: $token");
-        await _saveTokenToFirestore(token);
-      } else {
-        print("Failed to retrieve FCM token.");
-      }
+Future _getFCMToken() async {
+  try {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    print("User notification permissions: ${settings.authorizationStatus}");
+    String? token = await messaging.getToken();
+    if (token != null) {
+      print("FCM Token: $token");
+      await _saveTokenToFirestore(token);
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        print("New FCM Token: $newToken");
+        await _saveTokenToFirestore(newToken);
+      });
+    } else {
+      print("Failed to retrieve FCM token.");
     }
+  } catch (e) {
+    print("Error getting FCM token: $e");
+  }
+}
 
     Future _saveTokenToFirestore(String token) async {
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance
+        final docRef = FirebaseFirestore.instance
             .collection('user_device_tokens')
-            .doc(user.uid)
-            .set({
-          'tokens': FieldValue.arrayUnion([token])
-        }, SetOptions(merge: true));
+            .doc(user.uid);
+
+            final docSnapshot = await docRef.get();
+      
+      if (docSnapshot.exists) {
+        // Document exists, check if token is already in the array
+        List<dynamic> existingTokens = docSnapshot.data()?['tokens'] ?? [];
+        
+        if (!existingTokens.contains(token)) {
+          // Token doesn't exist, add it to the array
+          await docRef.update({
+            'tokens': FieldValue.arrayUnion([token])
+          });
+          print("Token added to existing user document");
+        } else {
+          print("Token already exists in user document");
+        }
+      } else {
+        // Document doesn't exist, create it with the token in an array
+        await docRef.set({
+          'tokens': [token],
+          'lastUpdated': FieldValue.serverTimestamp()
+        });
+        print("Created new user device tokens document");
+      }
       }
     }
 
@@ -184,6 +222,8 @@ Future<void> signInWithGoogle() async {
     User? user = userCredential.user;
 
     if (user != null) {
+
+      await _getFCMToken();
       SharedPreferences prefs = await SharedPreferences.getInstance();
       bool hasCompletedQuestionnaire = prefs.getBool('${user.uid}_completed_questionnaire') ?? false;
 
