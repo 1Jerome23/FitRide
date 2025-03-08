@@ -43,26 +43,26 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-Future<void> signInWithEmailAndPassword() async {
-  try {
-    await Auth().signInWithEmailAndPassword(
-      email: _controllerEmail.text,
-      password: _controllerPassword.text,
-    );
+  Future<void> signInWithEmailAndPassword() async {
+    try {
+      await Auth().signInWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
 
-    // Save FCM token after successful sign-in
-    await _onLoginSuccess();
+      // Save FCM token after successful sign-in
+      await _onLoginSuccess();
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      errorMessage = 'Invalid email or password.';
-    });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = 'Invalid email or password.';
+      });
+    }
   }
-}
 
   Future<void> createUserWithEmailAndPassword() async {
     try {
@@ -83,44 +83,45 @@ Future<void> signInWithEmailAndPassword() async {
       });
     }
   }
-Future _getFCMToken() async {
-  try {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-    NotificationSettings settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    print("User notification permissions: ${settings.authorizationStatus}");
-    String? token = await messaging.getToken();
-    if (token != null) {
-      print("FCM Token: $token");
-      await _saveTokenToFirestore(token);
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        print("New FCM Token: $newToken");
-        await _saveTokenToFirestore(newToken);
-      });
-    } else {
-      print("Failed to retrieve FCM token.");
+
+  Future _getFCMToken() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      print("User notification permissions: ${settings.authorizationStatus}");
+      String? token = await messaging.getToken();
+      if (token != null) {
+        print("FCM Token: $token");
+        await _saveTokenToFirestore(token);
+        FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+          print("New FCM Token: $newToken");
+          await _saveTokenToFirestore(newToken);
+        });
+      } else {
+        print("Failed to retrieve FCM token.");
+      }
+    } catch (e) {
+      print("Error getting FCM token: $e");
     }
-  } catch (e) {
-    print("Error getting FCM token: $e");
   }
-}
 
-    Future _saveTokenToFirestore(String token) async {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final docRef = FirebaseFirestore.instance
-            .collection('user_device_tokens')
-            .doc(user.uid);
+  Future _saveTokenToFirestore(String token) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final docRef = FirebaseFirestore.instance
+          .collection('user_device_tokens')
+          .doc(user.uid);
 
-            final docSnapshot = await docRef.get();
-      
+      final docSnapshot = await docRef.get();
+
       if (docSnapshot.exists) {
         // Document exists, check if token is already in the array
         List<dynamic> existingTokens = docSnapshot.data()?['tokens'] ?? [];
-        
+
         if (!existingTokens.contains(token)) {
           // Token doesn't exist, add it to the array
           await docRef.update({
@@ -138,26 +139,69 @@ Future _getFCMToken() async {
         });
         print("Created new user device tokens document");
       }
-      }
     }
+  }
 
-  Future<void> _onLoginSuccess() async {
-    _prefs = await SharedPreferences.getInstance();
-    await _prefs.setBool('isFirstLogin', true);
-    bool isFirstLogin = _prefs.getBool('isFirstLogin') ?? true;
-    await _getFCMToken();
-
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-      print("New FCM Token: $newToken");
-      await _saveTokenToFirestore(newToken);
-    });
-    if (isFirstLogin) {
-      await _prefs.setBool('isFirstLogin', false);
+ Future<void> _onLoginSuccess() async {
+  // Get the current user
+  User? user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+  
+  // Save FCM token
+  await _getFCMToken();
+  
+  // Set up token refresh listener
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    print("New FCM Token: $newToken");
+    await _saveTokenToFirestore(newToken);
+  });
+  
+  // Check if user exists in userData collection instead of using shared preferences
+  try {
+    print("🔍 Checking if user ${user.uid} exists in userData collection");
+    
+    // Query Firestore for documents with the user's UID
+    final QuerySnapshot userDataQuery = await FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+    
+    // If we find at least one document, the user has used the app before
+    bool userExists = userDataQuery.docs.isNotEmpty;
+    
+    print("👤 User exists in userData: $userExists");
+    
+    if (!userExists) {
+      // New user - show first login dialog and guide to questionnaire
+      print("🆕 New user detected, showing questionnaire prompt");
+      
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showFirstLoginDialog();
       });
+    } else {
+      // Existing user - go directly to homepage
+      print("👤 Existing user detected, skipping questionnaire");
+      
+      if (mounted) {
+        print("🏠 Redirecting existing user to HomePage...");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
+    }
+  } catch (e) {
+    print("❌ Error checking user data: $e");
+    // In case of error, default to showing HomePage
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
     }
   }
+}
 
   void _showFirstLoginDialog() {
     showDialog(
@@ -199,95 +243,112 @@ Future _getFCMToken() async {
     );
   }
 
-Future<void> signInWithGoogle() async {
-  try {
-    final GoogleSignIn googleSignIn = GoogleSignIn();
-    await googleSignIn.signOut(); // ✅ Ensure fresh login prompt
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+  Future<void> signInWithGoogle() async {
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut(); // ✅ Ensure fresh login prompt
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
-    if (googleUser == null) {
+      if (googleUser == null) {
+        setState(() {
+          errorMessage = 'Google Sign-In was canceled.';
+        });
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      User? user = userCredential.user;
+
+      if (user != null) {
+        await _getFCMToken();
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        bool hasCompletedQuestionnaire =
+            prefs.getBool('${user.uid}_completed_questionnaire') ?? false;
+
+        print("🔍 Has Completed Questionnaire: $hasCompletedQuestionnaire");
+
+        if (!hasCompletedQuestionnaire) {
+          print("➡️ Redirecting to Questionnaire...");
+
+          // ✅ Immediately mark questionnaire as completed
+          await prefs.setBool('${user.uid}_completed_questionnaire', true);
+          print("✅ Set questionnaire as completed IMMEDIATELY");
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => QuestionPage()),
+          );
+        } else {
+          print("🏠 Redirecting to HomePage...");
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage()),
+          );
+        }
+      }
+    } catch (e) {
       setState(() {
-        errorMessage = 'Google Sign-In was canceled.';
+        errorMessage = 'Google Sign-In failed: $e';
       });
+      print("❌ Google Sign-In Error: $e");
+    }
+  }
+
+ // This function should be called when the user completes the questionnaire
+// It should save user data to Firebase, which will serve as a marker that
+// the user has completed onboarding
+void completeQuestionnaire(Map<String, dynamic> userData) async {
+  try {
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (userId == null) {
+      print("❌ Error: No authenticated user when completing questionnaire");
       return;
     }
-
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-    User? user = userCredential.user;
-
-    if (user != null) {
-
-      await _getFCMToken();
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      bool hasCompletedQuestionnaire = prefs.getBool('${user.uid}_completed_questionnaire') ?? false;
-
-      print("🔍 Has Completed Questionnaire: $hasCompletedQuestionnaire");
-
-      if (!hasCompletedQuestionnaire) {
-        print("➡️ Redirecting to Questionnaire...");
-
-        // ✅ Immediately mark questionnaire as completed
-        await prefs.setBool('${user.uid}_completed_questionnaire', true);
-        print("✅ Set questionnaire as completed IMMEDIATELY");
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => QuestionPage()),
-        );
-      } else {
-        print("🏠 Redirecting to HomePage...");
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
-      }
+    
+    print("🔹 Saving questionnaire data for user: $userId");
+    
+    // Ensure the user ID is included in the data
+    userData['uid'] = userId;
+    
+    // Add a timestamp
+    userData['timestamp'] = FieldValue.serverTimestamp();
+    
+    // Save to Firestore userData collection
+    await FirebaseFirestore.instance
+        .collection('userData')
+        .add(userData);
+    
+    print("✅ Questionnaire data saved to Firestore");
+    
+    // Navigate to HomePage after completing the questionnaire
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
     }
   } catch (e) {
-    setState(() {
-      errorMessage = 'Google Sign-In failed: $e';
-    });
-    print("❌ Google Sign-In Error: $e");
+    print("❌ Error saving questionnaire data: $e");
+    
+    // Show error message to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error saving your data. Please try again.'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }
 
-
-void completeQuestionnaire() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? userId = FirebaseAuth.instance.currentUser?.uid;
-
-  if (userId == null) {
-    print("❌ Error: No authenticated user.");
-    return;
-  }
-
-  print("🔹 Attempting to save questionnaire completion for user: $userId");
-
-  // ✅ Save flag
-  await prefs.setBool('${userId}_completed_questionnaire', true);
-
-  // ✅ Force reload before checking the value
-  await Future.delayed(Duration(milliseconds: 300));
-  await prefs.reload(); // Ensures value is persisted
-
-  // ✅ Read and print saved value
-  bool savedValue = prefs.getBool('${userId}_completed_questionnaire') ?? false;
-  print("✅ Questionnaire completed flag saved: $savedValue");
-
-  // ✅ Add another delay to ensure SharedPreferences is fully written
-  await Future.delayed(Duration(milliseconds: 300));
-
-  // Redirect to HomePage after completing the questionnaire
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => HomePage()),
-  );
-}
   void toggleAuthMode() {
     setState(() {
       isLogin = !isLogin;
@@ -339,13 +400,14 @@ void completeQuestionnaire() async {
                           controller: _controllerEmail,
                           style: TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.person_outline_outlined, color: Colors.white),
+                            prefixIcon: Icon(Icons.person_outline_outlined,
+                                color: Colors.white),
                             labelText: "Email",
                             labelStyle: TextStyle(color: Colors.white),
                             floatingLabelStyle: TextStyle(color: Colors.white),
                             hintText: "Email",
                             hintStyle: TextStyle(color: Colors.white70),
-                            filled: true, 
+                            filled: true,
                             fillColor: Color(0xff777B7E),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -359,10 +421,11 @@ void completeQuestionnaire() async {
                           obscureText: !_isPasswordVisible,
                           style: TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.lock_outline, color: Colors.white),
+                            prefixIcon:
+                                Icon(Icons.lock_outline, color: Colors.white),
                             labelText: "Password",
-                            labelStyle: TextStyle(color: Colors.white), 
-                            floatingLabelStyle: TextStyle(color: Colors.white), 
+                            labelStyle: TextStyle(color: Colors.white),
+                            floatingLabelStyle: TextStyle(color: Colors.white),
                             hintText: "Password",
                             hintStyle: TextStyle(color: Colors.white70),
                             filled: true,
@@ -377,9 +440,11 @@ void completeQuestionnaire() async {
                                   _isPasswordVisible = !_isPasswordVisible;
                                 });
                               },
-                              icon: Icon(_isPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off, color: Colors.white),
+                              icon: Icon(
+                                  _isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: Colors.white),
                             ),
                           ),
                         ),
@@ -416,9 +481,11 @@ void completeQuestionnaire() async {
                         Row(
                           children: [
                             Expanded(
-                                child: Divider(thickness: 1, color: Colors.white)),
+                                child:
+                                    Divider(thickness: 1, color: Colors.white)),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10.0),
                               child: Text(
                                 "OR",
                                 style: TextStyle(
@@ -429,7 +496,8 @@ void completeQuestionnaire() async {
                               ),
                             ),
                             Expanded(
-                                child: Divider(thickness: 1, color: Colors.white)),
+                                child:
+                                    Divider(thickness: 1, color: Colors.white)),
                           ],
                         ),
                         const SizedBox(height: 20.0),
@@ -444,7 +512,8 @@ void completeQuestionnaire() async {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Image.asset("assets/googleicon.png", height: 24.0),
+                                Image.asset("assets/googleicon.png",
+                                    height: 24.0),
                                 const SizedBox(width: 10.0),
                                 Text(
                                   isLogin
