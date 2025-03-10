@@ -162,24 +162,7 @@ class _HealthSummaryState extends State<HealthSummary> {
     }
     
     try {
-      // Simplifying to avoid composite index issues
-      // First try the direct document approach
-      final userDoc = await FirebaseFirestore.instance
-          .collection('userData')
-          .doc(userId)
-          .get();
-      
-      if (userDoc.exists) {
-        final data = userDoc.data() as Map<String, dynamic>;
-        final bmr = double.tryParse(data['basalMetabolicRate']?.toString() ?? '0') ?? 0;
-        
-        if (bmr > 0) {
-          print("🔥 Basal Metabolic Rate from direct document: $bmr");
-          return bmr;
-        }
-      }
-      
-      // If that doesn't work, get all documents for this user without ordering
+    
       QuerySnapshot userDataQuery = await FirebaseFirestore.instance
           .collection('userData')
           .where('uid', isEqualTo: userId)
@@ -229,66 +212,83 @@ class _HealthSummaryState extends State<HealthSummary> {
     }
     
     try {
-      final userDoc = await FirebaseFirestore.instance.collection('userData').doc(userId).get();
-      final activitiesSnapshot = await FirebaseFirestore.instance.collection('activities').where('uid', isEqualTo: userId).get();
-      final athleteDoc = await FirebaseFirestore.instance.collection('athletes').doc(userId).get();
-      
-      // Fetch the weekly average calories and latest BMR
-      final averageCalories = await fetchWeeklyAverageCalories();
-      final basalMetabolicRate = await fetchLatestBasalMetabolicRate();
+  // Modified to get the most recent userData document for this userId
+  final userDataQuery = await FirebaseFirestore.instance
+      .collection('userData')
+      .where('uid', isEqualTo: userId)
+      .orderBy('timestamp', descending: true)  // Assuming 'timestamp' is your timestamp field
+      .limit(1)
+      .get();
+  
+  // Get the first (most recent) document or null if empty
+  final userDoc = userDataQuery.docs.isNotEmpty ? userDataQuery.docs.first : null;
+  
+  final activitiesSnapshot = await FirebaseFirestore.instance
+      .collection('activities')
+      .where('uid', isEqualTo: userId)
+      .get();
+  
+  final athleteDoc = await FirebaseFirestore.instance
+      .collection('athletes')
+      .doc(userId)
+      .get();
+  
+  // Fetch the weekly average calories and latest BMR
+  final averageCalories = await fetchWeeklyAverageCalories();
+  final basalMetabolicRate = await fetchLatestBasalMetabolicRate();
 
-      final userData = userDoc.data() ?? {};
-      final athleteData = athleteDoc.data() ?? {};
-      final activities = activitiesSnapshot.docs.map((doc) => doc.data()).toList();
+  final userData = userDoc?.data() ?? {};
+  final athleteData = athleteDoc.data() ?? {};
+  final activities = activitiesSnapshot.docs.map((doc) => doc.data()).toList();
 
-      double height = (double.tryParse(userData['height']?.toString() ?? '0') ?? 0) / 100;
-      double weight = double.tryParse(userData['weight']?.toString() ?? '0') ?? 0;
-      double bmi = (height > 0) ? weight / (height * height) : 0;
-      double metabolicRate = double.tryParse(userData['metabolic_rate']?.toString() ?? '0') ?? 0;
-      double bodyFatPercentage = double.tryParse(userData['bodyFat']?.toString() ?? '0') ?? 0;
+  // Rest of the code remains the same
+  double height = (double.tryParse(userData['height']?.toString() ?? '0') ?? 0) / 100;
+  double weight = double.tryParse(userData['weight']?.toString() ?? '0') ?? 0;
+  double bmi = (height > 0) ? weight / (height * height) : 0;
+  double metabolicRate = double.tryParse(userData['metabolic_rate']?.toString() ?? '0') ?? 0;
+  double bodyFatPercentage = double.tryParse(userData['bodyFat']?.toString() ?? '0') ?? 0;
 
-      double totalDistance = 0, totalCalories = 0;
-      double latestHeartRate = 0;
-      Timestamp? latestTimestamp;
+  double totalDistance = 0, totalCalories = 0;
+  double latestHeartRate = 0;
+  Timestamp? latestTimestamp;
 
-      for (var activity in activities) {
-        // Convert distance and calories directly
-        totalDistance += double.tryParse(activity['distance']?.toString() ?? '0') ?? 0;
-        totalCalories += double.tryParse(activity['calories_burned']?.toString() ?? '0') ?? 0;
+  for (var activity in activities) {
+    // Convert distance and calories directly
+    totalDistance += double.tryParse(activity['distance']?.toString() ?? '0') ?? 0;
+    totalCalories += double.tryParse(activity['calories_burned']?.toString() ?? '0') ?? 0;
 
-        // Ensure heart rate is valid
-        double heartRate = double.tryParse(activity['average_heartrate']?.toString() ?? '0') ?? 0;
-        Timestamp? activityTimestamp = activity['start_date']; // Assuming timestamp is stored
+    // Ensure heart rate is valid
+    double heartRate = double.tryParse(activity['average_heartrate']?.toString() ?? '0') ?? 0;
+    Timestamp? activityTimestamp = activity['start_date']; // Assuming timestamp is stored
 
-        if (heartRate > 0 && activityTimestamp != null) {
-          if (latestTimestamp == null || activityTimestamp.millisecondsSinceEpoch > latestTimestamp.millisecondsSinceEpoch) {
-            latestTimestamp = activityTimestamp;
-            latestHeartRate = heartRate;
-          }
-        }
+    if (heartRate > 0 && activityTimestamp != null) {
+      if (latestTimestamp == null || activityTimestamp.millisecondsSinceEpoch > latestTimestamp.millisecondsSinceEpoch) {
+        latestTimestamp = activityTimestamp;
+        latestHeartRate = heartRate;
       }
-      print("🔥 Heart Rate: $latestHeartRate");
-      print("🔥 Total Distance: $totalDistance");
-      print("🔥 Total Calories: $totalCalories");
-      print("🔥 Average Daily Calories: $averageCalories");
-      print("🔥 Basal Metabolic Rate: $basalMetabolicRate");
-      
-    return {
-      'Athlete Name': athleteData['athlete_name'] ?? 'N/A',
-      'Age': userData['age']?.toString() ?? 'N/A',
-      'Height (cm)': userData['height']?.toString() ?? 'N/A',
-      'Weight (kg)': userData['weight']?.toString() ?? 'N/A',
-      'BMI': bmi > 0 ? bmi.toStringAsFixed(2) : 'N/A',
-      'Metabolic Rate': metabolicRate > 0 ? metabolicRate.toStringAsFixed(2) : 'N/A',
-      'Basal Metabolic Rate': basalMetabolicRate > 0 ? basalMetabolicRate.toStringAsFixed(2) : 'N/A',
-      'Body Fat %': bodyFatPercentage > 0 ? bodyFatPercentage.toStringAsFixed(2) : 'N/A',
-      'Avg. Heart Rate': latestHeartRate > 0 ? latestHeartRate.toStringAsFixed(2) : 'N/A', // ✅ Uses latest heart rate
-      'Total Distance (km)': totalDistance > 0 ? totalDistance.toStringAsFixed(2) : 'N/A',
-      'Total Calories': totalCalories > 0 ? totalCalories.toStringAsFixed(2) : 'N/A',
-      'Avg. Daily Calories': averageCalories > 0 ? averageCalories.toStringAsFixed(2) : 'N/A',
-    };
-    
-    } catch (e) {
+    }
+  }
+  print("🔥 Heart Rate: $latestHeartRate");
+  print("🔥 Total Distance: $totalDistance");
+  print("🔥 Total Calories: $totalCalories");
+  print("🔥 Average Daily Calories: $averageCalories");
+  print("🔥 Basal Metabolic Rate: $basalMetabolicRate");
+  
+  return {
+    'Athlete Name': athleteData['athlete_name'] ?? 'N/A',
+    'Age': userData['age']?.toString() ?? 'N/A',
+    'Height (cm)': userData['height']?.toString() ?? 'N/A',
+    'Weight (kg)': userData['weight']?.toString() ?? 'N/A',
+    'BMI': bmi > 0 ? bmi.toStringAsFixed(2) : 'N/A',
+    'Metabolic Rate': metabolicRate > 0 ? metabolicRate.toStringAsFixed(2) : 'N/A',
+    'Basal Metabolic Rate': basalMetabolicRate > 0 ? basalMetabolicRate.toStringAsFixed(2) : 'N/A',
+    'Body Fat %': bodyFatPercentage > 0 ? bodyFatPercentage.toStringAsFixed(2) : 'N/A',
+    'Avg. Heart Rate': latestHeartRate > 0 ? latestHeartRate.toStringAsFixed(2) : 'N/A', // ✅ Uses latest heart rate
+    'Total Distance (km)': totalDistance > 0 ? totalDistance.toStringAsFixed(2) : 'N/A',
+    'Total Calories': totalCalories > 0 ? totalCalories.toStringAsFixed(2) : 'N/A',
+    'Avg. Daily Calories': averageCalories > 0 ? averageCalories.toStringAsFixed(2) : 'N/A',
+  };
+} catch (e) {
       throw Exception("Error fetching data: $e");
     }
   }

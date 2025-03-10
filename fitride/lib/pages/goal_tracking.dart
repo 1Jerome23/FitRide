@@ -785,7 +785,7 @@ Widget _buildActiveSubgoalCard() {
                 ),
                 Container(
                   height: 8,
-                  width: MediaQuery.of(context).size.width * 0.7 * progressPercent,
+                  width: MediaQuery.of(context).size.width * progressPercent,
                   decoration: BoxDecoration(
                     color: progressColor,
                     borderRadius: BorderRadius.circular(4),
@@ -879,6 +879,7 @@ Widget _buildActiveSubgoalCard() {
     ),
   );
 }
+
   void _checkEnduranceGoalCompletion() {
     print("⭐ Checking endurance goal completion...");
     

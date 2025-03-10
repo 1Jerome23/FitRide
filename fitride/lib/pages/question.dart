@@ -211,7 +211,7 @@ class _QuestionPageState extends State<QuestionPage>
 
       await FirebaseFirestore.instance
           .collection('userData')
-          .doc(user.uid) 
+          .doc() 
           .set(userData, SetOptions(merge: true)); 
 
       _controller.animateToPage(
@@ -254,7 +254,7 @@ class _QuestionPageState extends State<QuestionPage>
         
         await FirebaseFirestore.instance
             .collection('userData')
-            .doc(user.uid)
+            .doc()
             .set(bodyMetrics, SetOptions(merge: true));
             
         goalData['targetWeight'] = targetWeightController.text;
