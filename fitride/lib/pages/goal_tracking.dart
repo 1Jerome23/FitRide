@@ -17,7 +17,8 @@ class GoalTrackingPage extends StatefulWidget {
   _GoalTrackingPageState createState() => _GoalTrackingPageState();
 }
 
-class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerProviderStateMixin {
+class _GoalTrackingPageState extends State<GoalTrackingPage>
+    with SingleTickerProviderStateMixin {
   int _selectedIndex = 2;
   Map<String, dynamic>? userGoal;
   bool _isLoading = true;
@@ -58,7 +59,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
-  TextEditingController _updateMetabolicRateController = TextEditingController();
+  TextEditingController _updateMetabolicRateController =
+      TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -66,90 +68,90 @@ class _GoalTrackingPageState extends State<GoalTrackingPage> with SingleTickerPr
   late DateTime _weekStartDate;
   late DateTime _weekEndDate;
   // Method to fetch active subgoal when loading the page
-Future<void> _fetchActiveSubgoal() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
-  
-  try {
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: uid)
-        .where('endDate', isGreaterThan: DateTime.now())
-        .orderBy('endDate', descending: false)
-        .limit(1)
-        .get();
-    
-    if (subgoalQuery.docs.isNotEmpty) {
-      DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
-      var data = subgoalDoc.data() as Map<String, dynamic>;
-      
-      setState(() {
-        hasActiveSubgoal = true;
-        subgoalType = data['subgoalType'];
-        subgoalTargetValue = data['targetValue'];
-        subgoalStartDate = data['startDate'].toDate();
-        subgoalEndDate = data['endDate'].toDate();
-        
-        // Load stored suggestions and warnings
-        if (data.containsKey('suggestions')) {
-          subgoalSuggestions = List<String>.from(data['suggestions']);
-        }
-        
-        if (data.containsKey('warnings')) {
-          subgoalWarnings = List<String>.from(data['warnings']);
-        }
-        
-        // Load baseline values if available
-        if (data.containsKey('baselineDistance')) {
-          baselineDistance = data['baselineDistance'];
-        }
-        if (data.containsKey('baselinePace')) {
-          baselinePace = data['baselinePace'];
-        }
-        if (data.containsKey('baselineDuration')) {
-          baselineDuration = data['baselineDuration'];
-        }
-      });
-      print("Active subgoal found and loaded: $subgoalType");
-    } else {
-      setState(() {
-        hasActiveSubgoal = false;
-      });
-      print("No active subgoal found");
+  Future<void> _fetchActiveSubgoal() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .where('endDate', isGreaterThan: DateTime.now())
+          .orderBy('endDate', descending: false)
+          .limit(1)
+          .get();
+
+      if (subgoalQuery.docs.isNotEmpty) {
+        DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
+        var data = subgoalDoc.data() as Map<String, dynamic>;
+
+        setState(() {
+          hasActiveSubgoal = true;
+          subgoalType = data['subgoalType'];
+          subgoalTargetValue = data['targetValue'];
+          subgoalStartDate = data['startDate'].toDate();
+          subgoalEndDate = data['endDate'].toDate();
+
+          // Load stored suggestions and warnings
+          if (data.containsKey('suggestions')) {
+            subgoalSuggestions = List<String>.from(data['suggestions']);
+          }
+
+          if (data.containsKey('warnings')) {
+            subgoalWarnings = List<String>.from(data['warnings']);
+          }
+
+          // Load baseline values if available
+          if (data.containsKey('baselineDistance')) {
+            baselineDistance = data['baselineDistance'];
+          }
+          if (data.containsKey('baselinePace')) {
+            baselinePace = data['baselinePace'];
+          }
+          if (data.containsKey('baselineDuration')) {
+            baselineDuration = data['baselineDuration'];
+          }
+        });
+        print("Active subgoal found and loaded: $subgoalType");
+      } else {
+        setState(() {
+          hasActiveSubgoal = false;
+        });
+        print("No active subgoal found");
+      }
+    } catch (e) {
+      print("Error fetching active subgoal: $e");
     }
-  } catch (e) {
-    print("Error fetching active subgoal: $e");
   }
-}
+  DateTime _goalCreationDate = DateTime.now();
+
   DateTime _getWeekStartDate() {
     DateTime now = DateTime.now();
-
+    
+    int daysSinceCreation = now.difference(_goalCreationDate).inDays;
+    
+    int weekNumber = daysSinceCreation ~/ 7;
+    
     return DateTime(
-      now.year, 
-      now.month, 
-      now.day - (now.weekday - 1), 
-      0, 0, 0, 0 
+      _goalCreationDate.year,
+      _goalCreationDate.month,
+      _goalCreationDate.day + (weekNumber * 7),
+      0, 0, 0, 0
     );
   }
 
   DateTime _getWeekEndDate() {
-    DateTime now = DateTime.now();
-
-    return DateTime(
-      now.year,
-      now.month,
-      now.day + (7 - now.weekday), 
-      23, 59, 59, 999 
-    );
+    return _getWeekStartDate().add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
   }
 
   @override
   void initState() {
     super.initState();
 
-    _weekStartDate = _getWeekStartDate();
-    _weekEndDate = _getWeekEndDate();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+    _weekStartDate = DateTime.now();
+    _weekEndDate = DateTime.now().add(Duration(days: 7));
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 5));
 
     Future.delayed(Duration(milliseconds: 500), () {
       _loadUserGoalAndActivities();
@@ -172,7 +174,7 @@ Future<void> _fetchActiveSubgoal() async {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadUserGoalAndActivities();
-    
+
     Future.delayed(Duration(milliseconds: 1500), () {
       if (userGoal != null) {
         if (userGoal!['goalType'] == 'Endurance') {
@@ -242,12 +244,8 @@ Future<void> _fetchActiveSubgoal() async {
       MaterialPageRoute(builder: (context) => LoginPage()),
     );
   }
-  
 
   Future<void> _loadUserGoalAndActivities() async {
-    _weekStartDate = _getWeekStartDate();
-    _weekEndDate = _getWeekEndDate();
-
     setState(() {
       _isLoading = true;
     });
@@ -267,9 +265,16 @@ Future<void> _fetchActiveSubgoal() async {
 
         if (goalsSnapshot.docs.isNotEmpty) {
           DocumentSnapshot mostRecentGoalDoc = goalsSnapshot.docs.first;
-          Map<String, dynamic>? goalData = mostRecentGoalDoc.data() as Map<String, dynamic>?;
+          Map<String, dynamic>? goalData =
+              mostRecentGoalDoc.data() as Map<String, dynamic>?;
 
           print("Most recent goal data: $goalData");
+
+        Timestamp goalCreationTimestamp = goalData!['timestamp'] as Timestamp;
+        _goalCreationDate = goalCreationTimestamp.toDate();
+        
+        _weekStartDate = _getWeekStartDate();
+        _weekEndDate = _getWeekEndDate();
 
           if (goalData!['goalType'] == 'High Intensity Cycling') {
             try {
@@ -282,10 +287,10 @@ Future<void> _fetchActiveSubgoal() async {
 
               if (!goalData.containsKey('initialWeight')) {
                 await FirebaseFirestore.instance
-                  .collection('goals')
-                  .doc(mostRecentGoalDoc.id)
-                  .update({'initialWeight': _currentUserWeight});
-                
+                    .collection('goals')
+                    .doc(mostRecentGoalDoc.id)
+                    .update({'initialWeight': _currentUserWeight});
+
                 goalData['initialWeight'] = _currentUserWeight;
               }
 
@@ -303,7 +308,7 @@ Future<void> _fetchActiveSubgoal() async {
                     _currentUserWeight = double.tryParse(weightValue) ?? 0.0;
                   }
                 }
-                
+
                 print("Current user weight: $_currentUserWeight");
               } else {
                 print("No userData document found for current weight");
@@ -332,20 +337,22 @@ Future<void> _fetchActiveSubgoal() async {
 
             userIdNumber = int.tryParse(athleteId);
 
-            if (userIdNumber == null && athleteDoc.data().containsKey('user_id')) {
+            if (userIdNumber == null &&
+                athleteDoc.data().containsKey('user_id')) {
               userIdNumber = athleteDoc.data()['user_id'] as int?;
             }
 
             if (userIdNumber == null) {
-              final numericPart = RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
-              userIdNumber = numericPart != null ? int.tryParse(numericPart) : null;
+              final numericPart =
+                  RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
+              userIdNumber =
+                  numericPart != null ? int.tryParse(numericPart) : null;
             }
 
             print("Athlete Document ID: $athleteId");
             print("Converted User ID Number: $userIdNumber");
 
             if (userIdNumber != null) {
-
               final goalCreationTimestamp = goalData['timestamp'] as Timestamp;
 
               final allActivitiesSnapshot = await FirebaseFirestore.instance
@@ -354,7 +361,8 @@ Future<void> _fetchActiveSubgoal() async {
                   .where('start_date', isGreaterThan: goalCreationTimestamp)
                   .get();
 
-              print("Activities found after goal creation: ${allActivitiesSnapshot.docs.length}");
+              print(
+                  "Activities found after goal creation: ${allActivitiesSnapshot.docs.length}");
 
               hasActivity = allActivitiesSnapshot.docs.isNotEmpty;
 
@@ -369,16 +377,19 @@ Future<void> _fetchActiveSubgoal() async {
                   _latestActivityDate = null;
                   _latestDistance = 0;
 
-                  final sortedActivities = allActivitiesSnapshot.docs.map((doc) => doc.data()).toList()
+                  final sortedActivities = allActivitiesSnapshot.docs
+                      .map((doc) => doc.data())
+                      .toList()
                     ..sort((a, b) {
                       final dateA = (a['start_date'] as Timestamp).toDate();
                       final dateB = (b['start_date'] as Timestamp).toDate();
-                      return dateB.compareTo(dateA); 
+                      return dateB.compareTo(dateA);
                     });
 
                   if (sortedActivities.isNotEmpty) {
                     _latestActivity = sortedActivities.first;
-                    _latestActivityDate = (_latestActivity!['start_date'] as Timestamp).toDate();
+                    _latestActivityDate =
+                        (_latestActivity!['start_date'] as Timestamp).toDate();
 
                     var latestDistanceValue = _latestActivity!['distance'];
                     if (latestDistanceValue is int) {
@@ -386,7 +397,8 @@ Future<void> _fetchActiveSubgoal() async {
                     } else if (latestDistanceValue is double) {
                       _latestDistance = latestDistanceValue;
                     } else if (latestDistanceValue is String) {
-                      _latestDistance = double.tryParse(latestDistanceValue) ?? 0.0;
+                      _latestDistance =
+                          double.tryParse(latestDistanceValue) ?? 0.0;
                     }
 
                     print("Latest activity date: ${_latestActivityDate}");
@@ -410,21 +422,28 @@ Future<void> _fetchActiveSubgoal() async {
 
                     if (distance > _bestDistance) {
                       _bestDistance = distance;
-                      _bestDistanceDate = (data['start_date'] as Timestamp).toDate();
+                      _bestDistanceDate =
+                          (data['start_date'] as Timestamp).toDate();
                       _bestDistanceActivity = data;
-                      print("New best distance: $_bestDistance on ${_bestDistanceDate}");
+                      print(
+                          "New best distance: $_bestDistance on ${_bestDistanceDate}");
                     }
                   }
                 }
 
-                final weeklyActivitiesSnapshot = await FirebaseFirestore.instance
+                final weeklyActivitiesSnapshot = await FirebaseFirestore
+                    .instance
                     .collection('activities')
                     .where('user_id', isEqualTo: userIdNumber)
-                    .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(_weekStartDate))
-                    .where('start_date', isLessThanOrEqualTo: Timestamp.fromDate(_weekEndDate))
+                    .where('start_date',
+                        isGreaterThanOrEqualTo:
+                            Timestamp.fromDate(_weekStartDate))
+                    .where('start_date',
+                        isLessThanOrEqualTo: Timestamp.fromDate(_weekEndDate))
                     .get();
 
-                print("Weekly activities found: ${weeklyActivitiesSnapshot.docs.length}");
+                print(
+                    "Weekly activities found: ${weeklyActivitiesSnapshot.docs.length}");
 
                 double totalDuration = 0;
                 double totalDistance = 0;
@@ -432,7 +451,8 @@ Future<void> _fetchActiveSubgoal() async {
                 _weeklyActivities = weeklyActivitiesSnapshot.docs.map((doc) {
                   final data = doc.data();
 
-                  DateTime activityDate = (data['start_date'] as Timestamp).toDate();
+                  DateTime activityDate =
+                      (data['start_date'] as Timestamp).toDate();
                   String dayKey = DateFormat('yyyy-MM-dd').format(activityDate);
                   _uniqueDays.add(dayKey);
 
@@ -448,7 +468,6 @@ Future<void> _fetchActiveSubgoal() async {
 
                   duration = duration / 60.0;
                   totalDuration += duration;
-
 
                   if (data['distance'] != null) {
                     double distance = 0.0;
@@ -468,7 +487,9 @@ Future<void> _fetchActiveSubgoal() async {
 
                 _weeklyDaysProgress = _uniqueDays.length.toDouble();
                 _totalWeeklyDuration = totalDuration;
-                _averageSessionDuration = _weeklyActivities.isEmpty ? 0 : totalDuration / _weeklyActivities.length;
+                _averageSessionDuration = _weeklyActivities.isEmpty
+                    ? 0
+                    : totalDuration / _weeklyActivities.length;
                 _totalWeeklyDistance = totalDistance;
                 _checkEnduranceGoalCompletion();
               }
@@ -476,9 +497,10 @@ Future<void> _fetchActiveSubgoal() async {
           } else {
             print("No matching athlete found, but goal exists");
           }
-          if (userGoal != null && userGoal!['goalType'] == 'High Intensity Cycling') {
-              await _fetchActiveSubgoal();
-            }
+          if (userGoal != null &&
+              userGoal!['goalType'] == 'High Intensity Cycling') {
+            await _fetchActiveSubgoal();
+          }
           setState(() {
             userGoal = goalData;
             _hasActivityAfterGoal = hasActivity;
@@ -515,339 +537,310 @@ Future<void> _fetchActiveSubgoal() async {
       });
     }
   }
-Widget _buildActiveSubgoalCard() {
-  if (!hasActiveSubgoal) return SizedBox.shrink();
-  
-  // Calculate days remaining
-  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
-  if (daysRemaining < 0) daysRemaining = 0;
-  
-  // Calculate progress based on weekly averages and current activity data
-  double progressPercent = 0.0;
-  String currentValueText = "";
-  String targetValueText = "";
-  String baselineValueText = "";
-  
-  // Calculate current week's performance metrics
-  double currentWeekAvgDistance = 0.0;
-  double currentWeekAvgPace = 0.0;
-  double currentWeekAvgDuration = 0.0;
-  
-  if (_weeklyActivities.isNotEmpty) {
-    double totalDistance = 0.0;
-    double totalDuration = 0.0;
-    List<double> paces = [];
-    
-    for (var activity in _weeklyActivities) {
-      // Get distance
-      double distance = 0.0;
-      if (activity['distance'] != null) {
-        var distanceValue = activity['distance'];
-        if (distanceValue is int) {
-          distance = distanceValue.toDouble();
-        } else if (distanceValue is double) {
-          distance = distanceValue;
-        } else if (distanceValue is String) {
-          distance = double.tryParse(distanceValue) ?? 0.0;
-        }
-      }
-      totalDistance += distance;
-      
-      // Get duration in minutes
-      double duration = 0.0;
-      if (activity['elapsed_time'] != null) {
-        var timeValue = activity['elapsed_time'];
-        if (timeValue is int) {
-          duration = timeValue.toDouble() / 60.0; 
-        } else if (timeValue is double) {
-          duration = timeValue / 60.0;
-        } else if (timeValue is String) {
-          duration = (double.tryParse(timeValue) ?? 0.0) / 60.0;
-        }
-      }
-      totalDuration += duration;
-      
-      // Calculate pace (minutes per km)
-      if (distance > 0 && duration > 0) {
-        double pace = duration / distance;
-        paces.add(pace);
-      }
-    }
-    
-    // Calculate averages
+
+  Widget _buildActiveSubgoalCard() {
+    if (!hasActiveSubgoal) return SizedBox.shrink();
+
+    // Calculate days remaining
+    int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+    if (daysRemaining < 0) daysRemaining = 0;
+
+    // Calculate progress based on weekly averages and current activity data
+    double progressPercent = 0.0;
+    String currentValueText = "";
+    String targetValueText = "";
+    String baselineValueText = "";
+
+    // Calculate current week's performance metrics
+    double currentWeekAvgDistance = 0.0;
+    double currentWeekAvgPace = 0.0;
+    double currentWeekAvgDuration = 0.0;
+
     if (_weeklyActivities.isNotEmpty) {
-      currentWeekAvgDistance = totalDistance / _weeklyActivities.length;
-      currentWeekAvgDuration = totalDuration / _weeklyActivities.length;
-      
-      if (paces.isNotEmpty) {
-        currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+      double totalDistance = 0.0;
+      double totalDuration = 0.0;
+      List<double> paces = [];
+
+      for (var activity in _weeklyActivities) {
+        // Get distance
+        double distance = 0.0;
+        if (activity['distance'] != null) {
+          var distanceValue = activity['distance'];
+          if (distanceValue is int) {
+            distance = distanceValue.toDouble();
+          } else if (distanceValue is double) {
+            distance = distanceValue;
+          } else if (distanceValue is String) {
+            distance = double.tryParse(distanceValue) ?? 0.0;
+          }
+        }
+        totalDistance += distance;
+
+        // Get duration in minutes
+        double duration = 0.0;
+        if (activity['elapsed_time'] != null) {
+          var timeValue = activity['elapsed_time'];
+          if (timeValue is int) {
+            duration = timeValue.toDouble() / 60.0;
+          } else if (timeValue is double) {
+            duration = timeValue / 60.0;
+          } else if (timeValue is String) {
+            duration = (double.tryParse(timeValue) ?? 0.0) / 60.0;
+          }
+        }
+        totalDuration += duration;
+
+        // Calculate pace (minutes per km)
+        if (distance > 0 && duration > 0) {
+          double pace = duration / distance;
+          paces.add(pace);
+        }
+      }
+
+      // Calculate averages
+      if (_weeklyActivities.isNotEmpty) {
+        currentWeekAvgDistance = totalDistance / _weeklyActivities.length;
+        currentWeekAvgDuration = totalDuration / _weeklyActivities.length;
+
+        if (paces.isNotEmpty) {
+          currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+        }
       }
     }
-  }
-  
-  // Calculate progress based on subgoal type
-  switch (subgoalType) {
-    case "distance":
-      // Calculate progress using weekly averages
-      if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
-        progressPercent = (currentWeekAvgDistance - baselineDistance) / (subgoalTargetValue - baselineDistance);
-        
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        progressPercent = currentWeekAvgDistance > 0 ? 0.5 : 0.0;
-      }
-      
-      currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
-      baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
-      targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
-      break;
-      
-    case "pace":
-      if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
-        progressPercent = (baselinePace - currentWeekAvgPace) / (baselinePace - subgoalTargetValue);
-        
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        progressPercent = currentWeekAvgPace > 0 ? 0.5 : 0.0;
-      }
-      
-      currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
-      baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
-      targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
-      break;
-      
-    case "duration":
-      if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
-        progressPercent = (currentWeekAvgDuration - baselineDuration) / (subgoalTargetValue - baselineDuration);
-        
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 1) progressPercent = 1;
-      } else {
-        progressPercent = currentWeekAvgDuration > 0 ? 0.5 : 0.0;
-      }
-      
-      currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
-      baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
-      targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
-      break;
-      
-    case "maintain":
-      progressPercent = 0.75; 
-      
-      currentValueText = "Maintaining consistent performance";
-      baselineValueText = "";
-      targetValueText = "";
-      break;
-  }
-  
-  // Get goal title
-  String goalTitle = "";
-  
-  switch (subgoalType) {
-    case "distance":
-      goalTitle = "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
-      break;
-    case "pace":
-      goalTitle = "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
-      break;
-    case "duration":
-      goalTitle = "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
-      break;
-    case "maintain":
-      goalTitle = "Maintain current cycling performance";
-      break;
-  }
-  
-  Color progressColor = progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
-  
-  return Container(
-    margin: EdgeInsets.only(top: 20, bottom: 20),
-    padding: EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 2,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "This Week's Cycling Goal",
-              style: TextStyle(
-                fontFamily: 'Fredoka-SemiBold',
-                fontSize: 18,
-                color: Colors.black87,
-              ),
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.orange[300]!, width: 1),
-              ),
-              child: Text(
-                "$daysRemaining days left",
+
+    // Calculate progress based on subgoal type
+    switch (subgoalType) {
+      case "distance":
+        // Calculate progress using weekly averages
+        if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
+          progressPercent = (currentWeekAvgDistance - baselineDistance) /
+              (subgoalTargetValue - baselineDistance);
+
+          if (progressPercent < 0) progressPercent = 0;
+          if (progressPercent > 1) progressPercent = 1;
+        } else {
+          progressPercent = currentWeekAvgDistance > 0 ? 0.5 : 0.0;
+        }
+
+        currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
+        baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
+        targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
+        break;
+
+      case "pace":
+        if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
+          progressPercent = (baselinePace - currentWeekAvgPace) /
+              (baselinePace - subgoalTargetValue);
+
+          if (progressPercent < 0) progressPercent = 0;
+          if (progressPercent > 1) progressPercent = 1;
+        } else {
+          progressPercent = currentWeekAvgPace > 0 ? 0.5 : 0.0;
+        }
+
+        currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
+        baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
+        targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
+        break;
+
+      case "duration":
+        if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
+          progressPercent = (currentWeekAvgDuration - baselineDuration) /
+              (subgoalTargetValue - baselineDuration);
+
+          if (progressPercent < 0) progressPercent = 0;
+          if (progressPercent > 1) progressPercent = 1;
+        } else {
+          progressPercent = currentWeekAvgDuration > 0 ? 0.5 : 0.0;
+        }
+
+        currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
+        baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
+        targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
+        break;
+
+      case "maintain":
+        progressPercent = 0.75;
+
+        currentValueText = "Maintaining consistent performance";
+        baselineValueText = "";
+        targetValueText = "";
+        break;
+    }
+
+    // Get goal title
+    String goalTitle = "";
+
+    switch (subgoalType) {
+      case "distance":
+        goalTitle =
+            "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
+        break;
+      case "pace":
+        goalTitle =
+            "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+        break;
+      case "duration":
+        goalTitle =
+            "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
+        break;
+      case "maintain":
+        goalTitle = "Maintain current cycling performance";
+        break;
+    }
+
+    Color progressColor =
+        progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
+
+    return Container(
+      margin: EdgeInsets.only(top: 20, bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "This Week's Cycling Goal",
                 style: TextStyle(
-                  fontFamily: 'Lato',
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 18,
+                  color: Colors.black87,
                 ),
               ),
-            ),
-          ],
-        ),
-        SizedBox(height: 12),
-        
-        Text(
-          goalTitle,
-          style: TextStyle(
-            fontFamily: 'Lato',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        
-        SizedBox(height: 16),
-        
-        // Progress visualization with baseline included
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subgoalType != "maintain") ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Last Week's Avg: $baselineValueText",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orange[300]!, width: 1),
+                ),
+                child: Text(
+                  "$daysRemaining days left",
+                  style: TextStyle(
+                    fontFamily: 'Lato',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[700],
                   ),
-                  Text(
-                    "Target Avg: $targetValueText",
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
+                ),
               ),
-              SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Current Avg: $currentValueText",
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-            ] else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    currentValueText,
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
             ],
-            Stack(
-              children: [
-                Container(
-                  height: 8,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Container(
-                  height: 8,
-                  width: MediaQuery.of(context).size.width * progressPercent,
-                  decoration: BoxDecoration(
-                    color: progressColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              subgoalType == "maintain" 
-                  ? "Maintaining consistent performance"
-                  : "${(progressPercent * 100).toInt()}% of goal achieved",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-        
-        SizedBox(height: 16),
-        
-        Divider(),
-        
-        Text(
-          "Action Plan:",
-          style: TextStyle(
-            fontFamily: 'Lato',
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
           ),
-        ),
-        
-        SizedBox(height: 8),
-        
-        // Suggestions list
-        Column(
-          children: subgoalSuggestions.map((suggestion) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.check_circle_outline, size: 16, color: Colors.green[700]),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    suggestion,
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                ),
-              ],
-            ),
-          )).toList(),
-        ),
-        
-        // Warnings if available
-        if (subgoalWarnings.isNotEmpty) ...[
           SizedBox(height: 12),
+
           Text(
-            "Important Notes:",
+            goalTitle,
+            style: TextStyle(
+              fontFamily: 'Lato',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          // Progress visualization with baseline included
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (subgoalType != "maintain") ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Last Week's Avg: $baselineValueText",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    Text(
+                      "Target Avg: $targetValueText",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Current Avg: $currentValueText",
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      currentValueText,
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+              ],
+              Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    height: 8,
+                    width: MediaQuery.of(context).size.width * progressPercent,
+                    decoration: BoxDecoration(
+                      color: progressColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Text(
+                subgoalType == "maintain"
+                    ? "Maintaining consistent performance"
+                    : "${(progressPercent * 100).toInt()}% of goal achieved",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: 16),
+
+          Divider(),
+
+          Text(
+            "Action Plan:",
             style: TextStyle(
               fontFamily: 'Lato',
               fontSize: 14,
@@ -855,49 +848,92 @@ Widget _buildActiveSubgoalCard() {
               color: Colors.black87,
             ),
           ),
+
           SizedBox(height: 8),
+
+          // Suggestions list
           Column(
-            children: subgoalWarnings.map((warning) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.warning_amber_outlined, size: 16, color: Colors.orange[700]),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      warning,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[800]),
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
+            children: subgoalSuggestions
+                .map((suggestion) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.check_circle_outline,
+                              size: 16, color: Colors.green[700]),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              suggestion,
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.black87),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
           ),
+
+          // Warnings if available
+          if (subgoalWarnings.isNotEmpty) ...[
+            SizedBox(height: 12),
+            Text(
+              "Important Notes:",
+              style: TextStyle(
+                fontFamily: 'Lato',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8),
+            Column(
+              children: subgoalWarnings
+                  .map((warning) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.warning_amber_outlined,
+                                size: 16, color: Colors.orange[700]),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                warning,
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey[800]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   void _checkEnduranceGoalCompletion() {
     print("⭐ Checking endurance goal completion...");
-    
+
     if (userGoal == null) {
       print("No user goal found");
       return;
     }
-    
+
     if (userGoal!['goalType'] != 'Endurance') {
       print("Not an endurance goal: ${userGoal!['goalType']}");
       return;
     }
-    
+
     if (_hasShownCompletionDialog) {
       print("Dialog already shown this session");
       return;
     }
-    
+
     double targetDistance = 0;
     var distanceValue = userGoal!['targetDistance'];
     if (distanceValue is int) {
@@ -907,7 +943,7 @@ Widget _buildActiveSubgoalCard() {
     } else if (distanceValue is String) {
       targetDistance = double.tryParse(distanceValue) ?? 0;
     }
-    
+
     double targetDuration = 0;
     if (userGoal!.containsKey('sessionDuration')) {
       var durationValue = userGoal!['sessionDuration'];
@@ -915,23 +951,25 @@ Widget _buildActiveSubgoalCard() {
         targetDuration = durationValue.toDouble();
       } else if (durationValue is double) {
         targetDuration = durationValue;
-      } else if (durationValue is String) { 
+      } else if (durationValue is String) {
         targetDuration = double.tryParse(durationValue) ?? 0.0;
       }
     }
-    
+
     bool isDistanceComplete = _bestDistance >= targetDistance;
-    bool isDurationComplete = _bestDistanceActivity != null && 
+    bool isDurationComplete = _bestDistanceActivity != null &&
         _getBestActivityDuration() >= targetDuration;
-    
+
     print("Goal completion status:");
-    print("⭐ Best distance: $_bestDistance, Target: $targetDistance, Complete: $isDistanceComplete");
-    print("⭐ Best duration: ${_getBestActivityDuration()}, Target: $targetDuration, Complete: $isDurationComplete");
-    
+    print(
+        "⭐ Best distance: $_bestDistance, Target: $targetDistance, Complete: $isDistanceComplete");
+    print(
+        "⭐ Best duration: ${_getBestActivityDuration()}, Target: $targetDuration, Complete: $isDurationComplete");
+
     if (isDistanceComplete && isDurationComplete) {
       print("⭐⭐⭐ GOAL COMPLETED! Showing celebration dialog!");
       _hasShownCompletionDialog = true;
-      
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showGoalCompletionDialog();
       });
@@ -942,22 +980,22 @@ Widget _buildActiveSubgoalCard() {
 
   void _checkHighIntensityCyclingGoalCompletion() {
     print("⭐ Checking high intensity cycling goal completion...");
-    
+
     if (userGoal == null) {
       print("No user goal found");
       return;
     }
-    
+
     if (userGoal!['goalType'] != 'High Intensity Cycling') {
       print("Not a high intensity cycling goal: ${userGoal!['goalType']}");
       return;
     }
-    
+
     if (_hasShownCompletionDialog) {
       print("Dialog already shown this session");
       return;
     }
-    
+
     double targetWeight = 0;
     var targetWeightValue = userGoal!['targetWeight'];
     if (targetWeightValue is int) {
@@ -967,16 +1005,18 @@ Widget _buildActiveSubgoalCard() {
     } else if (targetWeightValue is String) {
       targetWeight = double.tryParse(targetWeightValue) ?? 0;
     }
-    
-    bool isWeightGoalComplete = _currentUserWeight > 0 && _currentUserWeight <= targetWeight;
-    
+
+    bool isWeightGoalComplete =
+        _currentUserWeight > 0 && _currentUserWeight <= targetWeight;
+
     print("Weight goal completion status:");
-    print("⭐ Current weight: $_currentUserWeight, Target: $targetWeight, Complete: $isWeightGoalComplete");
-    
+    print(
+        "⭐ Current weight: $_currentUserWeight, Target: $targetWeight, Complete: $isWeightGoalComplete");
+
     if (isWeightGoalComplete) {
       print("⭐⭐⭐ WEIGHT GOAL COMPLETED! Showing celebration dialog!");
       _hasShownCompletionDialog = true;
-      
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showWeightGoalCompletionDialog();
       });
@@ -990,10 +1030,10 @@ Widget _buildActiveSubgoalCard() {
       print("Widget not mounted, can't show dialog");
       return;
     }
-    
+
     try {
       _confettiController.play();
-      
+
       showGeneralDialog(
         context: context,
         barrierDismissible: false,
@@ -1009,7 +1049,8 @@ Widget _buildActiveSubgoalCard() {
             child: child,
           );
         },
-        pageBuilder: (BuildContext context, Animation animation, Animation secondaryAnimation) {
+        pageBuilder: (BuildContext context, Animation animation,
+            Animation secondaryAnimation) {
           return Material(
             type: MaterialType.transparency,
             child: Center(
@@ -1051,7 +1092,6 @@ Widget _buildActiveSubgoalCard() {
                           ],
                         ),
                       ),
-                      
                       Column(
                         children: [
                           Container(
@@ -1075,7 +1115,8 @@ Widget _buildActiveSubgoalCard() {
                                 Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.center, 
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text(
                                         "TARGET WEIGHT ACHIEVED!",
@@ -1087,9 +1128,10 @@ Widget _buildActiveSubgoalCard() {
                                           letterSpacing: 1.2,
                                           shadows: [
                                             Shadow(
-                                              offset: Offset(2, 2), 
-                                              blurRadius: 4.0, 
-                                              color: Colors.black.withOpacity(0.5),
+                                              offset: Offset(2, 2),
+                                              blurRadius: 4.0,
+                                              color:
+                                                  Colors.black.withOpacity(0.5),
                                             ),
                                           ],
                                         ),
@@ -1110,7 +1152,6 @@ Widget _buildActiveSubgoalCard() {
                               ],
                             ),
                           ),
-                          
                           Expanded(
                             child: SingleChildScrollView(
                               padding: EdgeInsets.all(24),
@@ -1126,7 +1167,6 @@ Widget _buildActiveSubgoalCard() {
                                     ),
                                   ),
                                   SizedBox(height: 16),
-                                  
                                   Container(
                                     padding: EdgeInsets.all(16),
                                     decoration: BoxDecoration(
@@ -1138,7 +1178,8 @@ Widget _buildActiveSubgoalCard() {
                                       ),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
                                         Text(
                                           "Weight Goal Achieved!",
@@ -1181,9 +1222,7 @@ Widget _buildActiveSubgoalCard() {
                                       ],
                                     ),
                                   ),
-                                  
                                   SizedBox(height: 24),
-                                  
                                   Container(
                                     padding: EdgeInsets.all(16),
                                     decoration: BoxDecoration(
@@ -1195,7 +1234,8 @@ Widget _buildActiveSubgoalCard() {
                                       ),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           "Your Cycling Stats",
@@ -1235,9 +1275,7 @@ Widget _buildActiveSubgoalCard() {
                                       ],
                                     ),
                                   ),
-                                  
                                   SizedBox(height: 24),
-                                  
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
@@ -1262,7 +1300,6 @@ Widget _buildActiveSubgoalCard() {
                               ),
                             ),
                           ),
-                          
                           Container(
                             width: double.infinity,
                             padding: EdgeInsets.all(20),
@@ -1271,7 +1308,9 @@ Widget _buildActiveSubgoalCard() {
                                 Navigator.of(context).pop();
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          QuestionPage(initialPage: 2)),
                                 );
                               },
                               style: ElevatedButton.styleFrom(
@@ -1311,7 +1350,7 @@ Widget _buildActiveSubgoalCard() {
 
   void _showGoalCompletionDialog() {
     _confettiController.play();
-    
+
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -1327,7 +1366,8 @@ Widget _buildActiveSubgoalCard() {
           child: child,
         );
       },
-      pageBuilder: (BuildContext context, Animation animation, Animation secondaryAnimation) {
+      pageBuilder: (BuildContext context, Animation animation,
+          Animation secondaryAnimation) {
         return Material(
           type: MaterialType.transparency,
           child: Center(
@@ -1369,7 +1409,6 @@ Widget _buildActiveSubgoalCard() {
                         ],
                       ),
                     ),
-                    
                     Column(
                       children: [
                         Container(
@@ -1377,7 +1416,10 @@ Widget _buildActiveSubgoalCard() {
                           padding: EdgeInsets.symmetric(vertical: 30),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [primaryOrange, const Color.fromARGB(255, 248, 149, 69)],
+                              colors: [
+                                primaryOrange,
+                                const Color.fromARGB(255, 248, 149, 69)
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -1399,8 +1441,8 @@ Widget _buildActiveSubgoalCard() {
                                   letterSpacing: 1.2,
                                   shadows: [
                                     Shadow(
-                                      offset: Offset(2, 2), 
-                                      blurRadius: 4.0, 
+                                      offset: Offset(2, 2),
+                                      blurRadius: 4.0,
                                       color: Colors.black.withOpacity(0.5),
                                     ),
                                   ],
@@ -1419,7 +1461,6 @@ Widget _buildActiveSubgoalCard() {
                             ],
                           ),
                         ),
-                        
                         Expanded(
                           child: SingleChildScrollView(
                             padding: EdgeInsets.all(24),
@@ -1437,20 +1478,22 @@ Widget _buildActiveSubgoalCard() {
                                   ),
                                 ),
                                 SizedBox(height: 16),
-                                
+
                                 // Best performance details
                                 Center(
                                   child: Column(
-                                    mainAxisSize: MainAxisSize.min, 
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Container(
                                         padding: EdgeInsets.all(16),
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
                                           children: [
                                             Text(
                                               "Best Performance",
@@ -1494,9 +1537,8 @@ Widget _buildActiveSubgoalCard() {
                                   ),
                                 ),
 
-                                
                                 SizedBox(height: 24),
-                                
+
                                 // Achievement details
                                 Container(
                                   padding: EdgeInsets.all(16),
@@ -1509,14 +1551,16 @@ Widget _buildActiveSubgoalCard() {
                                     ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
                                         children: [
                                           Text(
                                             "You've successfully reached your target distance of ${userGoal!['targetDistance']} km and completed it within your target duration of ${userGoal!['targetDuration']} minutes.",
-                                            textAlign: TextAlign.center, 
+                                            textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontFamily: 'Inter',
                                               fontSize: 14,
@@ -1526,7 +1570,7 @@ Widget _buildActiveSubgoalCard() {
                                           SizedBox(height: 16),
                                           Text(
                                             "This achievement shows your dedication to cycling and your endurance capabilities. Keep pushing your limits!",
-                                            textAlign: TextAlign.center, 
+                                            textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontFamily: 'Inter',
                                               fontSize: 14,
@@ -1538,9 +1582,9 @@ Widget _buildActiveSubgoalCard() {
                                     ],
                                   ),
                                 ),
-                                
+
                                 SizedBox(height: 24),
-                                
+
                                 Text(
                                   "What's Next?",
                                   style: TextStyle(
@@ -1562,7 +1606,6 @@ Widget _buildActiveSubgoalCard() {
                             ),
                           ),
                         ),
-                        
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(20),
@@ -1571,7 +1614,9 @@ Widget _buildActiveSubgoalCard() {
                               Navigator.of(context).pop();
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        QuestionPage(initialPage: 2)),
                               );
                             },
                             style: ElevatedButton.styleFrom(
@@ -1690,7 +1735,8 @@ Widget _buildActiveSubgoalCard() {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
               child: const Text(
                 "Change Goal",
@@ -1718,9 +1764,8 @@ Widget _buildActiveSubgoalCard() {
         );
       } catch (e) {
         print('Error resetting goal: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to reset goal. Please try again.'))
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Failed to reset goal. Please try again.')));
       }
     }
   }
@@ -1728,7 +1773,7 @@ Widget _buildActiveSubgoalCard() {
   Future<List<Map<String, dynamic>>> _fetchGoalHistory() async {
     List<Map<String, dynamic>> goalHistory = [];
     String? uid = FirebaseAuth.instance.currentUser?.uid;
-    
+
     if (uid != null) {
       try {
         QuerySnapshot goalsSnapshot = await FirebaseFirestore.instance
@@ -1736,18 +1781,17 @@ Widget _buildActiveSubgoalCard() {
             .where('uid', isEqualTo: uid)
             .orderBy('timestamp', descending: true)
             .get();
-        
+
         goalHistory = goalsSnapshot.docs.map((doc) {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
           data['id'] = doc.id;
           return data;
         }).toList();
-        
       } catch (e) {
         print('Error fetching goal history: $e');
       }
     }
-    
+
     return goalHistory;
   }
 
@@ -1856,13 +1900,15 @@ Widget _buildActiveSubgoalCard() {
                       final createdAt = goal['timestamp'] != null
                           ? (goal['timestamp'] as Timestamp).toDate()
                           : DateTime.now();
-                      
+
                       String details = '';
-                      
+
                       if (goalType == 'Leisure') {
                         final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
-                        final sessionDuration = goal['sessionDuration'] ?? 'N/A';
-                        details = "$daysPerWeek days/week, $sessionDuration min/session";
+                        final sessionDuration =
+                            goal['sessionDuration'] ?? 'N/A';
+                        details =
+                            "$daysPerWeek days/week, $sessionDuration min/session";
                       } else if (goalType == 'High Intensity Cycling') {
                         final targetWeight = goal['targetWeight'] ?? 'N/A';
                         details = "Target weight: $targetWeight kg";
@@ -1870,15 +1916,19 @@ Widget _buildActiveSubgoalCard() {
                         final targetDistance = goal['targetDistance'] ?? 'N/A';
                         details = "Target distance: $targetDistance km";
                       }
-                      
+
                       return Container(
                         margin: EdgeInsets.only(bottom: 12),
                         padding: EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: index == 0 ? primaryOrange.withOpacity(0.1) : Colors.grey.shade100,
+                          color: index == 0
+                              ? primaryOrange.withOpacity(0.1)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: index == 0 ? primaryOrange.withOpacity(0.3) : Colors.grey.shade300,
+                            color: index == 0
+                                ? primaryOrange.withOpacity(0.3)
+                                : Colors.grey.shade300,
                             width: 1,
                           ),
                         ),
@@ -1898,7 +1948,8 @@ Widget _buildActiveSubgoalCard() {
                                 ),
                                 if (index == 0)
                                   Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: primaryOrange,
                                       borderRadius: BorderRadius.circular(10),
@@ -2087,9 +2138,9 @@ Widget _buildActiveSubgoalCard() {
 
   double _getWeightLossProgress() {
     if (_currentUserWeight <= 0) {
-      return 0.0; 
+      return 0.0;
     }
-    
+
     double initialWeight = 0.0;
     if (userGoal != null && userGoal!.containsKey('initialWeight')) {
       var initialWeightValue = userGoal!['initialWeight'];
@@ -2101,18 +2152,18 @@ Widget _buildActiveSubgoalCard() {
         initialWeight = double.tryParse(initialWeightValue) ?? 0.0;
       }
     }
-    
+
     if (initialWeight <= 0) {
       return 0.0;
     }
-    
+
     double weightLost = initialWeight - _currentUserWeight;
     double weightToLose = initialWeight - targetWeight;
-    
+
     if (weightToLose <= 0) return 0.0;
-    
+
     double progress = (weightLost / weightToLose) * 100.0;
-    
+
     return progress.clamp(0.0, 100.0);
   }
 
@@ -2130,21 +2181,27 @@ Widget _buildActiveSubgoalCard() {
       return "Complete your first cycling activity to establish your baseline.";
     }
 
-    String bestDateStr = _bestDistanceDate != null ?
-    DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
+    String bestDateStr = _bestDistanceDate != null
+        ? DateFormat('MMM d, yyyy').format(_bestDistanceDate!)
+        : "your first ride";
 
     if (_bestDistance < targetDistance) {
       double remaining = targetDistance - _bestDistance;
-      String progressText = "Your best performance was ${_bestDistance.toStringAsFixed(1)} km on $bestDateStr.";
+      String progressText =
+          "Your best performance was ${_bestDistance.toStringAsFixed(1)} km on $bestDateStr.";
 
-      if (_latestActivityDate != null && _latestActivityDate != _bestDistanceDate) {
+      if (_latestActivityDate != null &&
+          _latestActivityDate != _bestDistanceDate) {
         if (_latestDistance < _bestDistance) {
-          String latestDateStr = DateFormat('MMM d, yyyy').format(_latestActivityDate!);
-          progressText += " Your latest ride on $latestDateStr was ${_latestDistance.toStringAsFixed(1)} km. Keep training to beat your personal best!";
+          String latestDateStr =
+              DateFormat('MMM d, yyyy').format(_latestActivityDate!);
+          progressText +=
+              " Your latest ride on $latestDateStr was ${_latestDistance.toStringAsFixed(1)} km. Keep training to beat your personal best!";
         }
       }
 
-      return progressText + " You need ${remaining.toStringAsFixed(1)} more km to reach your target.";
+      return progressText +
+          " You need ${remaining.toStringAsFixed(1)} more km to reach your target.";
     } else {
       return "Congratulations! You've reached your distance target of ${targetDistance.toStringAsFixed(1)} km on $bestDateStr.";
     }
@@ -2170,8 +2227,9 @@ Widget _buildActiveSubgoalCard() {
     if (_bestDistanceActivity == null) return "";
 
     double bestDuration = _getBestActivityDuration();
-    String bestDateStr = _bestDistanceDate != null ?
-    DateFormat('MMM d, yyyy').format(_bestDistanceDate!) : "your first ride";
+    String bestDateStr = _bestDistanceDate != null
+        ? DateFormat('MMM d, yyyy').format(_bestDistanceDate!)
+        : "your first ride";
 
     if (bestDuration > targetDuration) {
       return "Your best distance ride took longer than your target duration. Try to improve your speed while maintaining distance.";
@@ -2181,348 +2239,354 @@ Widget _buildActiveSubgoalCard() {
   }
 
   void _showUpdateWeightDialog() {
-  _updateWeightController.text = "";
-  _updateBodyFatController.text = "";
-  _updateMetabolicRateController.text = "";
+    _updateWeightController.text = "";
+    _updateBodyFatController.text = "";
+    _updateMetabolicRateController.text = "";
 
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text(
-          "Update Your Progress",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            fontSize: 22,
-            color: primaryBlack,
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _updateWeightController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.black),
-              decoration: InputDecoration(
-                labelText: "Current Weight (kg)",
-                labelStyle: const TextStyle(color: Colors.black),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _updateBodyFatController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.black),
-              decoration: InputDecoration(
-                labelText: "Body Fat Percentage (%)",
-                labelStyle: const TextStyle(color: Colors.black),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-          SizedBox(height: 16),
-            TextField(
-              controller: _updateMetabolicRateController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.black),
-              decoration: InputDecoration(
-                labelText: "Metabolic Rate",
-                labelStyle: const TextStyle(color: Colors.black),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text(
-              "Cancel",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                color: primaryGray,
-              ),
+          title: const Text(
+            "Update Your Progress",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 22,
+              color: primaryBlack,
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              _updateUserMetrics();
-              Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryOrange,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: const Text(
-              "Save",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-Future<void> _updateUserMetrics() async {
-  try {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    
-    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
-    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
-    double newMetabolicRate = double.tryParse(_updateMetabolicRateController.text) ?? 0;
-    
-    final userDataQuery = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-    
-    Map<String, dynamic> newData = {
-      'uid': uid,
-      'timestamp': FieldValue.serverTimestamp(),
-      'weight': newWeight,
-      'bodyFat': newBodyFat,
-      'basalMetabolicRate': newMetabolicRate,	
-    };
-    
-    if (userDataQuery.docs.isNotEmpty) {
-      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-      existingData.forEach((key, value) {
-        if (key != 'uid' && key != 'timestamp' && key != 'weight' && key != 'bodyFat') {
-          newData[key] = value;
-        }
-      });
-    }
-    
-    await FirebaseFirestore.instance
-        .collection('userData')
-        .add(newData);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Progress updated successfully!'))
-    );
-    
-    await _loadUserGoalAndActivities();
-    
-  } catch (e) {
-    print('Error updating metrics: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to update progress: $e'))
-    );
-  }
-}
-
-Widget _buildProgressCard(String title, double progress, double target, String unit, Color color, IconData icon, {String? helpText}) {
-  final percentage = (progress / target).clamp(0.0, 1.0);
-
-  return Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          spreadRadius: 0,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded( // Prevents title from overflowing
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 16,
-                    color: primaryBlack,
+              TextField(
+                controller: _updateWeightController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.black),
+                decoration: InputDecoration(
+                  labelText: "Current Weight (kg)",
+                  labelStyle: const TextStyle(color: Colors.black),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                "${(percentage * 100).toStringAsFixed(0)}%",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+              SizedBox(height: 16),
+              TextField(
+                controller: _updateBodyFatController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.black),
+                decoration: InputDecoration(
+                  labelText: "Body Fat Percentage (%)",
+                  labelStyle: const TextStyle(color: Colors.black),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: _updateMetabolicRateController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.black),
+                decoration: InputDecoration(
+                  labelText: "Metabolic Rate",
+                  labelStyle: const TextStyle(color: Colors.black),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          
-          // Progress Bar
-          Stack(
-            children: [
-              Container(
-                height: 8,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(10),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                "Cancel",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: primaryGray,
                 ),
               ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _updateUserMetrics();
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryOrange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                "Save",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updateUserMetrics() async {
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
+      double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+      double newMetabolicRate =
+          double.tryParse(_updateMetabolicRateController.text) ?? 0;
+
+      final userDataQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      Map<String, dynamic> newData = {
+        'uid': uid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'weight': newWeight,
+        'bodyFat': newBodyFat,
+        'basalMetabolicRate': newMetabolicRate,
+      };
+
+      if (userDataQuery.docs.isNotEmpty) {
+        Map<String, dynamic> existingData = userDataQuery.docs.first.data();
+        existingData.forEach((key, value) {
+          if (key != 'uid' &&
+              key != 'timestamp' &&
+              key != 'weight' &&
+              key != 'bodyFat') {
+            newData[key] = value;
+          }
+        });
+      }
+
+      await FirebaseFirestore.instance.collection('userData').add(newData);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Progress updated successfully!')));
+
+      await _loadUserGoalAndActivities();
+    } catch (e) {
+      print('Error updating metrics: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update progress: $e')));
+    }
+  }
+
+  Widget _buildProgressCard(String title, double progress, double target,
+      String unit, Color color, IconData icon,
+      {String? helpText}) {
+    final percentage = (progress / target).clamp(0.0, 1.0);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  // Prevents title from overflowing
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 16,
+                      color: primaryBlack,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "${(percentage * 100).toStringAsFixed(0)}%",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Progress Bar
+            Stack(
+              children: [
+                Container(
+                  height: 8,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    double barWidth = min(constraints.maxWidth * percentage,
+                        constraints.maxWidth);
+                    return Container(
+                      height: 8,
+                      width: barWidth,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [color, color.withOpacity(0.7)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            if (unit != "%")
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Current: ${progress.toStringAsFixed(1)} $unit",
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      "Target: ${target.toStringAsFixed(1)} $unit",
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                ],
+              ),
+
+            // Special Case: Weight Progress
+            if (unit == "%" && title == "Weight Progress")
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      "Target: ${targetWeight.toStringAsFixed(1)} kg",
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                ],
+              ),
+
+            // Help Text (Prevent Overflow)
+            if (helpText != null) ...[
+              const SizedBox(height: 8),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  double barWidth = min(constraints.maxWidth * percentage, constraints.maxWidth);
                   return Container(
-                    height: 8,
-                    width: barWidth,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [color, color.withOpacity(0.7)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                    width: constraints.maxWidth,
+                    child: Text(
+                      helpText,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: primaryGray,
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      softWrap: true,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
                   );
                 },
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-
-          if (unit != "%")
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    "Current: ${progress.toStringAsFixed(1)} $unit",
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: primaryGray,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    "Target: ${target.toStringAsFixed(1)} $unit",
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: primaryGray,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                  ),
-                ),
-              ],
-            ),
-          
-          // Special Case: Weight Progress
-          if (unit == "%" && title == "Weight Progress")
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    "Current: ${_currentUserWeight.toStringAsFixed(1)} kg",
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: primaryGray,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    "Target: ${targetWeight.toStringAsFixed(1)} kg",
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: primaryGray,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                  ),
-                ),
-              ],
-            ),
-
-          // Help Text (Prevent Overflow)
-          if (helpText != null) ...[
-            const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Container(
-                  width: constraints.maxWidth,
-                  child: Text(
-                    helpText,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: primaryGray,
-                    ),
-                    softWrap: true,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                );
-              },
-            ),
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildGoalCard() {
     if (userGoal == null) {
@@ -2572,7 +2636,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
         ? (userGoal!['timestamp'] as Timestamp).toDate()
         : DateTime.now();
 
-    final weekRangeStr = "${DateFormat('MMM d').format(_weekStartDate)} - ${DateFormat('MMM d').format(_weekEndDate)}";
+    final weekRangeStr =
+        "${DateFormat('MMM d').format(_weekStartDate)} - ${DateFormat('MMM d').format(_weekEndDate)}";
 
     double daysTarget = 7.0; // Default value
     double durationTarget = 30.0; // Default value
@@ -2586,7 +2651,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       } else if (daysValue is String) {
         daysTarget = double.tryParse(daysValue) ?? 7.0;
       }
-      print("Days target parsed as: $daysTarget from ${userGoal!['daysPerWeek']}");
+      print(
+          "Days target parsed as: $daysTarget from ${userGoal!['daysPerWeek']}");
     }
 
     if (userGoal!.containsKey('sessionDuration')) {
@@ -2598,7 +2664,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       } else if (durationValue is String) {
         durationTarget = double.tryParse(durationValue) ?? 30.0;
       }
-      print("Duration target parsed as: $durationTarget from ${userGoal!['sessionDuration']}");
+      print(
+          "Duration target parsed as: $durationTarget from ${userGoal!['sessionDuration']}");
     }
 
     // For weight management
@@ -2611,7 +2678,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       } else if (targetWeightValue is String) {
         targetWeight = double.tryParse(targetWeightValue) ?? 0;
       }
-      print("Target weight: $targetWeight, Current weight: $_currentUserWeight");
+      print(
+          "Target weight: $targetWeight, Current weight: $_currentUserWeight");
     }
 
     // For endurance
@@ -2631,7 +2699,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
     String daysHelperText = '';
     if (_weeklyDaysProgress < daysTarget) {
       int remaining = (daysTarget - _weeklyDaysProgress).round();
-      daysHelperText = "You need $remaining more day${remaining > 1 ? 's' : ''} this week to reach your goal.";
+      daysHelperText =
+          "You need $remaining more day${remaining > 1 ? 's' : ''} this week to reach your goal.";
     } else {
       daysHelperText = "Great job! You've reached your weekly cycling goal.";
     }
@@ -2639,61 +2708,62 @@ Widget _buildProgressCard(String title, double progress, double target, String u
     String durationHelperText = '';
     if (_averageSessionDuration < durationTarget) {
       double needed = durationTarget - _averageSessionDuration;
-      durationHelperText = "Try to increase your session duration by about ${needed.round()} mins.";
+      durationHelperText =
+          "Try to increase your session duration by about ${needed.round()} mins.";
     } else {
       durationHelperText = "Excellent! You're meeting your duration targets.";
     }
 
-      if (goalType == 'High Intensity Cycling') {
-  return FadeTransition(
-    opacity: _fadeAnimation,
-    child: Column(
-      children: [
-        // Update Weight Button
-        Container(
-          margin: const EdgeInsets.only(bottom: 5, top: 15),
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _showUpdateWeightDialog,
-            icon: const Icon(Icons.update, color: Colors.white),
-            label: const Text(
-              "Update Weight & Body Fat",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.white,
+    if (goalType == 'High Intensity Cycling') {
+      return FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            // Update Weight Button
+            Container(
+              margin: const EdgeInsets.only(bottom: 5, top: 15),
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showUpdateWeightDialog,
+                icon: const Icon(Icons.update, color: Colors.white),
+                label: const Text(
+                  "Update Weight & Body Fat",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryOrange,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+
+            // Add the subgoal card here
+            if (hasActiveSubgoal) _buildActiveSubgoalCard(),
+
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryOrange.withOpacity(0.2),
+                    primaryOrange.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: primaryOrange.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-            ),
-          ),
-        ),
-        
-        // Add the subgoal card here
-        if (hasActiveSubgoal) _buildActiveSubgoalCard(),
-        
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                primaryOrange.withOpacity(0.2),
-                primaryOrange.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: primaryOrange.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
@@ -2748,7 +2818,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
 
                         if (goalType != 'Endurance')
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -2780,7 +2851,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                           )
                         else if (_bestDistanceDate != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -2833,7 +2905,6 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                             Icons.timer,
                             helpText: _getDurationHelperText(durationTarget),
                           ),
- 
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -2946,7 +3017,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                               "mins",
                               Colors.blue,
                               Icons.timer,
-                              helpText: _getBestDurationHelperText(durationTarget),
+                              helpText:
+                                  _getBestDurationHelperText(durationTarget),
                             ),
                           ],
 
@@ -2987,7 +3059,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                         const SizedBox(height: 16),
 
                         // Weekly Activities Summary - only for non-endurance goals
-                        if (_weeklyActivities.isNotEmpty && goalType != 'Endurance') ...[
+                        if (_weeklyActivities.isNotEmpty &&
+                            goalType != 'Endurance') ...[
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -3038,7 +3111,9 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                         ],
 
                         // Latest activity summary for endurance goals
-                        if (goalType == 'Endurance' && _latestActivityDate != null && _latestActivityDate != _bestDistanceDate) ...[
+                        if (goalType == 'Endurance' &&
+                            _latestActivityDate != null &&
+                            _latestActivityDate != _bestDistanceDate) ...[
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -3085,14 +3160,14 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                                 ),
                                 _latestDistance < _bestDistance
                                     ? Text(
-                                  "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 14,
-                                    fontStyle: FontStyle.italic,
-                                    color: primaryOrange,
-                                  ),
-                                )
+                                        "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          fontStyle: FontStyle.italic,
+                                          color: primaryOrange,
+                                        ),
+                                      )
                                     : Container(),
                               ],
                             ),
@@ -3250,7 +3325,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
               // Current Week Display based on goal type
               if (goalType != 'Endurance')
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -3282,7 +3358,8 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                 )
               else if (_bestDistanceDate != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -3335,7 +3412,6 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                   Icons.timer,
                   helpText: _getDurationHelperText(durationTarget),
                 ),
-
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -3371,7 +3447,7 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                 _buildProgressCard(
                   "Weight Progress",
                   _getWeightLossProgress(),
-                  100, 
+                  100,
                   "%",
                   primaryOrange,
                   Icons.monitor_weight_outlined,
@@ -3389,13 +3465,12 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                 _buildProgressCard(
                   "Weekly Cycling Duration",
                   _totalWeeklyDuration,
-                  durationTarget, 
+                  durationTarget,
                   "mins",
                   Colors.blue,
                   Icons.timer,
                   helpText: _getDurationHelperText(durationTarget),
                 ),
-
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -3540,7 +3615,9 @@ Widget _buildProgressCard(String title, double progress, double target, String u
               ],
 
               // Latest activity summary for endurance goals
-              if (goalType == 'Endurance' && _latestActivityDate != null && _latestActivityDate != _bestDistanceDate) ...[
+              if (goalType == 'Endurance' &&
+                  _latestActivityDate != null &&
+                  _latestActivityDate != _bestDistanceDate) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -3587,14 +3664,14 @@ Widget _buildProgressCard(String title, double progress, double target, String u
                       ),
                       _latestDistance < _bestDistance
                           ? Text(
-                        "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic,
-                          color: primaryOrange,
-                        ),
-                      )
+                              "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: primaryOrange,
+                              ),
+                            )
                           : Container(),
                     ],
                   ),
@@ -3676,7 +3753,7 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -3709,159 +3786,161 @@ Widget _buildProgressCard(String title, double progress, double target, String u
       body: SafeArea(
         child: _isLoading
             ? const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
-          ),
-        )
-        
-        : RefreshIndicator(
-          onRefresh: () async {
-            await _loadUserGoalAndActivities();
-            return Future.value();
-          },
-          color: primaryOrange,
-          backgroundColor: Colors.white,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              const Text(
-                "Goal Tracking",
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 28,
-                  color: primaryBlack,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Track your cycling progress and stay motivated to achieve your fitness goals!",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 15,
-                  color: primaryGray,
-                ),
-              ),
-              userGoal == null
-                  ? Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 50),
+              )
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await _loadUserGoalAndActivities();
+                  return Future.value();
+                },
+                color: primaryOrange,
+                backgroundColor: Colors.white,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.track_changes_rounded,
-                        size: 70,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 20),
                       const Text(
-                        "No goal found",
+                        "Goal Tracking",
                         style: TextStyle(
                           fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 20,
+                          fontSize: 28,
                           color: primaryBlack,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       const Text(
-                        "Set up your cycling goal to start tracking your progress",
+                        "Track your cycling progress and stay motivated to achieve your fitness goals!",
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 15,
                           color: primaryGray,
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Navigate directly to the goals page (index 2)
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => QuestionPage(initialPage: 2)),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryOrange,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      userGoal == null
+                          ? Center(
+                              child: Container(
+                                margin: const EdgeInsets.only(top: 50),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.track_changes_rounded,
+                                      size: 70,
+                                      color: Colors.grey[300],
+                                    ),
+                                    const SizedBox(height: 20),
+                                    const Text(
+                                      "No goal found",
+                                      style: TextStyle(
+                                        fontFamily: 'Fredoka-SemiBold',
+                                        fontSize: 20,
+                                        color: primaryBlack,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      "Set up your cycling goal to start tracking your progress",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 15,
+                                        color: primaryGray,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        // Navigate directly to the goals page (index 2)
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  QuestionPage(initialPage: 2)),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: primaryOrange,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 24, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        "Set Up Goal",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : _buildGoalCard(),
+                      if (userGoal != null && _hasActivityAfterGoal) ...[
+                        const SizedBox(height: 20),
+                      ],
+                      if (userGoal != null) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: _showChangeGoalConfirmation,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: const BorderSide(color: primaryOrange),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              "Change Goal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                color: primaryOrange,
+                              ),
+                            ),
                           ),
                         ),
-                        child: const Text(
-                          "Set Up Goal",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 16,
-                            color: Colors.white,
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _showGoalHistoryDialog,
+                            icon:
+                                const Icon(Icons.history, color: Colors.white),
+                            label: const Text(
+                              "View Goal History",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[800],
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              )
-                  : _buildGoalCard(),
-
-              if (userGoal != null && _hasActivityAfterGoal) ...[
-                const SizedBox(height: 20),
-              ],
-
-              if (userGoal != null) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: _showChangeGoalConfirmation,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: const BorderSide(color: primaryOrange),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      "Change Goal",
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        color: primaryOrange,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _showGoalHistoryDialog,
-                    icon: const Icon(Icons.history, color: Colors.white),
-                    label: const Text(
-                      "View Goal History",
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[800],
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+              ),
       ),
-),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
