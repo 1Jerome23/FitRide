@@ -655,7 +655,8 @@ Widget _buildSubgoalSelectionCard() {
         children: [
           Text(
             "Weekly Goal Progress",
-            style: GoogleFonts.roboto(
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -1006,7 +1007,8 @@ Widget _buildSubgoalSelectionCard() {
                 "${distanceOption1.toStringAsFixed(1)} km/ride",
                 "From ${baselineDistance.toStringAsFixed(1)} km avg",
                 Colors.blue[700]!,
-                () => _setCyclingSubgoal("distance", distanceOption1),
+                "distance",  // Add type parameter
+                distanceOption1  // Add targetValue parameter
               ),
             ),
             SizedBox(width: 8),
@@ -1016,7 +1018,8 @@ Widget _buildSubgoalSelectionCard() {
                 "${distanceOption2.toStringAsFixed(1)} km/ride",
                 "From ${baselineDistance.toStringAsFixed(1)} km avg",
                 Colors.blue[900]!,
-                () => _setCyclingSubgoal("distance", distanceOption2),
+                "distance",  // Add type parameter
+                distanceOption2  // Add targetValue parameter
               ),
             ),
           ],
@@ -1035,7 +1038,8 @@ Widget _buildSubgoalSelectionCard() {
                   "${paceOption1.toStringAsFixed(1)} min/km",
                   "From ${baselinePace.toStringAsFixed(1)} min/km avg",
                   Colors.orange[700]!,
-                  () => _setCyclingSubgoal("pace", paceOption1),
+                  "pace",  // Add type parameter
+                  paceOption1  // Add targetValue parameter
                 ),
               ),
               SizedBox(width: 8),
@@ -1045,7 +1049,8 @@ Widget _buildSubgoalSelectionCard() {
                   "${paceOption2.toStringAsFixed(1)} min/km",
                   "From ${baselinePace.toStringAsFixed(1)} min/km avg",
                   Colors.orange[900]!,
-                  () => _setCyclingSubgoal("pace", paceOption2),
+                  "pace",  // Add type parameter
+                  paceOption2  // Add targetValue parameter
                 ),
               ),
             ],
@@ -1064,7 +1069,8 @@ Widget _buildSubgoalSelectionCard() {
                 "${durationOption1.toStringAsFixed(0)} min/ride",
                 "From ${baselineDuration.toStringAsFixed(0)} min avg",
                 Colors.green[700]!,
-                () => _setCyclingSubgoal("duration", durationOption1),
+                "duration", 
+                durationOption1  
               ),
             ),
             SizedBox(width: 8),
@@ -1074,7 +1080,8 @@ Widget _buildSubgoalSelectionCard() {
                 "${durationOption2.toStringAsFixed(0)} min/ride",
                 "From ${baselineDuration.toStringAsFixed(0)} min avg",
                 Colors.green[900]!,
-                () => _setCyclingSubgoal("duration", durationOption2),
+                "duration",  // Add type parameter
+                durationOption2  // Add targetValue parameter
               ),
             ),
           ],
@@ -1085,42 +1092,42 @@ Widget _buildSubgoalSelectionCard() {
         _buildSubgoalOptionTitle("Maintain Current Level", Icons.equalizer_outlined),
         SizedBox(height: 8),
         InkWell(
-          onTap: () => _setCyclingSubgoal("maintain", 0),
-          child: Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[300]!, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle_outline, color: Colors.grey[700], size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Maintain Weekly Averages",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
-                        ),
+        onTap: () => _showSubgoalConfirmationDialog("maintain", 0),
+        child: Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.grey[700], size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Maintain Weekly Averages",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        "Focus on consistency and technique",
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Focus on consistency and technique",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
         
         SizedBox(height: 16),
         
@@ -1146,6 +1153,127 @@ Widget _buildSubgoalSelectionCard() {
         ),
       ],
     ),
+  );
+}
+
+void _showSubgoalConfirmationDialog(String type, double targetValue) {
+  // Format the goal text based on type
+  String goalText = "";
+  switch (type) {
+    case "distance":
+      goalText = "increase your weekly average distance to ${targetValue.toStringAsFixed(1)} km";
+      break;
+    case "pace":
+      goalText = "improve your weekly average pace to ${targetValue.toStringAsFixed(1)} min/km";
+      break;
+    case "duration":
+      goalText = "extend your weekly average duration to ${targetValue.toStringAsFixed(0)} minutes";
+      break;
+    case "maintain":
+      goalText = "maintain your current cycling performance levels";
+      break;
+  }
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          "Confirm Your Goal",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Are you sure you want to $goalText for the next week?",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xffFFA500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Color(0xffFFA500).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xffFFA500),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      "This goal will be used to track your progress for the next 7 days.",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: Text(
+              "Cancel",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextButton(
+              child: Text(
+                "Confirm",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _setCyclingSubgoal(type, targetValue);
+              },
+            ),
+          ),
+        ],
+      );
+    },
   );
 }
 
@@ -1220,15 +1348,16 @@ Widget _buildSubgoalOptionTitle(String title, IconData icon) {
     );
   }
 
-Widget _buildSubgoalOptionButton(
+  Widget _buildSubgoalOptionButton(
     String title, 
     String value, 
     String baseline, 
     Color color, 
-    VoidCallback onTap
+    String type,
+    double targetValue 
   ) {
     return InkWell(
-      onTap: onTap,
+      onTap: () => _showSubgoalConfirmationDialog(type, targetValue), 
       child: Container(
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
