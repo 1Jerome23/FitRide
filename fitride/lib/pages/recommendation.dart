@@ -3358,7 +3358,7 @@ void _generateSeasonalAdvice() {
         "title": "Nutrition & Hydration",
         "icon": Icons.restaurant_rounded,
         "color": Color(0xFF43A047),
-        "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)], // Amber to deep orange
+        "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)], 
         "recommendations": nutritionRecommendations,
       });
     }
@@ -3367,8 +3367,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Health & Recovery",
         "icon": Icons.favorite_rounded,
-        "color": Color(0xFFEC407A), // Red accent
-        "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)], // Red accent to deep orange
+        "color": Color(0xFFEC407A),
+        "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)],
         "recommendations": healthRecommendations,
       });
     }
@@ -3377,8 +3377,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Equipment & Gear",
         "icon": Icons.handyman_rounded,
-        "color": Color(0xFF546E7A), // Orange
-        "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)], // Deep orange to orange
+        "color": Color(0xFF546E7A), 
+        "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)], 
         "recommendations": equipmentRecommendations,
       });
     }
@@ -3388,8 +3388,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Progress Insights",
         "icon": Icons.insights_rounded,
-        "color": Color(0xFFFF8F00), // Dark amber
-        "gradientColors": [Color(0xFFFF8F00), Color(0xFFF57C00)], // Dark amber to dark orange
+        "color": Color(0xFF8E24AA), 
+        "gradientColors": [Color(0xFF8E24AA), Color(0xFF5E35B1)], 
         "recommendations": progressRecommendations,
       });
     }
