@@ -566,54 +566,63 @@ void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String
 }
 
 Widget _buildFoodItem(String meal, String description, String calories) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            meal[0], // First letter
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+    return Container(
+      margin: EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              meal[0], // First letter
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.green[700],
+              ),
             ),
           ),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[800],
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.grey[800],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                calories,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
+                SizedBox(height: 2),
+                Text(
+                  calories,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
 // Widget to display subgoal selection options
 // Modify the _buildSubgoalSelectionCard() method to check if the user has completed their weekly commitment:
@@ -868,16 +877,15 @@ Widget _buildSubgoalSelectionCard() {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Wrap the Text in Expanded to prevent overflow
           Expanded(
-            child: Text(
-              "Set Your Next Week's Goal",
-              style: GoogleFonts.roboto(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            child: 
+              Text(
+              "Set Your Next Week's Goal!",
+              style: GoogleFonts.fredoka(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
                 color: Colors.black87,
               ),
-              overflow: TextOverflow.ellipsis, // Truncate if too long
             ),
           ),
         ],
@@ -1195,71 +1203,90 @@ void _calculateBaselines() {
 }
 
 Widget _buildSubgoalOptionTitle(String title, IconData icon) {
-  return Row(
-    children: [
-      Icon(icon, size: 18, color: Colors.grey[800]),
-      SizedBox(width: 8),
-      Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[800],
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.grey[800]),
+        SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
 Widget _buildSubgoalOptionButton(
-  String title, 
-  String value, 
-  String baseline, 
-  Color color, 
-  VoidCallback onTap
-) {
-  return InkWell(
-    onTap: onTap,
-    child: Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+    String title, 
+    String value, 
+    String baseline, 
+    Color color, 
+    VoidCallback onTap
+  ) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              baseline,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            baseline,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> _fetchUserData() async {
     if (userId == null) return;
@@ -2615,277 +2642,178 @@ void _generateSeasonalAdvice() {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Recommendations Title
-            Text(
-              "Personalized Recommendations",
-              style: GoogleFonts.roboto(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            SizedBox(height: 6),
-            Text(
-              "Based on your ${goalType.toLowerCase()} cycling goals",
-              style: GoogleFonts.roboto(
-                fontSize: 16,
-                fontWeight: FontWeight.normal,
-                color: Colors.grey[700],
-              ),
-            ),
-            SizedBox(height: 16),
-
-            // Primary Recommendation Container
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.5),
-                    spreadRadius: 3,
-                    blurRadius: 5,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recommendation,
-                    style: GoogleFonts.roboto(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: _getRecommendationColor(recommendation),
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    feedback,
-                    style: GoogleFonts.lato(fontSize: 16, color: Colors.black),
-                  ),
-
-                  // Activity history summary
-                  if (activityData.length >= 3) ...[
-                    SizedBox(height: 16),
-                    Divider(),
-                    SizedBox(height: 8),
-                    Text(
-                      "Based on ${activityData.length} activities over ${_calculateActivitySpan()} days",
-                      style: GoogleFonts.lato(
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-            if (goalType == "High Intensity Cycling") ...[
-            _buildSubgoalSelectionCard(),
-            ],
-            _buildRecommendationCarousel(),
-            SizedBox(height: 16),
-            _buildGoalBasedGraphs(),
-            SizedBox(height: 24),
-            SizedBox(height: 24),
-
-            // Recent Activity Logs
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: _isLoadingGraphs 
+      ? _buildLoadingScreen()
+      : AnimatedSwitcher(
+          duration: Duration(milliseconds: 500),
+          child: SingleChildScrollView(
+            physics: BouncingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Recent Activity Log",
-                  style: GoogleFonts.roboto(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                if (activityData.isNotEmpty)
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        showAllLogs = !showAllLogs;
-                      });
+                SizedBox(height: 16),
+                  // Header with welcome message
+                  _buildHeaderSection(),
+                  
+                  // Primary recommendation card with animation
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
                     },
-                    child: Text(
-                      showAllLogs ? "Hide" : "View All",
-                      style:
-                          GoogleFonts.lato(fontSize: 16, color: Colors.orange),
-                    ),
+                    child: _buildPrimaryRecommendationCard(),
                   ),
-              ],
+                  
+                  SizedBox(height: 16),
+                  
+                  // Show subgoal selection card if needed
+                  if (goalType == "High Intensity Cycling") 
+                    TweenAnimationBuilder(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: Duration(milliseconds: 800),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, double value, child) {
+                        return Transform.translate(
+                          offset: Offset(0, 30 * (1 - value)),
+                          child: Opacity(
+                            opacity: value,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _buildSubgoalSelectionCard(),
+                    ),
+                  
+                  SizedBox(height: 16),
+
+                  // Section title with animation
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(-30 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildSectionTitle("Personalized Insights", Icons.lightbulb_outline_rounded),
+                  ),
+                  
+                  SizedBox(height: 12),
+                  
+                  // Recommendation carousel with animation
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildRecommendationCarousel(),
+                  ),
+                  
+                  SizedBox(height: 24),
+                  
+                  // Analytics section title
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(-30 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildSectionTitle("Your Analytics", Icons.insert_chart_outlined_rounded),
+                  ),
+                  
+                  SizedBox(height: 12),
+
+                  _buildWeeklySummary(),
+                  
+                  // Goal based graphs with animation
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 1000),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildGoalBasedGraphs(),
+                  ),
+                  
+                  SizedBox(height: 24),
+                  
+                  // Activity section title
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(-30 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildActivityLogHeader(),
+                  ),
+                  
+                  SizedBox(height: 12),
+                  
+                  // Activity logs with animation
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 1100),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildActivityLogs(),
+                  ),
+                  
+                  SizedBox(height: 40),
+                ],
+              ),
             ),
-            SizedBox(height: 8),
-            if (activityData.isNotEmpty)
-              ListView.builder(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: showAllLogs ? activityData.length : 1,
-                itemBuilder: (context, index) {
-                  var data = activityData[index];
-                  // Format the start date
-                  String formattedDate = "N/A";
-                  if (data['start_date'] != null) {
-                    DateTime startDate = data['start_date'].toDate();
-                    formattedDate =
-                        DateFormat('MMM d, y • h:mm a').format(startDate);
-                  }
-
-                  // Convert elapsed time to hours:minutes format
-                  String duration = "N/A";
-                  int elapsedSeconds = 0;
-                  if (data['elapsed_time'] != null) {
-                    elapsedSeconds =
-                        int.tryParse(data['elapsed_time'].toString()) ?? 0;
-                    int hours = elapsedSeconds ~/ 3600;
-                    int minutes = (elapsedSeconds % 3600) ~/ 60;
-                    duration =
-                        hours > 0 ? "${hours}h ${minutes}m" : "${minutes}m";
-                  }
-
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 1,
-                          blurRadius: 3,
-                          offset: Offset(0, 2),
-                        )
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Activity name and date
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    data['name'] ?? "Cycling Activity",
-                                    style: GoogleFonts.roboto(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    formattedDate,
-                                    style: GoogleFonts.lato(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                data['type'] ?? "Ride",
-                                style: GoogleFonts.lato(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[700],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-
-                        // Activity metrics in grid
-                        Row(
-                          children: [
-                            _buildActivityMetric(
-                              "Distance",
-                              "${safeParseDouble(data['distance']).toStringAsFixed(1)} km",
-                              Icons.straighten_outlined,
-                            ),
-                            _buildActivityMetric(
-                              "Duration",
-                              duration,
-                              Icons.timer_outlined,
-                            ),
-                            _buildActivityMetric(
-                              "Avg Speed",
-                              "${safeParseDouble(data['average_speed']).toStringAsFixed(1)} km/h",
-                              Icons.speed_outlined,
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _buildActivityMetric(
-                              "Heart Rate",
-                              "${safeParseDouble(data['average_heartrate']).toInt()} bpm",
-                              Icons.favorite_border_outlined,
-                            ),
-                            _buildActivityMetric(
-                              "Calories",
-                              "${safeParseDouble(data['calories_burned']).toInt()} kcal",
-                              Icons.local_fire_department_outlined,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            if (activityData.isEmpty)
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.grey[600]),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        "No activity data found. Connect your Strava account or log your rides manually to get personalized recommendations.",
-                        style: GoogleFonts.lato(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+          ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -2943,6 +2871,455 @@ void _generateSeasonalAdvice() {
     );
   }
 
+   Widget _buildLoadingScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: CircularProgressIndicator(
+              color: Color(0xffFFA500),
+              strokeWidth: 3,
+            ),
+          ),
+          SizedBox(height: 24),
+          Text(
+            "Loading your insights...",
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 16,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Header section with welcome message
+  Widget _buildHeaderSection() {
+    return Container(
+      margin: EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Your Cycling Insights",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            goalType != "-" 
+              ? "Personalized for your ${goalType.toLowerCase()} goals" 
+              : "Connect your Strava to get personalized insights",
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Section title widget
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 25,
+          color: Color(0xffFFA500),
+        ),
+        SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 23,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrimaryRecommendationCard() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xffFFF8E1), // Cream color
+            Color(0xffFFE0B2), // Lighter cream with orange tint
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xffFFA500).withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 15,
+            offset: Offset(0, 5),
+          ),
+        ],
+        border: Border.all(color: Color(0xffFFA500).withOpacity(0.3), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Color(0xffFFA500),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _getRecommendationIcon(recommendation),
+                  size: 26,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  recommendation,
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xffE65100), // Dark orange text
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Text(
+            feedback,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 16,
+              color: Colors.brown[700], // Darker text for readability on cream
+            ),
+          ),
+
+          // Activity history summary
+          if (activityData.length >= 3) ...[
+            SizedBox(height: 16),
+            Divider(color: Color(0xffFFA500).withOpacity(0.3), thickness: 1),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.access_time_rounded, size: 14, color: Color(0xffFFA500)),
+                SizedBox(width: 6),
+                Text(
+                  "Based on ${activityData.length} activities over ${_calculateActivitySpan()} days",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xffF57C00), // Medium orange text
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Activity log header with view all/hide toggle
+  Widget _buildActivityLogHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.directions_bike_rounded,
+              size: 22,
+              color: Color(0xffFFA500),
+            ),
+            SizedBox(width: 8),
+            Text(
+              "Recent Activities",
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        if (activityData.isNotEmpty)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                showAllLogs = !showAllLogs;
+              });
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Color(0xffFFA500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Color(0xffFFA500).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    showAllLogs ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                    size: 16,
+                    color: Color(0xffFFA500),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    showAllLogs ? "Hide" : "View All",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xffFFA500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Activity logs list
+  Widget _buildActivityLogs() {
+    if (activityData.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "No activity data found. Connect your Strava account or log your rides manually to get personalized recommendations.",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: showAllLogs ? activityData.length : 1,
+      itemBuilder: (context, index) {
+        var data = activityData[index];
+        
+        // Format the start date
+        String formattedDate = "N/A";
+        if (data['start_date'] != null) {
+          DateTime startDate = data['start_date'].toDate();
+          formattedDate = DateFormat('MMM d, y • h:mm a').format(startDate);
+        }
+
+        // Convert elapsed time to hours:minutes format
+        String duration = "N/A";
+        int elapsedSeconds = 0;
+        if (data['elapsed_time'] != null) {
+          elapsedSeconds = int.tryParse(data['elapsed_time'].toString()) ?? 0;
+          int hours = elapsedSeconds ~/ 3600;
+          int minutes = (elapsedSeconds % 3600) ~/ 60;
+          duration = hours > 0 ? "${hours}h ${minutes}m" : "${minutes}m";
+        }
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.all(0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.12),
+                spreadRadius: 0,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: Color(0xffFFA500),
+                    width: 4,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Activity name and date
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_bike_rounded,
+                            color: Color(0xffFFA500),
+                            size: 20,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                data['name'] ?? "Cycling Activity",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                formattedDate,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            data['type'] ?? "Ride",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+
+                    // Metrics grid
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              _buildActivityMetric(
+                                "Distance",
+                                "${safeParseDouble(data['distance']).toStringAsFixed(1)} km",
+                                Icons.straighten_rounded,
+                                Colors.blue[700]!,
+                              ),
+                              _buildActivityMetric(
+                                "Duration",
+                                duration,
+                                Icons.timer_rounded,
+                                Colors.purple[700]!,
+                              ),
+                              _buildActivityMetric(
+                                "Avg Speed",
+                                "${safeParseDouble(data['average_speed']).toStringAsFixed(1)} km/h",
+                                Icons.speed_rounded,
+                                Colors.green[700]!,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildActivityMetric(
+                                "Heart Rate",
+                                "${safeParseDouble(data['average_heartrate']).toInt()} bpm",
+                                Icons.favorite_rounded,
+                                Colors.red[700]!,
+                              ),
+                              _buildActivityMetric(
+                                "Calories",
+                                "${safeParseDouble(data['calories_burned']).toInt()} kcal",
+                                Icons.local_fire_department_rounded,
+                                Colors.orange[700]!,
+                              ),
+                              Expanded(child: SizedBox()), // Empty space for alignment
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+
   // Calculate how many days the activity data spans
   String _calculateActivitySpan() {
     if (activityData.length < 2) return "0";
@@ -2962,16 +3339,15 @@ void _generateSeasonalAdvice() {
     return days.toString();
   }
 
-  // Create an active page indicator for the carousel
-  Widget _buildRecommendationCarousel() {
-    // Create list of recommendation categories with their data
+ Widget _buildRecommendationCarousel() {
     List<Map<String, dynamic>> recommendationCategories = [];
+    int currentPage = 0;
 
     if (trainingRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Training Tips",
-        "icon": Icons.directions_bike_outlined,
-        "color": Colors.blue[700]!,
+        "icon": Icons.directions_bike_rounded,
+        "color": Color(0xff2f4d2a),
         "recommendations": trainingRecommendations,
       });
     }
@@ -2979,8 +3355,8 @@ void _generateSeasonalAdvice() {
     if (nutritionRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Nutrition & Hydration",
-        "icon": Icons.restaurant_outlined,
-        "color": Colors.green[700]!,
+        "icon": Icons.restaurant_rounded,
+        "color": Color(0xff429ebd),
         "recommendations": nutritionRecommendations,
       });
     }
@@ -2988,8 +3364,8 @@ void _generateSeasonalAdvice() {
     if (healthRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Health & Recovery",
-        "icon": Icons.favorite_outline,
-        "color": Colors.purple[700]!,
+        "icon": Icons.favorite_rounded,
+        "color": Color(0xff810a3b),
         "recommendations": healthRecommendations,
       });
     }
@@ -2997,8 +3373,8 @@ void _generateSeasonalAdvice() {
     if (equipmentRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Equipment & Gear",
-        "icon": Icons.handyman_outlined,
-        "color": Colors.orange[700]!,
+        "icon": Icons.handyman_rounded,
+        "color": Color(0xff5c3566),
         "recommendations": equipmentRecommendations,
       });
     }
@@ -3007,8 +3383,8 @@ void _generateSeasonalAdvice() {
     if (progressRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Progress Insights",
-        "icon": Icons.insights_outlined,
-        "color": Colors.teal[700]!,
+        "icon": Icons.insights_rounded,
+        "color": Color(0xff6d5271),
         "recommendations": progressRecommendations,
       });
     }
@@ -3016,20 +3392,22 @@ void _generateSeasonalAdvice() {
     // If no recommendations are available
     if (recommendationCategories.isEmpty) {
       return Container(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
         ),
         child: Row(
           children: [
-            Icon(Icons.info_outline, color: Colors.grey[600]),
+            Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
             SizedBox(width: 12),
             Expanded(
               child: Text(
                 "Track more cycling activities to receive personalized recommendations.",
-                style: GoogleFonts.lato(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
                   color: Colors.grey[700],
                 ),
               ),
@@ -3039,14 +3417,10 @@ void _generateSeasonalAdvice() {
       );
     }
 
-    // Current page value
-    int currentPage = 0;
-
     // Create a PageController for the carousel
     PageController pageController = PageController(
       initialPage: 0,
-      viewportFraction:
-          0.9, // Slightly increase view fraction to reduce clipping
+      viewportFraction: 0.92,
     );
 
     return StatefulBuilder(
@@ -3054,7 +3428,7 @@ void _generateSeasonalAdvice() {
         return Column(
           children: [
             Container(
-              height: 350, // Fixed height for carousel
+              height: 350,
               child: PageView.builder(
                 controller: pageController,
                 itemCount: recommendationCategories.length,
@@ -3074,21 +3448,22 @@ void _generateSeasonalAdvice() {
                 },
               ),
             ),
-            SizedBox(height: 12),
-            // Page indicator
+            SizedBox(height: 16),
+            // Enhanced page indicator
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
                 recommendationCategories.length,
-                (index) => Container(
+                (index) => AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
                   margin: EdgeInsets.symmetric(horizontal: 4),
-                  width: 8,
+                  width: currentPage == index ? 16 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(8),
                     color: currentPage == index
-                        ? recommendationCategories[index]["color"]
-                        : Colors.grey[300],
+                        ? (recommendationCategories[index]["color"] as Color)
+                        : Colors.orange.withOpacity(0.2),
                   ),
                 ),
               ),
@@ -3103,85 +3478,99 @@ void _generateSeasonalAdvice() {
   Widget _buildRecommendationCard(
       String title, IconData icon, Color color, List<String> recommendations) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      padding: EdgeInsets.all(12),
+      margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.2),
+            color: color.withOpacity(0.15),
             spreadRadius: 1,
-            blurRadius: 8,
-            offset: Offset(0, 3),
+            blurRadius: 12,
+            offset: Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with icon and title - fixed height
+          // Header with icon and title
           Container(
-            padding: EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: color.withOpacity(0.2),
-                  width: 2,
-                ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color,
+                  color.withOpacity(0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(6),
+                  padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: Colors.white, size: 20),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 12),
                 Text(
                   title,
-                  style: GoogleFonts.roboto(
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: color,
+                    color: Colors.white,
                   ),
                 ),
               ],
             ),
           ),
-          SizedBox(height: 8),
 
           // Recommendation content - scrollable section
           Expanded(
             child: ListView.builder(
               physics: BouncingScrollPhysics(),
-              padding: EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               itemCount: recommendations.length,
               itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withOpacity(0.1), width: 1),
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        margin: EdgeInsets.only(top: 6),
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                        margin: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.check_circle_rounded,
+                          size: 18,
                           color: color,
                         ),
                       ),
-                      SizedBox(width: 8),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           recommendations[index],
-                          style: GoogleFonts.lato(
-                              fontSize: 14, color: Colors.black87),
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14, 
+                            color: Colors.black87,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ],
@@ -3194,25 +3583,50 @@ void _generateSeasonalAdvice() {
           // Scroll indicator
           Container(
             alignment: Alignment.center,
-            padding: EdgeInsets.only(top: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            padding: EdgeInsets.only(bottom: 12),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 24,
+              color: Colors.grey[400],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityMetric(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 20,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(1.5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.grey[600],
                   ),
                 ),
-                SizedBox(width: 2),
-                Container(
-                  width: 20,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(1.5),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
               ],
@@ -3223,38 +3637,76 @@ void _generateSeasonalAdvice() {
     );
   }
 
-  Widget _buildActivityMetric(String label, String value, IconData icon) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: Colors.grey[600]),
-              SizedBox(width: 4),
-              Text(
-                label,
-                style: GoogleFonts.lato(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.roboto(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
+  IconData _getRecommendationIcon(String recommendation) {
+    if (recommendation.contains("✅") ||
+        recommendation.contains("Good") ||
+        recommendation.contains("Improving") ||
+        recommendation.contains("Progress")) {
+      return Icons.check_circle_rounded;
+    } else if (recommendation.contains("⚠️") ||
+        recommendation.contains("Warning") ||
+        recommendation.contains("Needs") ||
+        recommendation.contains("Decreasing")) {
+      return Icons.warning_rounded;
+    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
+      return Icons.error_rounded;
+    } else if (recommendation.contains("ℹ️") ||
+        recommendation.contains("Info") ||
+        recommendation.contains("Building") ||
+        recommendation.contains("In Progress")) {
+      return Icons.info_rounded;
+    } else {
+      return Icons.lightbulb_rounded;
+    }
   }
+
+  Color _getRecommendationGradientStart(String recommendation) {
+    if (recommendation.contains("✅") ||
+        recommendation.contains("Good") ||
+        recommendation.contains("Improving") ||
+        recommendation.contains("Progress")) {
+      return Colors.green[600]!;
+    } else if (recommendation.contains("⚠️") ||
+        recommendation.contains("Warning") ||
+        recommendation.contains("Needs") ||
+        recommendation.contains("Decreasing")) {
+      return Colors.orange[600]!;
+    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
+      return Colors.red[600]!;
+    } else if (recommendation.contains("ℹ️") ||
+        recommendation.contains("Info") ||
+        recommendation.contains("Building") ||
+        recommendation.contains("In Progress")) {
+      return Colors.blue[600]!;
+    } else {
+      return Color(0xffFFA500);
+    }
+  }
+
+  Color _getRecommendationGradientEnd(String recommendation) {
+    if (recommendation.contains("✅") ||
+        recommendation.contains("Good") ||
+        recommendation.contains("Improving") ||
+        recommendation.contains("Progress")) {
+      return Colors.green[400]!;
+    } else if (recommendation.contains("⚠️") ||
+        recommendation.contains("Warning") ||
+        recommendation.contains("Needs") ||
+        recommendation.contains("Decreasing")) {
+      return Colors.orange[400]!;
+    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
+      return Colors.red[400]!;
+    } else if (recommendation.contains("ℹ️") ||
+        recommendation.contains("Info") ||
+        recommendation.contains("Building") ||
+        recommendation.contains("In Progress")) {
+      return Colors.blue[400]!;
+    } else {
+      return Color(0xffFFB74D);
+    }
+  }
+
+  
 
   Widget _buildWeightOverTimeGraph() {
     return FutureBuilder<QuerySnapshot>(
@@ -3476,23 +3928,42 @@ void _generateSeasonalAdvice() {
 // Helper methods for common UI elements
   Widget _buildLoadingGraph() {
     return Container(
-      height: 250,
-      padding: EdgeInsets.all(16),
+      height: 280,
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
+            spreadRadius: 0,
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
         ],
       ),
       child: Center(
-        child: CircularProgressIndicator(
-          color: Color(0xffFFA500),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                color: Color(0xffFFA500),
+                strokeWidth: 3,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              "Loading your data...",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -3500,15 +3971,15 @@ void _generateSeasonalAdvice() {
 
   Widget _buildEmptyGraph(String message) {
     return Container(
-      height: 250,
-      padding: EdgeInsets.all(16),
+      height: 280,
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
+            spreadRadius: 0,
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -3519,17 +3990,17 @@ void _generateSeasonalAdvice() {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.bar_chart_rounded,
-              color: Colors.grey[400],
-              size: 40,
+              Icons.insert_chart_outlined_rounded,
+              color: Colors.grey[300],
+              size: 48,
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 16),
             Text(
               message,
               style: TextStyle(
-                color: Colors.grey[600],
+                fontFamily: 'Inter',
                 fontSize: 15,
-                fontFamily: "Inter",
+                color: Colors.grey[700],
               ),
               textAlign: TextAlign.center,
             ),
@@ -3588,7 +4059,6 @@ void _generateSeasonalAdvice() {
       );
     }
     List<Widget> goalGraphs = [];
-    goalGraphs.add(_buildWeeklySummaryGraph());
 
     // If no activity data is available
     if (activityData.isEmpty) {
@@ -3941,7 +4411,7 @@ void _generateSeasonalAdvice() {
     );
   }
 
-  Widget _buildGraphContainer({
+   Widget _buildGraphContainer({
     required String title,
     required String subtitle,
     required Widget child,
@@ -3949,14 +4419,14 @@ void _generateSeasonalAdvice() {
   }) {
     return Container(
       height: height,
-      padding: EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
+            color: Colors.grey.withOpacity(0.12),
+            spreadRadius: 0,
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -3965,42 +4435,48 @@ void _generateSeasonalAdvice() {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 18,
-                    color: Colors.black87,
-                  ),
-                  overflow:
-                      TextOverflow.ellipsis, 
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[700],
-                    fontFamily: "Inter",
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Color(0xffFFA500).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Color(0xffFFA500).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xffFFA500),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 10),
           Expanded(
-            child: ErrorBoundary(child: child), 
+            child: ErrorBoundary(child: child),
           ),
         ],
       ),
@@ -4308,327 +4784,1045 @@ Widget _buildBMRTrendGraph() {
     },
   );
 }
-Widget _buildWeeklySummaryGraph() {
 
+Widget _buildWeeklySummary() {
+  var media = MediaQuery.of(context).size;
+  
   double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
   double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
-
-  double balanceRatio = weeklyCaloriesConsumed > 0 ? 
-  weeklyCaloriesBurned / weeklyCaloriesConsumed : 0.5;
-  balanceRatio = balanceRatio > 1 ? 1 : (balanceRatio < 0 ? 0 : balanceRatio);
-
-  return _buildGraphContainer(
-    title: "Weekly Summary",
-    subtitle: "Comprehensive view",
-    height: 600, 
-    child: SingleChildScrollView(
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[200]!, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Weekly Summary Section Title
+      Padding(
+        padding: const EdgeInsets.only(left: 5, bottom: 15),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Summary statistics
-            Text(
-              "Week Summary",
-              style: GoogleFonts.roboto(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(height: 16),
-
-            // Cycling sessions
-            _buildSummaryItem(
-              "Cycling Sessions",
-              "${weeklyActivityCount}",
-              icon: Icons.directions_bike_outlined,
-              color: Color(0xffFFA500),
-            ),
-
-            // Total calories burned
-            _buildSummaryItem(
-              "Calories Burned",
-              "${(latestCaloriesBurned * weeklyActivityCount).toInt()} kcal",
-              icon: Icons.local_fire_department_outlined,
-              color: Colors.red[400]!,
-            ),
-
-            // Average heart rate
-            _buildSummaryItem(
-              "Avg HR",
-              "${latestAverageHeartrate.toInt()} bpm",
-              icon: Icons.favorite_outline,
-              color: Colors.pink[400]!,
-            ),
-
-            // Add nutrition summary if available
-            if (nutritionData.isNotEmpty) ...[
-              Divider(height: 24),
-              
-              Text(
-                "Nutrition Summary",
-                style: GoogleFonts.roboto(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(height: 12),
-              
-              // Latest food diary entry
-              _buildSummaryItem(
-                "Daily Calories",
-                "${safeParseDouble(caloriesConsumed).toInt()} kcal",
-                icon: Icons.restaurant_outlined,
-                color: Colors.green[600]!,
-              ),
-            
-            ],
-
-            Divider(height: 24),
-            
-            // Food diary summary if available
-            if (nutritionData.isNotEmpty) ...[
-              Text(
-                "Latest Food Diary",
-                style: GoogleFonts.roboto(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(height: 8),
-              
-              if (nutritionData[0]['breakfast'] != "-")
-                _buildFoodItem("Breakfast", nutritionData[0]['breakfast'], 
-                  "${nutritionData[0]['breakfast_calories'].toInt()} kcal"),
-              
-              if (nutritionData[0]['lunch'] != "-")
-                _buildFoodItem("Lunch", nutritionData[0]['lunch'], 
-                  "${nutritionData[0]['lunch_calories'].toInt()} kcal"),
-              
-              if (nutritionData[0]['dinner'] != "-")
-                _buildFoodItem("Dinner", nutritionData[0]['dinner'], 
-                  "${nutritionData[0]['dinner_calories'].toInt()} kcal"),
-              
-              Divider(height: 24),
-            ],
-
-            // Body composition changes
-            Row(
-              children: [
-                Expanded(
-                  child: _buildChangeItem(
-                    "Weight",
-                    "$weight kg",
-                    previousWeight > 0
-                        ? "${(latestWeight - previousWeight).toStringAsFixed(1)} kg"
-                        : "N/A",
-                    isPositive: latestWeight < previousWeight,
-                    reverseColor: true,
-                  ),
-                ),
-                Expanded(
-                  child: _buildChangeItem(
-                    "Body Fat",
-                    "$bodyFat%",
-                    previousBodyFat > 0
-                        ? "${(latestBodyFat - previousBodyFat).toStringAsFixed(1)}%"
-                        : "N/A",
-                    isPositive: latestBodyFat < previousBodyFat,
-                    reverseColor: true,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-
-            Text(
-              "Weekly Caloric Balance:",
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(height: 8),
-
-            LinearProgressIndicator(
-              value: balanceRatio,
-              backgroundColor: Colors.green[100],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                weeklyCaloriesBurned > weeklyCaloriesConsumed
-                    ? Colors.green
-                    : Colors.orange,
-              ),
-            ),
-            SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                ),
-                Text(
-                  "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                ),
-              ],
-            ),
-            // Add a net caloric balance row
-            SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                        ? Colors.green[50]
-                        : Colors.orange[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                          ? Colors.green.withOpacity(0.3)
-                          : Colors.orange.withOpacity(0.3),
+            Flexible(
+              child: Row(
+                children: [
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      "Weekly Summary",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).toInt()} kcal",
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      color: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                          ? Colors.green[700]
-                          : Colors.orange[700],
-                    ),
-                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
                 ),
-              ],
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                "This Week",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+      
+      // Cards Row 1 - Cycling Sessions and Calories
+      Row(
+        children: [
+          // Cycling Sessions Card
+          Expanded(
+            child: Container(
+              height: media.width * 0.45,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Cycling\nSessions",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFFA500).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_bike_rounded,
+                            color: Color(0xffFFA500),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) {
+                      return LinearGradient(
+                        colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight
+                      ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                    },
+                    child: Text(
+                      "$weeklyActivityCount",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    "of ${daysPerWeek} goal",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: weeklyActivityCount / (int.tryParse(daysPerWeek) ?? 7),
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                ],
+              ),
+            ),
+          ),
+          
+          // Calories Burned Card
+          Expanded(
+            child: Container(
+              height: media.width * 0.45,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Calories\nBurned",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF7E00).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.local_fire_department_rounded,
+                            color: Color(0xffFF7E00),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 30),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ShaderMask(
+                            blendMode: BlendMode.srcIn,
+                            shaderCallback: (bounds) {
+                              return LinearGradient(
+                                colors: [Color(0xffFF7E00), Color(0xffFF5900)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight
+                              ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                            },
+                            child: Text(
+                              "${weeklyCaloriesBurned.toInt()}",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            "kcal this week",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      
+      SizedBox(height: 15),
+      
+      // Cards Row 2 - Heart Rate and Weight
+      Row(
+        children: [
+          // Heart Rate Card
+          Expanded(
+            child: Container(
+              height: media.width * 0.45,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Heart Rate",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF5900).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            color: Color(0xffFF5900),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) {
+                      return LinearGradient(
+                        colors: [Color(0xffFF5900), Color(0xffFF3800)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight
+                      ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                    },
+                    child: Text(
+                      "${latestAverageHeartrate.toInt()}",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    "bpm avg",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildHRZone(
+                          "Z1",
+                          latestAverageHeartrate <= zone1HeartRate,
+                          Colors.green,
+                        ),
+                        SizedBox(width: 3),
+                        _buildHRZone(
+                          "Z2",
+                          latestAverageHeartrate > zone1HeartRate && 
+                          latestAverageHeartrate <= zone2HeartRate,
+                          Color(0xffFFA500),
+                        ),
+                        SizedBox(width: 3),
+                        _buildHRZone(
+                          "Z3",
+                          latestAverageHeartrate > zone2HeartRate && 
+                          latestAverageHeartrate <= zone3HeartRate,
+                          Color(0xffFF7E00),
+                        ),
+                        SizedBox(width: 3),
+                        _buildHRZone(
+                          "Z4",
+                          latestAverageHeartrate > zone3HeartRate && 
+                          latestAverageHeartrate <= zone4HeartRate,
+                          Color(0xffFF5900),
+                        ),
+                        SizedBox(width: 3),
+                        _buildHRZone(
+                          "Z5",
+                          latestAverageHeartrate > zone4HeartRate,
+                          Color(0xffFF3800),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                ],
+              ),
+            ),
+          ),
+          
+          // Weight Card
+          Expanded(
+            child: Container(
+              height: media.width * 0.45,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Weight",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF3800).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.monitor_weight_rounded,
+                            color: Color(0xffFF3800),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ShaderMask(
+                            blendMode: BlendMode.srcIn,
+                            shaderCallback: (bounds) {
+                              return LinearGradient(
+                                colors: [Color(0xffFF3800), Color(0xffE62200)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight
+                              ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                            },
+                            child: Text(
+                              "${weight}",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            "kg | ${bodyFat}% fat",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: (previousWeight > 0 && latestWeight > 0)
+                        ? Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: latestWeight < previousWeight ? 
+                                Colors.green.withOpacity(0.1) : 
+                                Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  latestWeight < previousWeight ? 
+                                    Icons.arrow_downward_rounded : 
+                                    Icons.arrow_upward_rounded,
+                                  size: 14,
+                                  color: latestWeight < previousWeight ? 
+                                    Colors.green : Colors.red,
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: latestWeight < previousWeight ? 
+                                      Colors.green : Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SizedBox(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      
+      SizedBox(height: 15),
+      
+      // Bottom Card - Caloric Balance
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      "Caloric Balance",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xffFFA500).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.equalizer_rounded,
+                      color: Color(0xffFFA500),
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 15),
+              
+              // Single bar balance visualization
+              Container(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xff4CAF50), Color(0xff388E3C)],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    // Balance bar
+                    Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            flex: weeklyCaloriesBurned.toInt(),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(5),
+                                  bottomLeft: Radius.circular(5),
+                                  topRight: weeklyCaloriesConsumed == 0 ? Radius.circular(5) : Radius.zero,
+                                  bottomRight: weeklyCaloriesConsumed == 0 ? Radius.circular(5) : Radius.zero,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            flex: weeklyCaloriesConsumed.toInt(),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xff4CAF50), Color(0xff388E3C)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(5),
+                                  bottomRight: Radius.circular(5),
+                                  topLeft: weeklyCaloriesBurned == 0 ? Radius.circular(5) : Radius.zero,
+                                  bottomLeft: weeklyCaloriesBurned == 0 ? Radius.circular(5) : Radius.zero,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 15),
+              
+              // Net caloric balance
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: weeklyCaloriesBurned > weeklyCaloriesConsumed ? 
+                            [Color(0xffFFA500), Color(0xffFF8C00)] : 
+                            [Color(0xff4CAF50), Color(0xff388E3C)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: weeklyCaloriesBurned > weeklyCaloriesConsumed ? 
+                              Color(0xffFFA500).withOpacity(0.3) : 
+                              Color(0xff4CAF50).withOpacity(0.3),
+                            spreadRadius: 1,
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            weeklyCaloriesBurned > weeklyCaloriesConsumed ? 
+                              Icons.trending_down_rounded : 
+                              Icons.trending_up_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              if (nutritionData.isNotEmpty) ...[
+                SizedBox(height: 20),
+                Divider(),
+                SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Latest Meals",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Text(
+                        "Today",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 15),
+                // Enhanced meal cards in a column layout
+                Column(
+                  children: [
+                    if (nutritionData[0]['breakfast'] != "-")
+                      _buildEnhancedMealCard(
+                        "B", 
+                        "Breakfast",
+                        nutritionData[0]['breakfast'],
+                        "${nutritionData[0]['breakfast_calories']} kcal",
+                        Color(0xffFFA500),
+                        Icons.wb_sunny_outlined,
+                      ),
+                    SizedBox(height: nutritionData[0]['breakfast'] != "-" ? 10 : 0),
+                    
+                    if (nutritionData[0]['lunch'] != "-")
+                      _buildEnhancedMealCard(
+                        "L", 
+                        "Lunch",
+                        nutritionData[0]['lunch'],
+                        "${nutritionData[0]['lunch_calories']} kcal",
+                        Color(0xffFF7E00),
+                        Icons.restaurant_outlined,
+                      ),
+                    SizedBox(height: nutritionData[0]['lunch'] != "-" ? 10 : 0),
+                    
+                    if (nutritionData[0]['dinner'] != "-")
+                      _buildEnhancedMealCard(
+                        "D", 
+                        "Dinner",
+                        nutritionData[0]['dinner'],
+                        "${nutritionData[0]['dinner_calories']} kcal",
+                        Color(0xffFF5900),
+                        Icons.nightlight_outlined,
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildEnhancedMealCard(String letter, String mealType, String mealDesc, String calories, Color color, IconData icon) {
+  return TweenAnimationBuilder(
+    tween: Tween<double>(begin: 0, end: 1),
+    duration: Duration(milliseconds: 800),
+    curve: Curves.easeOutBack,
+    builder: (context, double value, child) {
+      return Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001) // perspective
+          ..translate(0.0, -4.0 * value), // floating effect
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                color.withOpacity(0.1), 
+                color.withOpacity(0.05)
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.12 * value),
+                spreadRadius: 1 * value,
+                blurRadius: 8 * value,
+                offset: Offset(0, 3 * value),
+              ),
+            ],
+            border: Border.all(
+              color: color.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [color, color.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      mealType,
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      mealDesc,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  calories,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildHRZone(String zone, bool isActive, Color color) {
+  return Container(
+    width: 24, // Reduced size slightly
+    height: 24, // Reduced size slightly
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: isActive ? color : Colors.grey[200],
+      boxShadow: isActive ? [
+        BoxShadow(
+          color: color.withOpacity(0.3),
+          spreadRadius: 1,
+          blurRadius: 3,
+          offset: Offset(0, 1),
+        ),
+      ] : null,
+    ),
+    child: Center(
+      child: Text(
+        zone,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 10, // Reduced font size
+          color: isActive ? Colors.white : Colors.grey[600],
+          fontWeight: FontWeight.bold,
         ),
       ),
     ),
   );
 }
-// Helper method for summary items
-  Widget _buildSummaryItem(String label, String value,
-      {required IconData icon, required Color color}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-// Helper method for change items
-  Widget _buildChangeItem(String label, String value, String change,
-      {required bool isPositive, bool reverseColor = false}) {
-    final Color changeColor = isPositive
-        ? (reverseColor ? Colors.green[700]! : Colors.red[700]!)
-        : (reverseColor ? Colors.red[700]! : Colors.green[700]!);
-
-    return Column(
+// Helper widget for meal cards
+Widget _buildMealCard(String letter, String meal, String calories, Color color) {
+  return Container(
+    margin: EdgeInsets.symmetric(horizontal: 3),
+    padding: EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        SizedBox(height: 2),
-        if (change != "N/A")
-          Row(
-            children: [
-              Icon(
-                isPositive ? Icons.arrow_downward : Icons.arrow_upward,
-                size: 12,
-                color: changeColor,
+        Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
               ),
-              SizedBox(width: 2),
-              Text(
-                change,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: changeColor,
+              child: Center(
+                child: Text(
+                  letter,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ],
+            ),
+            SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                meal,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 3),
+        Padding(
+          padding: const EdgeInsets.only(left: 27),
+          child: Text(
+            calories,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
           ),
+        ),
       ],
-    );
-  }
+    ),
+  );
+}
 
-  Color _getRecommendationColor(String recommendation) {
-    if (recommendation.contains("✅") ||
-        recommendation.contains("Good") ||
-        recommendation.contains("Improving") ||
-        recommendation.contains("Progress")) {
-      return Colors.green[700]!;
-    } else if (recommendation.contains("⚠️") ||
-        recommendation.contains("Warning") ||
-        recommendation.contains("Needs") ||
-        recommendation.contains("Decreasing")) {
-      return Colors.orange[700]!;
-    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
-      return Colors.red[700]!;
-    } else if (recommendation.contains("ℹ️") ||
-        recommendation.contains("Info") ||
-        recommendation.contains("Building") ||
-        recommendation.contains("In Progress")) {
-      return Colors.blue[700]!;
-    } else {
-      return Colors.black;
-    }
-  }
 void _onItemTapped(int index) {
   setState(() {
     _selectedIndex = index;
