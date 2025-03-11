@@ -3339,7 +3339,7 @@ void _generateSeasonalAdvice() {
     return days.toString();
   }
 
- Widget _buildRecommendationCarousel() {
+  Widget _buildRecommendationCarousel() {
     List<Map<String, dynamic>> recommendationCategories = [];
     int currentPage = 0;
 
@@ -3347,7 +3347,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Training Tips",
         "icon": Icons.directions_bike_rounded,
-        "color": Color(0xff2f4d2a),
+        "color": Color(0xFF1E88E5), 
+        "gradientColors": [Color(0xFF1E88E5), Color(0xFF0D47A1)], 
         "recommendations": trainingRecommendations,
       });
     }
@@ -3356,7 +3357,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Nutrition & Hydration",
         "icon": Icons.restaurant_rounded,
-        "color": Color(0xff429ebd),
+        "color": Color(0xFF43A047),
+        "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)], // Amber to deep orange
         "recommendations": nutritionRecommendations,
       });
     }
@@ -3365,7 +3367,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Health & Recovery",
         "icon": Icons.favorite_rounded,
-        "color": Color(0xff810a3b),
+        "color": Color(0xFFEC407A), // Red accent
+        "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)], // Red accent to deep orange
         "recommendations": healthRecommendations,
       });
     }
@@ -3374,7 +3377,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Equipment & Gear",
         "icon": Icons.handyman_rounded,
-        "color": Color(0xff5c3566),
+        "color": Color(0xFF546E7A), // Orange
+        "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)], // Deep orange to orange
         "recommendations": equipmentRecommendations,
       });
     }
@@ -3384,7 +3388,8 @@ void _generateSeasonalAdvice() {
       recommendationCategories.add({
         "title": "Progress Insights",
         "icon": Icons.insights_rounded,
-        "color": Color(0xff6d5271),
+        "color": Color(0xFFFF8F00), // Dark amber
+        "gradientColors": [Color(0xFFFF8F00), Color(0xFFF57C00)], // Dark amber to dark orange
         "recommendations": progressRecommendations,
       });
     }
@@ -3438,6 +3443,7 @@ void _generateSeasonalAdvice() {
                     category["title"],
                     category["icon"],
                     category["color"],
+                    category["gradientColors"],
                     category["recommendations"],
                   );
                 },
@@ -3476,7 +3482,7 @@ void _generateSeasonalAdvice() {
 
   // Build improved recommendation card with scrollable content
   Widget _buildRecommendationCard(
-      String title, IconData icon, Color color, List<String> recommendations) {
+      String title, IconData icon, Color color, List<Color> gradientColors, List<String> recommendations) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
@@ -3501,10 +3507,7 @@ void _generateSeasonalAdvice() {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  color,
-                  color.withOpacity(0.8),
-                ],
+                colors: gradientColors,
               ),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(16),
