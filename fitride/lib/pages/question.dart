@@ -185,7 +185,16 @@ class _QuestionPageState extends State<QuestionPage>
     }
   }
 
-  Future<void> submitUserData() async {
+  // Combined submit function
+  Future<void> submitAllUserData() async {
+    // Validate required fields
+    if (ageController.text.isEmpty || heightController.text.isEmpty || _healthCondition == null || _selectedGoal == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+    
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -195,6 +204,7 @@ class _QuestionPageState extends State<QuestionPage>
     }
 
     try {
+      // Collect all user data
       Map<String, dynamic> userData = {
         'uid': user.uid,
         'timestamp': FieldValue.serverTimestamp(), 
@@ -209,32 +219,7 @@ class _QuestionPageState extends State<QuestionPage>
         userData['maxDuration'] = _maxDuration;
       }
 
-      await FirebaseFirestore.instance
-          .collection('userData')
-          .doc() 
-          .set(userData, SetOptions(merge: true)); 
-
-      _controller.animateToPage(
-        page: _currentPage + 1,
-        duration: 600,
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit data: $e')),
-      );
-    }
-  }
-  
-  Future<void> submitGoalData() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to submit your data')),
-      );
-      return;
-    }
-
-    try {
+      // Collect goal data
       Map<String, dynamic> goalData = {
         'uid': user.uid,
         'timestamp': FieldValue.serverTimestamp(),
@@ -246,17 +231,12 @@ class _QuestionPageState extends State<QuestionPage>
         goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'High Intensity Cycling') {
         double initialWeight = double.tryParse(weightController.text) ?? 0.0;
-        Map<String, dynamic> bodyMetrics = {
-          'weight': weightController.text,
-          'basalMetabolicRate': basalMetabolicRateController.text,
-          'bodyFat': bodyFatController.text,
-        };
         
-        await FirebaseFirestore.instance
-            .collection('userData')
-            .doc()
-            .set(bodyMetrics, SetOptions(merge: true));
-            
+        // Add body metrics to userData
+        userData['weight'] = weightController.text;
+        userData['basalMetabolicRate'] = basalMetabolicRateController.text;
+        userData['bodyFat'] = bodyFatController.text;
+              
         goalData['targetWeight'] = targetWeightController.text;
         goalData['initialWeight'] = initialWeight;
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
@@ -267,18 +247,28 @@ class _QuestionPageState extends State<QuestionPage>
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
       }
 
-      await FirebaseFirestore.instance
-          .collection('goals')
-          .doc()
-          .set(goalData, SetOptions(merge: true)); 
+      // Submit both sets of data in a batch operation
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      
+      // Use a unique ID for userData document
+      DocumentReference userDataRef = FirebaseFirestore.instance.collection('userData').doc();
+      batch.set(userDataRef, userData);
+      
+      // Use a unique ID for goals document
+      DocumentReference goalsRef = FirebaseFirestore.instance.collection('goals').doc();
+      batch.set(goalsRef, goalData);
+      
+      // Commit the batch
+      await batch.commit();
 
+      // Navigate to the next page
       _controller.animateToPage(
         page: _currentPage + 1,
         duration: 600,
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit goal data: $e')),
+        SnackBar(content: Text('Failed to submit data: $e')),
       );
     }
   }
@@ -967,11 +957,18 @@ class _QuestionPageState extends State<QuestionPage>
                       
                       SizedBox(height: media.width * 0.07),
                       
+                      // Modified Next button - just navigate without submitting data
                       Container(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: submitUserData,
+                          onPressed: () {
+                            // Just navigate to the next page without submitting
+                            _controller.animateToPage(
+                              page: _currentPage + 1,
+                              duration: 600,
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryOrange,
                             shape: RoundedRectangleBorder(
@@ -1046,11 +1043,12 @@ class _QuestionPageState extends State<QuestionPage>
                 SizedBox(height: 20),
                 
                 if (_selectedGoal != null) ...[
+                  // Updated button text and function
                   Container(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: submitGoalData,
+                      onPressed: submitAllUserData,  // Using the combined function
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryOrange,
                         shape: RoundedRectangleBorder(
@@ -1058,7 +1056,7 @@ class _QuestionPageState extends State<QuestionPage>
                         ),
                       ),
                       child: Text(
-                        "Save Goals",
+                        "Save and Continue",  // Updated text
                         style: TextStyle(
                           fontFamily: "Inter",
                           color: Colors.black,
