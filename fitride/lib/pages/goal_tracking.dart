@@ -59,8 +59,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
-  TextEditingController _updateMetabolicRateController =
-      TextEditingController();
+  TextEditingController _updateMetabolicRateController =TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -2380,7 +2379,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           if (key != 'uid' &&
               key != 'timestamp' &&
               key != 'weight' &&
-              key != 'bodyFat') {
+              key != 'bodyFat' &&
+              key != 'basalMetabolicRate') {
             newData[key] = value;
           }
         });

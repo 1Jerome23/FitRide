@@ -489,7 +489,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
   
   // Generate recommendations based on meal distribution and overall intake
   if (totalCalories < dailyCalorieNeeds * 0.7) {
-    nutritionRecommendations.add("Your calorie intake (${totalCalories.toInt()} kcal) is significantly below your estimated needs (${dailyCalorieNeeds.toInt()} kcal). Consider increasing your intake for optimal performance.");
+    nutritionRecommendations.add("Your calorie intake is significantly below your estimated needs (${dailyCalorieNeeds.toInt()} kcal). Consider increasing your intake for optimal performance.");
   } else if (totalCalories > dailyCalorieNeeds * 1.2 && goalType == "High Intensity Cycling") {
     nutritionRecommendations.add("Your calorie intake exceeds your calculated needs by ${(totalCalories - dailyCalorieNeeds).toInt()} kcal. Adjust portion sizes to align with your weight management goals.");
   }
@@ -503,13 +503,6 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.add("Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than recommended. Aim for 20-25% of daily calories at breakfast for sustained energy.");
   }
   
-  // Lunch-specific recommendations
-  if (lunchPercent < 25 && totalCalories > 0) {
-    nutritionRecommendations.add("Your lunch (${lunchPercent.toInt()}% of daily calories) is smaller than ideal. Aim for 25-30% of daily calories at lunch to fuel afternoon activities.");
-  } else if (lunchPercent > 45 && totalCalories > 0) {
-    nutritionRecommendations.add("Your lunch (${lunchPercent.toInt()}% of daily calories) is quite large. Consider a more moderate portion to avoid afternoon energy slumps.");
-  }
-  
   // Tailored lunch content recommendations based on goal type
   if (goalType == "Endurance") {
     nutritionRecommendations.add("For endurance training, include a balanced lunch with lean protein, complex carbs, and healthy fats. Good options include whole grain sandwiches with lean protein, pasta with vegetables, or grain bowls.");
@@ -520,10 +513,6 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.add("If training within 2 hours after lunch, keep the meal lighter and focus on easily digestible carbs with moderate protein.");
   } else if (goalType == "Leisure") {
     nutritionRecommendations.add("For leisure cycling, focus on balanced lunches with colorful vegetables, lean proteins, and whole grains. This supports general health and provides steady energy for casual rides.");
-  }
-  
-  if (dinnerPercent > 50 && totalCalories > 0) {
-    nutritionRecommendations.add("Your dinner makes up ${dinnerPercent.toInt()}% of your daily calories. Try to shift more calories to earlier meals for better energy distribution throughout the day.");
   }
   // Activity-specific recommendations
   if (goalType == "Endurance") {
@@ -1465,6 +1454,7 @@ Widget _buildSubgoalOptionButton(
               "weight": data['weight'] ?? weight,
               "bodyFat": data['bodyFat'] ?? bodyFat,
               "basalMetabolicRate": data['basalMetabolicRate'] ?? basalMetabolicRate,
+              "gender": data['gender'] ?? gender,
             });
           }
 
@@ -1561,6 +1551,7 @@ Widget _buildSubgoalOptionButton(
       print("Error fetching user data: $e");
     }
   }
+
   // New method to analyze historical trends across all activities
   void _analyzeHistoricalTrends() {
     if (activityData.length < 2) return;
@@ -2108,22 +2099,20 @@ void _generateSeasonalAdvice() {
     equipmentRecommendations.add("Consider padded shorts for longer rides.");
   }
 
- void _generateWeightManagementRecommendations() {
-  // Weight management through high intensity cycling needs specific guidelines
+void _generateWeightManagementRecommendations() {
+
   double targetWeightValue = safeParseDouble(targetWeight);
   double currentWeightValue = safeParseDouble(weight);
   double bmr = safeParseDouble(basalMetabolicRate);
   double bodyFatPercentage = safeParseDouble(bodyFat);
   double totalCaloriesBurned = safeParseDouble(caloriesBurned);
 
-  // Calculate heart rate zones for weight management
   double maxHeartRate = 220 - age.toDouble();
   double fatBurningZoneLower = maxHeartRate * 0.7; 
   double fatBurningZoneUpper = maxHeartRate * 0.85; 
 
   double latestHeartRate = safeParseDouble(averageHeartrate);
 
-  // Primary feedback based on weight/body fat trends
   if (latestWeight < previousWeight &&
       latestBodyFat < previousBodyFat &&
       latestWeight > 0 &&
@@ -2201,7 +2190,6 @@ void _generateSeasonalAdvice() {
             print("PreviousWeight: $previousWeight");
             print("latestBodyFat: $latestBodyFat");
             print("PreviousBodyFat: $previousBodyFat");
-
       });
     } else {
       setState(() {
@@ -2211,9 +2199,10 @@ void _generateSeasonalAdvice() {
       });
     }
   }
+
   if (totalCaloriesBurned > 0) {
-    double weeklyDeficitNeeded = 3500;
-    double dailyDeficitNeeded = weeklyDeficitNeeded / 7;
+    double monthlyDeficitNeeded = 3500 * 4; 
+    double dailyDeficitNeeded = monthlyDeficitNeeded / 30; 
     
     if (totalCaloriesBurned < dailyDeficitNeeded / 2 && activityData.isNotEmpty) {
       trainingRecommendations.add(
@@ -2221,6 +2210,122 @@ void _generateSeasonalAdvice() {
     } else if (totalCaloriesBurned > dailyDeficitNeeded) {
       trainingRecommendations.add(
           "You're burning ${totalCaloriesBurned.toInt()} kcal per session, which is excellent for weight loss. Ensure proper recovery and nutrition.");
+    }
+  }
+
+  if (bodyFatPercentage > 0) {
+    bool isMale = gender.toLowerCase() == "male";
+    String userName = FirebaseAuth.instance.currentUser?.displayName ?? "You";
+    
+    String bodyFatCategory = "";
+    if (isMale) {
+      if (bodyFatPercentage < 6) {
+        bodyFatCategory = "essential fat";
+      } else if (bodyFatPercentage < 14) {
+        bodyFatCategory = "athletic";
+      } else if (bodyFatPercentage < 18) {
+        bodyFatCategory = "fitness";
+      } else if (bodyFatPercentage < 25) {
+        bodyFatCategory = "average";
+      } else {
+        bodyFatCategory = "obesity";
+      }
+    } else { // Female
+      if (bodyFatPercentage < 16) {
+        bodyFatCategory = "essential fat";
+      } else if (bodyFatPercentage < 24) {
+        bodyFatCategory = "athletic";
+      } else if (bodyFatPercentage < 31) {
+        bodyFatCategory = "fitness";
+      } else if (bodyFatPercentage < 36) {
+        bodyFatCategory = "average";
+      } else {
+        bodyFatCategory = "obesity";
+      }
+    }
+    
+    healthRecommendations.add(
+        "$userName, your current body fat percentage (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range for your gender.");
+    
+    double targetBodyFat = isMale ? 
+        math.max(bodyFatPercentage - 5, 10) : 
+        math.max(bodyFatPercentage - 5, 18);  
+    
+    if (bodyFatCategory == "obesity") {
+      int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4; 
+      double userZoneLower = maxHeartRate * 0.6; 
+      double userZoneUpper = maxHeartRate * 0.7;
+      
+      healthRecommendations.add(
+          "Based on your current activity level (${weeklyActivityCount} sessions/week), aim to gradually build to ${recommendedSessions}-5 sessions per week with a mix of moderate intensity (${userZoneLower.toInt()}-${userZoneUpper.toInt()} bpm) and short interval sessions.");
+      
+      int recommendedDeficit = bmr > 1800 ? 750 : 500; 
+      
+      healthRecommendations.add(
+          "With your BMR of ${bmr.toInt()} kcal, create a daily deficit of ${recommendedDeficit} kcal through a combination of diet and your cycling routine to work toward your target body fat of ${targetBodyFat.toStringAsFixed(1)}%.");
+    } else if (bodyFatCategory == "average") {
+      bool hasHighIntensitySessions = latestAverageHeartrate > fatBurningZoneLower;
+      String intensityRecommendation = hasHighIntensitySessions ? 
+          "continue your high-intensity work" : 
+          "incorporate more intervals to your routine";
+      
+      healthRecommendations.add(
+          "For your body composition goals, ${intensityRecommendation} with a 2:1 ratio of high-intensity intervals to steady-state cardio to maximize fat loss while preserving muscle.");
+      
+      int strengthDays = daysSinceLastActivity > 2 ? 2 : 3; 
+      
+      healthRecommendations.add(
+          "With your current cycling frequency, add ${strengthDays} resistance training sessions weekly on ${mostFrequentDay != "" ? "days other than $mostFrequentDay" : "your rest days"} to increase muscle mass and boost your metabolic rate.");
+    } else if (bodyFatCategory == "fitness") {
+      String nutritionTiming = nutritionData.isNotEmpty ? 
+          "adjust your current meal timing to include more protein daily)" : 
+          "focus on nutrition timing with pre-workout carbs and post-workout protein";
+      
+      healthRecommendations.add(
+          "To further reduce your body fat from ${bodyFatPercentage.toStringAsFixed(1)}% to your ideal range, ${nutritionTiming} for optimal body composition.");
+      
+      // Morning session recommendation based on schedule
+      String morningRecommendation = hasRegularSchedule ? 
+          "Based on your regular cycling schedule, add 1-2 fasted morning sessions" : 
+          "Consider adding 1-2 early morning sessions before breakfast";
+      
+      healthRecommendations.add(
+          "$morningRecommendation to target stubborn fat stores. This complements your current ${averageDistanceAllTime.toStringAsFixed(1)} km average distance rides.");
+    } else if (bodyFatCategory == "athletic") {
+      // Performance focus
+      double bestPerformanceMetric = math.max(bestDistance, 20);
+      
+      healthRecommendations.add(
+          "With your athletic ${bodyFatPercentage.toStringAsFixed(1)}% body fat, shift focus to performance goals such as reaching ${(bestPerformanceMetric * 1.1).toStringAsFixed(1)} km distance or improving your average speed of ${averageSpeedAllTime.toStringAsFixed(1)} km/h.");
+      
+      // Nutrition cycling based on activity pattern
+      String highCarb = hasRegularSchedule ? mostFrequentDay : "training days";
+      String lowCarb = hasRegularSchedule ? "days after $mostFrequentDay" : "rest days";
+      
+      healthRecommendations.add(
+          "Implement carb cycling with higher carbs on $highCarb (${(safeParseDouble(weight) * 4).toInt()}g) and lower carbs on $lowCarb (${(safeParseDouble(weight) * 2).toInt()}g) to maintain your excellent body fat levels.");
+    } else if (bodyFatCategory == "essential fat") {
+      healthRecommendations.add(
+          "At ${bodyFatPercentage.toStringAsFixed(1)}%, your body fat is at or near essential levels. Focus on maintaining this level through consistent performance rather than further reduction.");
+      
+      // Personalized fat intake recommendation
+      double idealFatIntake = safeParseDouble(weight) * 0.7;
+      
+      healthRecommendations.add(
+          "For hormonal health at your low body fat percentage, ensure you're consuming at least ${idealFatIntake.toInt()}g of healthy fats daily, especially around your ${weeklyActivityCount} weekly high-intensity sessions.");
+    }
+    
+    // Add recommendations for optimal monthly body fat reduction
+    if (bodyFatCategory != "essential fat" && bodyFatCategory != "athletic") {
+      // Calculate personalized monthly target
+      double monthlyReductionTarget = bodyFatPercentage > 25 ? 2.0 : 1.0;
+      double currentWeight = safeParseDouble(weight);
+      double fatMassKg = currentWeight * (bodyFatPercentage / 100);
+      double targetFatLossKg = (bodyFatPercentage - monthlyReductionTarget) / 100 * currentWeight;
+      double kgToLose = fatMassKg - targetFatLossKg;
+      
+      healthRecommendations.add(
+          "Based on your metrics, aim for a ${monthlyReductionTarget}% body fat reduction this month (approximately ${kgToLose.toStringAsFixed(1)} kg of fat) through your high-intensity cycling, ${totalActivities > 15 ? "maintaining your impressive consistency" : "gradually increasing your cycling frequency"}, and proper nutrition.");
     }
   }
 
@@ -2241,21 +2346,86 @@ void _generateSeasonalAdvice() {
     }
   }
 
-  // Historical heart rate analysis
-  if (heartrateProgression.length >= 3) {
+  // Historical heart rate analysis - extended to consider monthly patterns
+  if (heartrateProgression.length >= 10) { // More data points for monthly analysis
     double avgHistoricalHR = heartrateProgression.reduce((a, b) => a + b) /
         heartrateProgression.length;
+    String userName = FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "your";
 
+    // Personalized heart rate recommendations
     if (avgHistoricalHR < fatBurningZoneLower) {
+      // Calculate the intensity gap
+      int intensityGap = fatBurningZoneLower.toInt() - avgHistoricalHR.toInt();
+      String intensityAdvice = intensityGap > 15 ? 
+          "gradually increase your intensity by adding short 2-minute bursts at ${(avgHistoricalHR + 15).toInt()} bpm" : 
+          "increase your intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm";
+      
       trainingRecommendations.add(
-          "Your historical average heart rate (${avgHistoricalHR.toInt()} bpm) is below optimal fat-burning zone. Increase intensity in future workouts.");
+          "${userName}'s monthly heart rate average (${avgHistoricalHR.toInt()} bpm) is ${intensityGap} bpm below your optimal fat-burning zone. To maximize results, $intensityAdvice during your next few workouts.");
     } else if (avgHistoricalHR > fatBurningZoneUpper) {
+      // Calculate percent above threshold
+      int excessBPM = avgHistoricalHR.toInt() - fatBurningZoneUpper.toInt();
+      
+      // Personalize based on health conditions
+      String recoveryAdvice = respiratoryCondition == "Yes" || cardiovascularCondition == "Yes" ? 
+          "incorporate more Zone 2 (${zone2HeartRate} bpm) training sessions for safety and recovery" : 
+          "add 1-2 Zone 2 (${zone2HeartRate} bpm) sessions weekly for better fat utilization";
+      
       trainingRecommendations.add(
-          "Your historical heart rates average ${avgHistoricalHR.toInt()} bpm, which is quite high. Mix in some Zone 2 (${zone2HeartRate} bpm) training for recovery.");
+          "Your monthly heart rates average ${avgHistoricalHR.toInt()} bpm, which is ${excessBPM} bpm above your ideal zone. For your body composition goals, $recoveryAdvice while maintaining your impressive intensity on key training days.");
+    } else {
+      // If they're in the perfect zone, acknowledge it
+      trainingRecommendations.add(
+          "Excellent work! Your average heart rate of ${avgHistoricalHR.toInt()} bpm is perfectly within your fat-burning zone. This is ideal for your current body composition goals.");
+    }
+    
+    // Monthly trend analysis
+    if (heartrateProgression.length >= 20) { // At least 20 data points for reliable trend
+      List<double> recentHRs = heartrateProgression.sublist(0, 10);
+      List<double> earlierHRs = heartrateProgression.sublist(10, math.min(20, heartrateProgression.length));
+      
+      double recentAvg = recentHRs.reduce((a, b) => a + b) / recentHRs.length;
+      double earlierAvg = earlierHRs.reduce((a, b) => a + b) / earlierHRs.length;
+      
+      double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+      
+      if (hrChangePercent < -5) {
+        // Calculate fitness improvement estimate
+        double fitnessImprovement = (-hrChangePercent) * 0.5; // Rough estimate of VO2max improvement
+        String improvedPerformance = "";
+        
+        if (distanceProgression.length >= 10) {
+          List<double> recentDistances = distanceProgression.sublist(0, 5);
+          List<double> earlierDistances = distanceProgression.sublist(5, 10);
+          double recentDistAvg = recentDistances.reduce((a, b) => a + b) / recentDistances.length;
+          double earlierDistAvg = earlierDistances.reduce((a, b) => a + b) / earlierDistances.length;
+          
+          if (recentDistAvg > earlierDistAvg) {
+            improvedPerformance = " This has translated to ${((recentDistAvg - earlierDistAvg) / earlierDistAvg * 100).toStringAsFixed(1)}% longer rides at the same effort level!";
+          }
+        }
+        
+        trainingRecommendations.add(
+            "Great progress! Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% over the past month, suggesting a ${fitnessImprovement.toStringAsFixed(1)}% improvement in cardiovascular efficiency.$improvedPerformance Continue with your current training approach.");
+      } else if (hrChangePercent > 5) {
+        // Personalized recovery recommendation based on activity frequency
+        String recoveryAdvice = weeklyActivityCount > 4 ? 
+            "add an additional rest day this week" : 
+            "maintain your current frequency but lower the intensity of 1-2 sessions";
+        
+        // Check weather and other factors for additional context
+        String additionalContext = "";
+        if (safeParseDouble(temperature) > 28) {
+          additionalContext = " The higher temperatures (${temperature}°C) may be contributing to this, so consider earlier morning rides when it's cooler.";
+        } else if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
+          additionalContext = " Your training frequency (${weeklyActivityCount} sessions/week) may be limiting recovery time.";
+        }
+        
+        trainingRecommendations.add(
+            "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% over the past month, which may indicate accumulated fatigue.$additionalContext To prevent overtraining, $recoveryAdvice and ensure adequate sleep (7-9 hours nightly).");
+      }
     }
   }
-
-  // Heart rate recommendations for current workout
   if (latestHeartRate > 0) {
     if (latestHeartRate < fatBurningZoneLower) {
       trainingRecommendations.add(
@@ -2269,21 +2439,22 @@ void _generateSeasonalAdvice() {
     }
   }
 
-  // Training structure based on historical data
+  // Training structure based on historical data - adjusted for monthly view
   int totalHighIntensitySessions = 0;
   List<int> lastFiveHeartRates = [];
 
-  // Count high intensity sessions from historical data
-  for (int i = 0; i < math.min(activityData.length, 10); i++) {
+  // Count high intensity sessions from historical data - expanded sample size
+  for (int i = 0; i < math.min(activityData.length, 20); i++) { // Increased from 10 to 20
     double hr = safeParseDouble(activityData[i]['average_heartrate']);
     if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
 
     if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
   }
 
-  if (totalHighIntensitySessions < 3 && activityData.length >= 5) {
+  // Monthly target adjustment (12 high intensity sessions per month minimum)
+  if (totalHighIntensitySessions < 12 && activityData.length >= 15) { 
     trainingRecommendations.add(
-        "Of your last ${math.min(activityData.length, 10)} rides, only $totalHighIntensitySessions were at high intensity. Aim for at least 3 per week for weight management.");
+        "Of your last ${math.min(activityData.length, 20)} rides, only $totalHighIntensitySessions were at high intensity. Aim for at least 12 per month for effective weight management.");
   }
 
   if (lastFiveHeartRates.length >= 3) {
@@ -2292,17 +2463,70 @@ void _generateSeasonalAdvice() {
         "Your recent heart rate trend (bpm): $hrTrend. Aim for consistent intensity in the fat-burning zone.");
   }
 
-  // Standard training recommendations
-  trainingRecommendations.add(
-      "Aim for 3-5 sessions/week with 4-6 intervals (2-3 min high intensity, 2-3 min recovery).");
-
+  // Personalized standard training recommendations based on user profile and history
+  String userName = FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "Your";
+  
+  // Calculate personalized monthly session target based on current activity level and health
+  int baseMonthlyTarget = 16; // Standard recommendation is 16 sessions/month (4/week)
+  
+  // Adjust based on health conditions
+  if (respiratoryCondition == "Yes" || cardiovascularCondition == "Yes") {
+    baseMonthlyTarget = 12; // Lower target for health conditions (3/week)
+  }
+  
+  // Adjust based on current activity level for gradual progression
+  int personalizedMonthlyTarget;
+  if (weeklyActivityCount * 4 > baseMonthlyTarget) {
+    // If already exceeding target, recommend maintaining with slight increase
+    personalizedMonthlyTarget = (weeklyActivityCount * 4).round() + 1;
+  } else if (weeklyActivityCount < 1) {
+    // If very inactive, start conservatively
+    personalizedMonthlyTarget = baseMonthlyTarget - 4;
+  } else {
+    // Otherwise, recommend gradual increase toward base target
+    personalizedMonthlyTarget = (weeklyActivityCount * 4 + 2).round();
+    personalizedMonthlyTarget = math.min(personalizedMonthlyTarget, baseMonthlyTarget);
+  }
+  
+  // Personalize interval structure based on fitness level and goal
+  int intervalLength = 2; // Default interval length in minutes
+  int recoveryLength = 2; // Default recovery length in minutes
+  
+  // Adjust interval structure based on heart rate data
+  if (averageHeartrateAllTime > 0) {
+    if (averageHeartrateAllTime > fatBurningZoneUpper + 10) {
+      // If consistently training too hard, recommend longer recoveries
+      recoveryLength = 3;
+    } else if (averageHeartrateAllTime < fatBurningZoneLower - 10) {
+      // If consistently training too easy, recommend longer intervals
+      intervalLength = 3;
+    }
+  }
+  
+  // Adjust based on reported exertion level if available
+  double exertion = safeParseDouble(levelOfExertion);
+  if (exertion > 0) {
+    if (exertion > 8) {
+      // If reporting very high exertion, reduce interval length
+      intervalLength = math.max(1, intervalLength - 1);
+    } else if (exertion < 4) {
+      // If reporting very low exertion, increase interval length
+      intervalLength += 1;
+    }
+  }
+  
   if (weeklyActivityCount < 3) {
+    // Personalized frequency recommendation based on constraints
+    String frequencyAdvice = daysSinceLastActivity > 5 ? 
+        "start with just one session this week, then add another session next week" : 
+        "gradually build to 3 sessions per week";
+    
     trainingRecommendations.add(
-        "Increase to at least 3 sessions per week for weight management.");
+        "Based on your current activity level (${weeklyActivityCount} sessions/week), $frequencyAdvice, aiming for 12+ monthly sessions for effective weight management. ${mostFrequentDay.isNotEmpty ? "You tend to ride on $mostFrequentDay - try adding sessions on other days too." : ""}");
   }
 
-  // Calorie recommendations with historical context
-  if (bmr > 0 && activityData.length >= 3) {
+  // Personalized calorie recommendations with historical context - adjusted for monthly targets
+  if (bmr > 0 && activityData.length >= 5) {
     List<double> allCalories = [];
     for (var activity in activityData) {
       double cals = safeParseDouble(activity['calories_burned']);
@@ -2312,28 +2536,67 @@ void _generateSeasonalAdvice() {
     if (allCalories.isNotEmpty) {
       double avgCaloriesPerSession =
           allCalories.reduce((a, b) => a + b) / allCalories.length;
-      double weeklyCalorieBurn = avgCaloriesPerSession * weeklyActivityCount;
-      double dailyDeficitFromExercise = weeklyCalorieBurn / 7.0;
+      double monthlyCalorieBurn = avgCaloriesPerSession * (weeklyActivityCount * 4); // Estimated monthly burn
+      double dailyDeficitFromExercise = monthlyCalorieBurn / 30.0; // 30 days per month
+      
+      // Calculate target weight loss rate (0.5-1 kg per week based on starting weight)
+      double targetWeightLossPerMonth = safeParseDouble(weight) > 100 ? 4.0 : 2.0;
+      double targetDailyDeficit = (targetWeightLossPerMonth * 7700) / 30; // Convert kg to calories (7700 cal/kg)
+      
+      // Calculate difference between current and target
+      double deficitGap = targetDailyDeficit - dailyDeficitFromExercise;
 
       if (dailyDeficitFromExercise < 250) {
+        // Calculate session duration increase needed
+        double currentDuration = safeParseDouble(sessionDuration) / 60; // Convert to minutes
+        double targetDuration = currentDuration * (400 / avgCaloriesPerSession);
+        
         trainingRecommendations.add(
-            "Your average workout burns ${avgCaloriesPerSession.toInt()} kcal. Aim for 400-500 kcal daily deficit through longer/intense rides.");
+            "Your rides currently burn ${avgCaloriesPerSession.toInt()} kcal per session. For your weight management goals, aim to increase your average ride duration from ${currentDuration.toInt()} min to ${targetDuration.toInt()} min, or add one extra session weekly to create a ${deficitGap.toInt()} kcal larger daily deficit.");
       } else if (dailyDeficitFromExercise > 1000) {
+        // Calculate estimated weight loss from current deficit
+        double estimatedMonthlyLoss = (dailyDeficitFromExercise * 30) / 7700; // Convert calories to kg
+        
+        // Personalized high-calorie burn advice
+        String nutritionAdvice = nutritionData.isNotEmpty ?
+            "increase your carbohydrate intake by ~${(estimatedMonthlyLoss * 50).toInt()}g on training days" :
+            "consume a carb-protein snack (3:1 ratio) within 30 minutes post-workout";
+        
         trainingRecommendations.add(
-            "You're burning an average of ${avgCaloriesPerSession.toInt()} kcal per workout, creating a ${dailyDeficitFromExercise.toInt()} kcal daily deficit. Ensure proper fueling.");
+            "You're burning an impressive ${avgCaloriesPerSession.toInt()} kcal per workout, creating a ${dailyDeficitFromExercise.toInt()} kcal daily deficit. This could yield approximately ${estimatedMonthlyLoss.toStringAsFixed(1)} kg weight loss per month. To maintain your energy levels and performance, $nutritionAdvice.");
       }
     }
   }
 
-  // Weather and air quality
+  // Personalized weather recommendations
   if (weatherData.isNotEmpty) {
     double currentTemp = safeParseDouble(temperature);
-
+    double currentHumidity = safeParseDouble(humidity);
+    
     if (currentTemp > 30) {
+      // Personalized hot weather recommendations based on time of day patterns
+      List<DateTime> activityTimes = [];
+      for (var activity in activityData) {
+        if (activity['start_date'] != null) {
+          DateTime date = activity['start_date'].toDate();
+          activityTimes.add(date);
+        }
+      }
+      
+      bool mostlyEveningRider = activityTimes.where((time) => time.hour >= 17).length > 
+                               activityTimes.where((time) => time.hour < 17).length;
+      
+      String timeRecommendation = mostlyEveningRider ? 
+          "shift your usual evening rides to early morning (5-8 AM)" : 
+          "continue your morning rides, but start 1-2 hours earlier";
+      
+      String hydrationAdvice = currentHumidity > 70 ? 
+          "increase your hydration by 150-200ml per 20 minutes in this heat and humidity" : 
+          "increase your hydration by 100-150ml per 20 minutes in this heat";
+      
       trainingRecommendations.add(
-          "Hot weather: Exercise early morning for better fat burning efficiency.");
+          "Current weather (${currentTemp.toStringAsFixed(1)}°C, ${currentHumidity.toStringAsFixed(0)}% humidity): For your high-intensity sessions, $timeRecommendation for better fat burning efficiency. Also, $hydrationAdvice.");
     }
-  }
 
   // Health condition recommendations
   if (respiratoryCondition == "Yes") {
@@ -2358,7 +2621,7 @@ void _generateSeasonalAdvice() {
   equipmentRecommendations
       .add("Use a heart rate monitor for optimal fat-burning zone training.");
 }
-  
+}
   void _generateCyclingEnduranceRecommendations() {
     // Basic data
     double targetDistanceValue = safeParseDouble(targetDistance);

@@ -8,9 +8,9 @@ import 'package:fitride/pages/home_page.dart';
 
 class QuestionPage extends StatefulWidget {
   final int initialPage;
-  
+
   const QuestionPage({
-    Key? key, 
+    Key? key,
     this.initialPage = 0,
   }) : super(key: key);
 
@@ -24,36 +24,40 @@ class _QuestionPageState extends State<QuestionPage>
   int _currentPage = 0;
   bool _stravaAuthSuccessful = false;
   String? _selectedGoal;
-  
+
   final TextEditingController ageController = TextEditingController();
   final TextEditingController heightController = TextEditingController();
   String? _healthCondition;
-  
+
   String? _weatherCondition;
   String? _heartRateLimit;
   String? _maxDuration;
-  
+  String? _gender;
+
   final TextEditingController weightController = TextEditingController();
-  final TextEditingController basalMetabolicRateController = TextEditingController();
+  final TextEditingController basalMetabolicRateController =
+      TextEditingController();
   final TextEditingController bodyFatController = TextEditingController();
   final TextEditingController targetWeightController = TextEditingController();
-  
+
   final TextEditingController daysPerWeekController = TextEditingController();
-  final TextEditingController sessionDurationController = TextEditingController();
-  
-  final TextEditingController targetDistanceController = TextEditingController();
-  final TextEditingController targetDurationController = TextEditingController();
+  final TextEditingController sessionDurationController =
+      TextEditingController();
+
+  final TextEditingController targetDistanceController =
+      TextEditingController();
+  final TextEditingController targetDurationController =
+      TextEditingController();
 
   String name = "Loading...";
   String email = "Loading...";
-  
+
   late AnimationController _animationController;
   late Animation<double> _opacityAnimation;
 
   static const Color primaryBlack = Color(0xFF1A1A1A);
   static const Color primaryGray = Color(0xFF676767);
   static const Color primaryOrange = Color(0xFFFF8B3D);
-  
 
   final List<Map<String, dynamic>> _healthConditions = [
     {
@@ -77,7 +81,7 @@ class _QuestionPageState extends State<QuestionPage>
       'description': 'Both cardiovascular and respiratory conditions'
     },
   ];
-  
+
   final List<String> _weatherOptions = [
     'No limitations',
     'High temperatures affect me',
@@ -86,7 +90,11 @@ class _QuestionPageState extends State<QuestionPage>
     'Poor air quality affects me',
     'Rain or strong winds affect me'
   ];
-  
+  final List<String> selectedGender = [
+    'Male',
+    'Female',
+  ];
+
   final List<String> _heartRateOptions = [
     'No limitations',
     'Stay below 120 BPM',
@@ -95,7 +103,7 @@ class _QuestionPageState extends State<QuestionPage>
     'Must monitor continuously',
     'Other (consult with doctor)'
   ];
-  
+
   final List<String> _durationOptions = [
     'No limitations',
     '15 minutes maximum',
@@ -104,7 +112,7 @@ class _QuestionPageState extends State<QuestionPage>
     '60 minutes maximum',
     'Other (consult with doctor)'
   ];
-  
+
   final List<Map<String, dynamic>> _goalOptions = [
     {
       'image': 'assets/leisure.png',
@@ -138,7 +146,7 @@ class _QuestionPageState extends State<QuestionPage>
       vsync: this,
       duration: Duration(milliseconds: 1000),
     );
-    
+
     _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _animationController,
@@ -167,14 +175,16 @@ class _QuestionPageState extends State<QuestionPage>
     setState(() {
       _currentPage = activePageIndex;
     });
-    
-    if (activePageIndex == 3) { 
-      Timer(Duration(seconds: 5), () { 
+
+    if (activePageIndex == 3) {
+      Timer(Duration(seconds: 5), () {
         _animationController.forward().then((_) {
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => HomePage(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  HomePage(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
               transitionDuration: Duration(milliseconds: 500),
@@ -185,16 +195,17 @@ class _QuestionPageState extends State<QuestionPage>
     }
   }
 
-  // Combined submit function
   Future<void> submitAllUserData() async {
-    // Validate required fields
-    if (ageController.text.isEmpty || heightController.text.isEmpty || _healthCondition == null || _selectedGoal == null) {
+    if (ageController.text.isEmpty ||
+        heightController.text.isEmpty ||
+        _healthCondition == null ||
+        _selectedGoal == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields')),
       );
       return;
     }
-    
+
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,64 +215,61 @@ class _QuestionPageState extends State<QuestionPage>
     }
 
     try {
-      // Collect all user data
       Map<String, dynamic> userData = {
         'uid': user.uid,
-        'timestamp': FieldValue.serverTimestamp(), 
+        'timestamp': FieldValue.serverTimestamp(),
         'age': ageController.text,
         'height': heightController.text,
         'healthCondition': _healthCondition,
       };
-      
+
       if (_healthCondition != 'None') {
         userData['weatherCondition'] = _weatherCondition;
         userData['heartRateLimit'] = _heartRateLimit;
         userData['maxDuration'] = _maxDuration;
       }
 
-      // Collect goal data
       Map<String, dynamic> goalData = {
         'uid': user.uid,
         'timestamp': FieldValue.serverTimestamp(),
         'goalType': _selectedGoal,
       };
-      
+
       if (_selectedGoal == 'Leisure') {
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
-        goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
+        goalData['sessionDuration'] =
+            int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'High Intensity Cycling') {
         double initialWeight = double.tryParse(weightController.text) ?? 0.0;
-        
-        // Add body metrics to userData
+
         userData['weight'] = weightController.text;
         userData['basalMetabolicRate'] = basalMetabolicRateController.text;
         userData['bodyFat'] = bodyFatController.text;
-              
+        userData['gender'] = _gender;
+
         goalData['targetWeight'] = targetWeightController.text;
         goalData['initialWeight'] = initialWeight;
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
-        goalData['sessionDuration'] = int.tryParse(sessionDurationController.text) ?? 0;
+        goalData['sessionDuration'] =
+            int.tryParse(sessionDurationController.text) ?? 0;
       } else if (_selectedGoal == 'Endurance') {
         goalData['targetDistance'] = targetDistanceController.text;
         goalData['targetDuration'] = targetDurationController.text;
         goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
       }
 
-      // Submit both sets of data in a batch operation
       WriteBatch batch = FirebaseFirestore.instance.batch();
-      
-      // Use a unique ID for userData document
-      DocumentReference userDataRef = FirebaseFirestore.instance.collection('userData').doc();
+
+      DocumentReference userDataRef =
+          FirebaseFirestore.instance.collection('userData').doc();
       batch.set(userDataRef, userData);
-      
-      // Use a unique ID for goals document
-      DocumentReference goalsRef = FirebaseFirestore.instance.collection('goals').doc();
+
+      DocumentReference goalsRef =
+          FirebaseFirestore.instance.collection('goals').doc();
       batch.set(goalsRef, goalData);
-      
-      // Commit the batch
+
       await batch.commit();
 
-      // Navigate to the next page
       _controller.animateToPage(
         page: _currentPage + 1,
         duration: 600,
@@ -279,16 +287,17 @@ class _QuestionPageState extends State<QuestionPage>
     final String responseType = "code";
     final String approvalPrompt = "force";
     final String scope = "activity:read_all";
-    final String login = "true";  
+    final String login = "true";
 
-    final String authorizationUrl = Uri.parse("https://www.strava.com/oauth/authorize")
-        .replace(queryParameters: {
+    final String authorizationUrl =
+        Uri.parse("https://www.strava.com/oauth/authorize")
+            .replace(queryParameters: {
       "client_id": clientId,
       "redirect_uri": redirectUri,
       "response_type": responseType,
       "approval_prompt": approvalPrompt,
       "scope": scope,
-      "login": login,  
+      "login": login,
     }).toString();
 
     Navigator.push(
@@ -311,8 +320,9 @@ class _QuestionPageState extends State<QuestionPage>
     ).then((result) {
       if (result != null && result is Map<String, dynamic>) {
         bool success = result['success'] ?? false;
-        String message = result['message'] ?? 'Authentication process completed';
-        
+        String message =
+            result['message'] ?? 'Authentication process completed';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -320,7 +330,7 @@ class _QuestionPageState extends State<QuestionPage>
             duration: Duration(seconds: 5),
           ),
         );
-        
+
         if (success) {
           setState(() {
             _stravaAuthSuccessful = true;
@@ -335,13 +345,13 @@ class _QuestionPageState extends State<QuestionPage>
     return Scaffold(
       backgroundColor: Color(0xFFEEF9FF),
       body: SafeArea(
-        child: SingleChildScrollView( 
+        child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(25.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(height: media.height * 0.05), 
+                SizedBox(height: media.height * 0.05),
                 Image.asset(
                   'assets/strava_logo.png',
                   height: media.width * 0.3,
@@ -396,10 +406,10 @@ class _QuestionPageState extends State<QuestionPage>
                     ],
                   ),
                 ),
-                SizedBox(height: 30), 
+                SizedBox(height: 30),
                 Container(
                   width: double.infinity,
-                  height: 50, 
+                  height: 50,
                   child: ElevatedButton(
                     onPressed: () {
                       _authorizeStrava();
@@ -427,7 +437,6 @@ class _QuestionPageState extends State<QuestionPage>
                     ),
                   ),
                 ),
-                
                 if (_stravaAuthSuccessful) ...[
                   SizedBox(height: 20),
                   Container(
@@ -486,19 +495,15 @@ class _QuestionPageState extends State<QuestionPage>
                 Text(
                   "Enter your data below",
                   style: TextStyle(
-                    fontFamily: "Fredoka-SemiBold",
-                    color: Colors.black,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700
-                  ),
+                      fontFamily: "Fredoka-SemiBold",
+                      color: Colors.black,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700),
                 ),
                 Text(
                   "It will help us to know more about you!",
                   style: TextStyle(
-                    fontFamily: "Inter",
-                    color: primaryGray, 
-                    fontSize: 12
-                  ),
+                      fontFamily: "Inter", color: primaryGray, fontSize: 12),
                 ),
                 SizedBox(height: media.width * 0.05),
                 Padding(
@@ -535,14 +540,10 @@ class _QuestionPageState extends State<QuestionPage>
                                   border: InputBorder.none,
                                   hintText: "Age",
                                   hintStyle: TextStyle(
-                                    fontFamily: "Inter",
-                                    color: primaryGray
-                                  ),
+                                      fontFamily: "Inter", color: primaryGray),
                                 ),
                                 style: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: Colors.black
-                                ),
+                                    fontFamily: "Inter", color: Colors.black),
                               ),
                             ),
                           ],
@@ -583,14 +584,12 @@ class _QuestionPageState extends State<QuestionPage>
                                         border: InputBorder.none,
                                         hintText: "Height",
                                         hintStyle: TextStyle(
-                                          fontFamily: "Inter",
-                                          color: primaryGray
-                                        ),
+                                            fontFamily: "Inter",
+                                            color: primaryGray),
                                       ),
                                       style: TextStyle(
-                                        fontFamily: "Inter",
-                                        color: Colors.black
-                                      ),
+                                          fontFamily: "Inter",
+                                          color: Colors.black),
                                     ),
                                   ),
                                 ],
@@ -604,17 +603,19 @@ class _QuestionPageState extends State<QuestionPage>
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                                colors: [
+                                  primaryOrange,
+                                  primaryOrange.withOpacity(0.7)
+                                ],
                               ),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Text(
                               "CM",
                               style: TextStyle(
-                                fontFamily: "Inter",
-                                color: Colors.white, 
-                                fontSize: 12
-                              ),
+                                  fontFamily: "Inter",
+                                  color: Colors.white,
+                                  fontSize: 12),
                             ),
                           ),
                         ],
@@ -634,54 +635,55 @@ class _QuestionPageState extends State<QuestionPage>
                             ),
                           ),
                           SizedBox(height: 10),
-                          ..._healthConditions.map((condition) => Container(
-                            margin: EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: _healthCondition == condition['label'] 
-                                  ? primaryOrange.withOpacity(0.1)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: _healthCondition == condition['label']
-                                    ? primaryOrange
-                                    : Colors.transparent,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 5,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: ListTile(
-                              leading: Image.asset(
-                                condition['image'],
-                                width: 30,
-                                height: 30,
-                              ),
-                              title: Text(
-                                condition['label'],
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                )
-                              ),
-                              subtitle: Text(
-                                condition['description'],
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                )
-                              ),
-                              onTap: () => setState(() => 
-                                _healthCondition = condition['label']
-                              ),
-                            ),
-                          )).toList(),
+                          ..._healthConditions
+                              .map((condition) => Container(
+                                    margin: EdgeInsets.only(bottom: 10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _healthCondition == condition['label']
+                                              ? primaryOrange.withOpacity(0.1)
+                                              : Colors.white,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: _healthCondition ==
+                                                condition['label']
+                                            ? primaryOrange
+                                            : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 5,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ListTile(
+                                      leading: Image.asset(
+                                        condition['image'],
+                                        width: 30,
+                                        height: 30,
+                                      ),
+                                      title: Text(condition['label'],
+                                          style: TextStyle(
+                                            fontFamily: "Inter",
+                                          )),
+                                      subtitle: Text(condition['description'],
+                                          style: TextStyle(
+                                            fontFamily: "Inter",
+                                          )),
+                                      onTap: () => setState(() =>
+                                          _healthCondition =
+                                              condition['label']),
+                                    ),
+                                  ))
+                              .toList(),
                         ],
                       ),
-                      
-                      if (_healthCondition != null && _healthCondition != 'None') ...[
+
+                      if (_healthCondition != null &&
+                          _healthCondition != 'None') ...[
                         SizedBox(height: 15),
                         Text(
                           "Additional Health Information",
@@ -693,7 +695,7 @@ class _QuestionPageState extends State<QuestionPage>
                           ),
                         ),
                         SizedBox(height: 10),
-                        
+
                         // Weather conditions dropdown
                         Container(
                           decoration: BoxDecoration(
@@ -707,7 +709,8 @@ class _QuestionPageState extends State<QuestionPage>
                               ),
                             ],
                           ),
-                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -726,8 +729,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _weatherCondition != null 
-                                          ? primaryOrange 
+                                      color: _weatherCondition != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _weatherCondition != null ? 2 : 1,
                                     ),
@@ -735,8 +738,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _weatherCondition != null 
-                                          ? primaryOrange 
+                                      color: _weatherCondition != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _weatherCondition != null ? 2 : 1,
                                     ),
@@ -749,10 +752,11 @@ class _QuestionPageState extends State<QuestionPage>
                                     ),
                                   ),
                                   filled: _weatherCondition != null,
-                                  fillColor: _weatherCondition != null 
-                                      ? primaryOrange.withOpacity(0.1) 
+                                  fillColor: _weatherCondition != null
+                                      ? primaryOrange.withOpacity(0.1)
                                       : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 10),
                                 ),
                                 style: TextStyle(
                                   fontFamily: "Inter",
@@ -773,14 +777,16 @@ class _QuestionPageState extends State<QuestionPage>
                                 },
                                 icon: Icon(
                                   Icons.arrow_drop_down,
-                                  color: _weatherCondition != null ? primaryOrange : primaryGray,
+                                  color: _weatherCondition != null
+                                      ? primaryOrange
+                                      : primaryGray,
                                 ),
                               ),
                             ],
                           ),
                         ),
                         SizedBox(height: 15),
-                        
+
                         // Heart rate limitations dropdown
                         Container(
                           decoration: BoxDecoration(
@@ -794,7 +800,8 @@ class _QuestionPageState extends State<QuestionPage>
                               ),
                             ],
                           ),
-                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -813,8 +820,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _heartRateLimit != null 
-                                          ? primaryOrange 
+                                      color: _heartRateLimit != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _heartRateLimit != null ? 2 : 1,
                                     ),
@@ -822,8 +829,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _heartRateLimit != null 
-                                          ? primaryOrange 
+                                      color: _heartRateLimit != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _heartRateLimit != null ? 2 : 1,
                                     ),
@@ -836,10 +843,11 @@ class _QuestionPageState extends State<QuestionPage>
                                     ),
                                   ),
                                   filled: _heartRateLimit != null,
-                                  fillColor: _heartRateLimit != null 
-                                      ? primaryOrange.withOpacity(0.1) 
+                                  fillColor: _heartRateLimit != null
+                                      ? primaryOrange.withOpacity(0.1)
                                       : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 10),
                                 ),
                                 style: TextStyle(
                                   fontFamily: "Inter",
@@ -860,14 +868,16 @@ class _QuestionPageState extends State<QuestionPage>
                                 },
                                 icon: Icon(
                                   Icons.arrow_drop_down,
-                                  color: _heartRateLimit != null ? primaryOrange : primaryGray,
+                                  color: _heartRateLimit != null
+                                      ? primaryOrange
+                                      : primaryGray,
                                 ),
                               ),
                             ],
                           ),
                         ),
                         SizedBox(height: 15),
-                        
+
                         // Maximum exercise duration dropdown
                         Container(
                           decoration: BoxDecoration(
@@ -881,7 +891,8 @@ class _QuestionPageState extends State<QuestionPage>
                               ),
                             ],
                           ),
-                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -900,8 +911,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _maxDuration != null 
-                                          ? primaryOrange 
+                                      color: _maxDuration != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _maxDuration != null ? 2 : 1,
                                     ),
@@ -909,8 +920,8 @@ class _QuestionPageState extends State<QuestionPage>
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: BorderSide(
-                                      color: _maxDuration != null 
-                                          ? primaryOrange 
+                                      color: _maxDuration != null
+                                          ? primaryOrange
                                           : Colors.grey.shade300,
                                       width: _maxDuration != null ? 2 : 1,
                                     ),
@@ -923,10 +934,11 @@ class _QuestionPageState extends State<QuestionPage>
                                     ),
                                   ),
                                   filled: _maxDuration != null,
-                                  fillColor: _maxDuration != null 
-                                      ? primaryOrange.withOpacity(0.1) 
+                                  fillColor: _maxDuration != null
+                                      ? primaryOrange.withOpacity(0.1)
                                       : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 10),
                                 ),
                                 style: TextStyle(
                                   fontFamily: "Inter",
@@ -947,16 +959,18 @@ class _QuestionPageState extends State<QuestionPage>
                                 },
                                 icon: Icon(
                                   Icons.arrow_drop_down,
-                                  color: _maxDuration != null ? primaryOrange : primaryGray,
+                                  color: _maxDuration != null
+                                      ? primaryOrange
+                                      : primaryGray,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ],
-                      
+
                       SizedBox(height: media.width * 0.07),
-                      
+
                       // Modified Next button - just navigate without submitting data
                       Container(
                         width: double.infinity,
@@ -978,10 +992,9 @@ class _QuestionPageState extends State<QuestionPage>
                           child: Text(
                             "Next",
                             style: TextStyle(
-                              fontFamily: "Inter",
-                              color: Colors.white, 
-                              fontSize: 16
-                            ),
+                                fontFamily: "Inter",
+                                color: Colors.white,
+                                fontSize: 16),
                           ),
                         ),
                       ),
@@ -1032,23 +1045,21 @@ class _QuestionPageState extends State<QuestionPage>
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: media.width * 0.05),
-                
                 AnimatedSwitcher(
                   duration: Duration(milliseconds: 500),
-                  child: _selectedGoal == null 
+                  child: _selectedGoal == null
                       ? _buildGoalSelection(media)
                       : _buildGoalQuestions(media),
                 ),
-                
                 SizedBox(height: 20),
-                
                 if (_selectedGoal != null) ...[
                   // Updated button text and function
                   Container(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: submitAllUserData,  // Using the combined function
+                      onPressed:
+                          submitAllUserData, // Using the combined function
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryOrange,
                         shape: RoundedRectangleBorder(
@@ -1056,7 +1067,7 @@ class _QuestionPageState extends State<QuestionPage>
                         ),
                       ),
                       child: Text(
-                        "Save and Continue",  // Updated text
+                        "Save and Continue", // Updated text
                         style: TextStyle(
                           fontFamily: "Inter",
                           color: Colors.black,
@@ -1089,77 +1100,77 @@ class _QuestionPageState extends State<QuestionPage>
       ),
     );
   }
-  
+
   Widget _buildGoalSelection(Size media) {
     return Column(
       key: ValueKey<String>('goal_selection'),
-      children: _goalOptions.map((goal) => 
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedGoal = goal['label'];
-            });
-          },
-          child: Container(
-            margin: EdgeInsets.only(bottom: 15),
-            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 5,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Image.asset(
-                  goal['image'],
-                  width: 50,
-                  height: 50,
-                ),
-                SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      children: _goalOptions
+          .map((goal) => GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedGoal = goal['label'];
+                  });
+                },
+                child: Container(
+                  margin: EdgeInsets.only(bottom: 15),
+                  padding: EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 5,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        goal['label'],
-                        style: TextStyle(
-                          fontFamily: "Fredoka-SemiBold",
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: primaryBlack,
+                      Image.asset(
+                        goal['image'],
+                        width: 50,
+                        height: 50,
+                      ),
+                      SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              goal['label'],
+                              style: TextStyle(
+                                fontFamily: "Fredoka-SemiBold",
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: primaryBlack,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              goal['description'],
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                fontSize: 14,
+                                color: primaryGray,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 5),
-                      Text(
-                        goal['description'],
-                        style: TextStyle(
-                          fontFamily: "Inter",
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: primaryOrange,
+                        size: 20,
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: primaryOrange,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        )
-      ).toList(),
+              ))
+          .toList(),
     );
   }
-  
+
   Widget _buildGoalQuestions(Size media) {
     switch (_selectedGoal) {
       case 'Leisure':
@@ -1172,7 +1183,7 @@ class _QuestionPageState extends State<QuestionPage>
         return Container();
     }
   }
-  
+
   Widget _buildLeisureQuestions(Size media) {
     return Column(
       key: ValueKey<String>('leisure_questions'),
@@ -1208,7 +1219,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 20),
-        
+
         // Days per week
         Container(
           decoration: BoxDecoration(
@@ -1249,7 +1260,8 @@ class _QuestionPageState extends State<QuestionPage>
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 ),
                 style: TextStyle(
                   fontFamily: "Inter",
@@ -1260,7 +1272,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Session duration
         Container(
           decoration: BoxDecoration(
@@ -1297,14 +1309,14 @@ class _QuestionPageState extends State<QuestionPage>
                       decoration: InputDecoration(
                         hintText: "Enter duration",
                         hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14
-                        ),
+                            fontFamily: "Inter",
+                            color: primaryGray,
+                            fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                       style: TextStyle(
                         fontFamily: "Inter",
@@ -1326,10 +1338,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "MINS",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -1340,7 +1351,7 @@ class _QuestionPageState extends State<QuestionPage>
       ],
     );
   }
-  
+
   Widget _buildHighIntensityQuestions(Size media) {
     return Column(
       key: ValueKey<String>('high_intensity_questions'),
@@ -1376,7 +1387,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 20),
-        
+
         // Current Measurements Section
         Container(
           width: double.infinity,
@@ -1405,7 +1416,7 @@ class _QuestionPageState extends State<QuestionPage>
                 ),
               ),
               SizedBox(height: 15),
-              
+
               // Weight
               Row(
                 children: [
@@ -1434,14 +1445,10 @@ class _QuestionPageState extends State<QuestionPage>
                                 border: InputBorder.none,
                                 hintText: "Weight",
                                 hintStyle: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryGray
-                                ),
+                                    fontFamily: "Inter", color: primaryGray),
                               ),
                               style: TextStyle(
-                                fontFamily: "Inter",
-                                color: Colors.black
-                              ),
+                                  fontFamily: "Inter", color: Colors.black),
                             ),
                           ),
                         ],
@@ -1462,10 +1469,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "KG",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -1474,68 +1480,63 @@ class _QuestionPageState extends State<QuestionPage>
 
               // Basal Metabolic Rate
               Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          padding: EdgeInsets.all(15),
-                          child: Image.asset(
-                            "assets/fire.png",
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            padding: EdgeInsets.all(15),
+                            child: Image.asset(
+                              "assets/fire.png",
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: basalMetabolicRateController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Basal Metabolic Rate",
-                              hintStyle: TextStyle(
-                                fontFamily: "Inter",
-                                color: primaryGray
+                          Expanded(
+                            child: TextField(
+                              controller: basalMetabolicRateController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Basal Metabolic Rate",
+                                hintStyle: TextStyle(
+                                    fontFamily: "Inter", color: primaryGray),
                               ),
-                            ),
-                            style: TextStyle(
-                              fontFamily: "Inter",
-                              color: Colors.black
+                              style: TextStyle(
+                                  fontFamily: "Inter", color: Colors.black),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: 8),
-                Container(
-                  width: 50,
-                  height: 50,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                  SizedBox(width: 8),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Text(
-                    "KCAL",
-                    style: TextStyle(
-                      fontFamily: "Inter",
-                      color: Colors.white, 
-                      fontSize: 12
+                    child: Text(
+                      "KCAL",
+                      style: TextStyle(
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
               SizedBox(height: 15),
 
               // Body Fat
@@ -1566,14 +1567,10 @@ class _QuestionPageState extends State<QuestionPage>
                                 border: InputBorder.none,
                                 hintText: "Body Fat",
                                 hintStyle: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryGray
-                                ),
+                                    fontFamily: "Inter", color: primaryGray),
                               ),
                               style: TextStyle(
-                                fontFamily: "Inter",
-                                color: Colors.black
-                              ),
+                                  fontFamily: "Inter", color: Colors.black),
                             ),
                           ),
                         ],
@@ -1594,10 +1591,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "%",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -1606,7 +1602,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Target Weight
         Container(
           decoration: BoxDecoration(
@@ -1643,15 +1639,15 @@ class _QuestionPageState extends State<QuestionPage>
                       decoration: InputDecoration(
                         hintText: "Enter target weight",
                         hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14
-                        ),
+                            fontFamily: "Inter",
+                            color: primaryGray,
+                            fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(color: Colors.grey.shade300),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                       style: TextStyle(
                         fontFamily: "Inter",
@@ -1673,9 +1669,79 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "KG",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 15),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "What is your gender?",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: primaryBlack,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _gender,
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _gender = newValue;
+                        });
+                        print("Selected gender: $_gender");
+                      },
+                      items: selectedGender.map((String gender) {
+                        return DropdownMenuItem<String>(
+                          value: gender,
+                          child: Text(
+                            gender,
+                            style: TextStyle(
+                              fontFamily: "Inter",
+                              color: primaryBlack,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      decoration: InputDecoration(
+                        hintText: "Select your gender",
+                        hintStyle: TextStyle(
+                          fontFamily: "Inter",
+                          color: primaryGray,
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                     ),
                   ),
@@ -1685,7 +1751,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Days per week
         Container(
           decoration: BoxDecoration(
@@ -1719,14 +1785,12 @@ class _QuestionPageState extends State<QuestionPage>
                 decoration: InputDecoration(
                   hintText: "Enter a number between 1-7",
                   hintStyle: TextStyle(
-                    fontFamily: "Inter",
-                    color: primaryGray,
-                    fontSize: 14
-                  ),
+                      fontFamily: "Inter", color: primaryGray, fontSize: 14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 ),
                 style: TextStyle(
                   fontFamily: "Inter",
@@ -1737,7 +1801,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Session duration
         Container(
           decoration: BoxDecoration(
@@ -1774,14 +1838,14 @@ class _QuestionPageState extends State<QuestionPage>
                       decoration: InputDecoration(
                         hintText: "Enter duration",
                         hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14
-                        ),
+                            fontFamily: "Inter",
+                            color: primaryGray,
+                            fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                       style: TextStyle(
                         fontFamily: "Inter",
@@ -1803,10 +1867,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "MINS",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -1817,7 +1880,7 @@ class _QuestionPageState extends State<QuestionPage>
       ],
     );
   }
-  
+
   Widget _buildEnduranceQuestions(Size media) {
     return Column(
       key: ValueKey<String>('endurance_questions'),
@@ -1853,7 +1916,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 20),
-        
+
         // Target distance
         Container(
           decoration: BoxDecoration(
@@ -1890,14 +1953,14 @@ class _QuestionPageState extends State<QuestionPage>
                       decoration: InputDecoration(
                         hintText: "Enter distance",
                         hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14
-                        ),
+                            fontFamily: "Inter",
+                            color: primaryGray,
+                            fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                       style: TextStyle(
                         fontFamily: "Inter",
@@ -1919,10 +1982,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "KM",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -1931,7 +1993,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Target duration
         Container(
           decoration: BoxDecoration(
@@ -1968,14 +2030,14 @@ class _QuestionPageState extends State<QuestionPage>
                       decoration: InputDecoration(
                         hintText: "Enter time",
                         hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14
-                        ),
+                            fontFamily: "Inter",
+                            color: primaryGray,
+                            fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                       ),
                       style: TextStyle(
                         fontFamily: "Inter",
@@ -1997,10 +2059,9 @@ class _QuestionPageState extends State<QuestionPage>
                     child: Text(
                       "MINS",
                       style: TextStyle(
-                        fontFamily: "Inter",
-                        color: Colors.white, 
-                        fontSize: 12
-                      ),
+                          fontFamily: "Inter",
+                          color: Colors.white,
+                          fontSize: 12),
                     ),
                   ),
                 ],
@@ -2009,7 +2070,7 @@ class _QuestionPageState extends State<QuestionPage>
           ),
         ),
         SizedBox(height: 15),
-        
+
         // Days per week
         Container(
           decoration: BoxDecoration(
@@ -2043,14 +2104,12 @@ class _QuestionPageState extends State<QuestionPage>
                 decoration: InputDecoration(
                   hintText: "Enter a number between 1-7",
                   hintStyle: TextStyle(
-                    fontFamily: "Inter",
-                    color: primaryGray,
-                    fontSize: 14
-                  ),
+                      fontFamily: "Inter", color: primaryGray, fontSize: 14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 ),
                 style: TextStyle(
                   fontFamily: "Inter",
@@ -2066,7 +2125,7 @@ class _QuestionPageState extends State<QuestionPage>
 
   Widget buildWelcomePage() {
     var media = MediaQuery.of(context).size;
-    
+
     return AnimatedBuilder(
       animation: _opacityAnimation,
       builder: (context, child) {
@@ -2099,7 +2158,6 @@ class _QuestionPageState extends State<QuestionPage>
                         width: media.width * 0.3,
                         height: media.width * 0.3,
                       ),
-                      
                       Text(
                         "Welcome to FitRide!",
                         style: TextStyle(
@@ -2117,7 +2175,6 @@ class _QuestionPageState extends State<QuestionPage>
                         ),
                       ),
                       SizedBox(height: 20),
-                      
                       Text(
                         "Your journey to fitness begins now",
                         textAlign: TextAlign.center,
@@ -2128,7 +2185,6 @@ class _QuestionPageState extends State<QuestionPage>
                           fontFamily: "Fredoka-SemiBold",
                         ),
                       ),
-                      
                       SizedBox(height: 40),
                     ],
                   ),

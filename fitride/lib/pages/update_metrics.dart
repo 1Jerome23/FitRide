@@ -58,24 +58,54 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
     });
     
     try {
+      // Clear cache by forcing a fresh Firestore query
+      FirebaseFirestore.instance.clearPersistence();
+      
       final userData = await getLatestUserData();
       
       if (userData != null) {
+        log('Retrieved user data: $userData');
+        
+        // Clear controllers first
+        _weightController.clear();
+        _bodyFatController.clear();
+        _metabolicRateController.clear();
+        
         setState(() {
           _userData = userData;
           
           if (userData.containsKey('weight')) {
             _weightController.text = userData['weight'].toString();
+            log('Weight loaded: ${_weightController.text}');
           }
           
           if (userData.containsKey('bodyFat')) {
             _bodyFatController.text = userData['bodyFat'].toString();
+            log('Body Fat loaded: ${_bodyFatController.text}');
           }
           
           if (userData.containsKey('basalMetabolicRate')) {
-            _metabolicRateController.text = userData['basalMetabolicRate'].toString();
+            // Debug the value and type
+            log('BMR from Firebase: ${userData['basalMetabolicRate']}');
+            log('BMR type: ${userData['basalMetabolicRate'].runtimeType}');
+            
+            // Always treat as number for display consistency with other fields
+            var bmrValue = userData['basalMetabolicRate'];
+            if (bmrValue is String) {
+              // If it's stored as string, convert to number first then back to string
+              _metabolicRateController.text = double.tryParse(bmrValue)?.toString() ?? bmrValue;
+            } else {
+              // If it's already a number (int or double), just convert to string
+              _metabolicRateController.text = bmrValue.toString();
+            }
+            
+            log('Metabolic Rate loaded: ${_metabolicRateController.text}');
+          } else {
+            log('basalMetabolicRate field not found in user data');
           }
         });
+      } else {
+        log('No user data retrieved');
       }
     } catch (e) {
       log('Error loading user data: $e');
@@ -102,44 +132,54 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
       if (currentUser == null) return null;
       
       final String uid = currentUser.uid;
+      log('Getting data for user: $uid');
       
-      final metricsSnapshot = await FirebaseFirestore.instance
-          .collection('user_metrics')
-          .where('uid', isEqualTo: uid)
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
-      
-      if (metricsSnapshot.docs.isNotEmpty) {
-        return metricsSnapshot.docs.first.data();
-      }
-      
+      // Use no-cache option to force a refresh from the server
       final userSnapshot = await FirebaseFirestore.instance
           .collection('userData')
           .where('uid', isEqualTo: uid)
           .orderBy('timestamp', descending: true)
           .limit(1)
-          .get();
+          .get(GetOptions(source: Source.server)); // Force server refresh
       
-      if (userSnapshot.docs.isEmpty) return null;
+      if (userSnapshot.docs.isEmpty) {
+        log('No documents found for user');
+        return null;
+      }
       
-      return userSnapshot.docs.first.data();
+      log('Document ID: ${userSnapshot.docs.first.id}');
+      log('Document data: ${userSnapshot.docs.first.data()}');
+      
+      // Explicitly check for the basalMetabolicRate field
+      var data = userSnapshot.docs.first.data();
+      if (data.containsKey('basalMetabolicRate')) {
+        log('Found basalMetabolicRate in latest document: ${data['basalMetabolicRate']}');
+      } else {
+        log('WARNING: basalMetabolicRate not found in latest document!');
+      }
+      
+      return data;
     } catch (e) {
       log('Error getting user data: $e');
       return null;
     }
   }
 
-  Future<void> saveUserMetrics({
+  Future<bool> saveUserMetrics({
     required double weight,
     required double bodyFat,
     required double metabolicRate,
   }) async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      if (currentUser == null) {
+        log('No current user found');
+        return false;
+      }
       
       final String uid = currentUser.uid;
+      log('Saving metrics for user: $uid');
+      log('Values to save - Weight: $weight, Body Fat: $bodyFat, BMR: $metabolicRate');
       
       final userSnapshot = await FirebaseFirestore.instance
           .collection('userData')
@@ -150,23 +190,42 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
       
       if (userSnapshot.docs.isEmpty) {
         log('No user data found');
-        return;
+        return false;
       }
       
       final userData = userSnapshot.docs.first.data();
+      log('Previous data: $userData');
       
       Map<String, dynamic> newData = Map.from(userData);
 
+      // Update the values - keep weight and bodyFat as numbers since that's working
       newData['timestamp'] = Timestamp.now();
-      newData['weight'] = weight;
-      newData['bodyFat'] = bodyFat;
-      newData['basalMetabolicRate'] = metabolicRate; 
+      newData['weight'] = weight; // Keep as number
+      newData['bodyFat'] = bodyFat; // Keep as number
+      newData['basalMetabolicRate'] = metabolicRate; // Store as number to match others
       
-      await FirebaseFirestore.instance.collection('userData').add(newData);
+      log('New data to save: $newData');
+      
+      // Add as a new document, not updating the existing one
+      DocumentReference docRef = await FirebaseFirestore.instance.collection('userData').add(newData);
+      log('Saved new document with ID: ${docRef.id}');
+      
+      // Verify the data was saved correctly by reading it back
+      DocumentSnapshot savedDoc = await docRef.get();
+      if (savedDoc.exists) {
+        var savedData = savedDoc.data() as Map<String, dynamic>;
+        if (savedData.containsKey('basalMetabolicRate')) {
+          log('Verified basalMetabolicRate was saved: ${savedData['basalMetabolicRate']}');
+        } else {
+          log('ERROR: basalMetabolicRate field missing from saved document!');
+          return false;
+        }
+      }
       
       log('User metrics saved successfully');
       
       await scheduleWeeklyMetricsUpdate();
+      return true;
     } catch (e) {
       log('Error saving user metrics: $e');
       throw e; 
@@ -238,16 +297,29 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
   
   Future<void> _saveMetrics() async {
     if (_formKey.currentState!.validate()) {
+      log('Form validated. Values - Weight: ${_weightController.text}, Body Fat: ${_bodyFatController.text}, BMR: ${_metabolicRateController.text}');
+      
       setState(() {
         _isLoading = true;
       });
       
       try {
-        await saveUserMetrics(
-          weight: double.parse(_weightController.text),
-          bodyFat: double.parse(_bodyFatController.text),
-          metabolicRate: double.parse(_metabolicRateController.text),
+        double weight = double.parse(_weightController.text);
+        double bodyFat = double.parse(_bodyFatController.text);
+        double metabolicRate = double.parse(_metabolicRateController.text);
+        
+        log('Parsed values - Weight: $weight, Body Fat: $bodyFat, BMR: $metabolicRate');
+        
+        // Add direct field check and update
+        bool success = await saveUserMetrics(
+          weight: weight,
+          bodyFat: bodyFat,
+          metabolicRate: metabolicRate,
         );
+        
+        if (!success) {
+          throw Exception("Failed to save metrics - no data was updated");
+        }
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -257,7 +329,8 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
             ),
           );
           
-          Navigator.pop(context);
+          // Instead of just popping, we'll pop and pass back a result to trigger a refresh
+          Navigator.pop(context, true);  // Pass true to indicate data was updated
         }
       } catch (e) {
         log('Error saving metrics: $e');
@@ -276,6 +349,8 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
           });
         }
       }
+    } else {
+      log('Form validation failed');
     }
   }
   
@@ -412,12 +487,16 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
                               FilteringTextInputFormatter.digitsOnly,
                             ],
                             validator: (value) {
+                              log('Validating BMR: $value');
                               if (value == null || value.isEmpty) {
+                                log('BMR validation failed: empty');
                                 return 'Please enter your metabolic rate';
                               }
                               if (int.tryParse(value) == null) {
+                                log('BMR validation failed: not an integer: $value');
                                 return 'Please enter a valid number';
                               }
+                              log('BMR validation passed: $value');
                               return null;
                             },
                           ),
