@@ -59,7 +59,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
-  TextEditingController _updateMetabolicRateController =TextEditingController();
+  TextEditingController _updateMetabolicRateController =
+      TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -717,7 +718,14 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                 style: TextStyle(
                   fontFamily: 'Fredoka-SemiBold',
                   fontSize: 18,
-                  color: Colors.black87,
+                  color: Colors.orangeAccent,
+                  shadows: [
+                    Shadow(
+                      offset: Offset(2, 2), 
+                      blurRadius: 6.0, 
+                      color: Colors.orange.withOpacity(0.3), 
+                    ),
+                  ],
                 ),
               ),
               Container(
@@ -744,8 +752,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           Text(
             goalTitle,
             style: TextStyle(
-              fontFamily: 'Lato',
-              fontSize: 16,
+              fontFamily: 'Inter',
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.black,
             ),
@@ -758,79 +766,370 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (subgoalType != "maintain") ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Last Week's Avg: $baselineValueText",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    Text(
-                      "Target Avg: $targetValueText",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
+                // Progress indicators layout
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Progress status text with percentage
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Progress",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: progressPercent >= 1.0 
+                                  ? Colors.green[50] 
+                                  : progressPercent >= 0.5 
+                                      ? Colors.orange[50]
+                                      : Colors.blue[50],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: progressPercent >= 1.0 
+                                  ? Colors.green[300]! 
+                                  : progressPercent >= 0.5 
+                                      ? Colors.orange[300]!
+                                      : Colors.blue[300]!,
+                                width: 1
+                              ),
+                            ),
+                            child: Text(
+                              "${(progressPercent * 100).toInt()}%",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: progressPercent >= 1.0 
+                                  ? Colors.green[700] 
+                                  : progressPercent >= 0.5 
+                                      ? Colors.orange[700]
+                                      : Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      
+                      // Enhanced animated progress bar
+                      Stack(
+                        children: [
+                          // Markers for baseline and target
+                          Container(
+                            height: 12,
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: ProgressMarkerPainter(
+                                baselinePosition: 0.0,
+                                targetPosition: 1.0,
+                                containerWidth: MediaQuery.of(context).size.width - 80, // Adjust based on your padding
+                              ),
+                            ),
+                          ),
+                          
+                          // Background track
+                          Container(
+                            height: 12,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          
+                          // Animated progress fill
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.0, end: progressPercent),
+                            duration: Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, animatedProgress, child) {
+                              return Container(
+                                height: 12,
+                                width: (MediaQuery.of(context).size.width - 64) * animatedProgress,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: progressPercent >= 1.0
+                                        ? [Colors.green[400]!, Colors.green[600]!]
+                                        : progressPercent >= 0.5
+                                            ? [Colors.orange[300]!, Colors.orange[500]!]
+                                            : [Colors.blue[300]!, Colors.blue[500]!],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (progressPercent >= 1.0
+                                              ? Colors.green
+                                              : progressPercent >= 0.5
+                                                  ? Colors.orange
+                                                  : Colors.blue)
+                                          .withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          ),
+                          
+                          // Current value marker
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.0, end: progressPercent),
+                            duration: Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, animatedProgress, child) {
+                              return Positioned(
+                                left: (MediaQuery.of(context).size.width - 64) * animatedProgress - 7,
+                                top: -3,
+                                child: Container(
+                                  width: 14,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: progressPercent >= 1.0
+                                          ? Colors.green[600]!
+                                          : progressPercent >= 0.5
+                                              ? Colors.orange[600]!
+                                              : Colors.blue[600]!,
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                          ),
+                        ],
+                      ),
+                      
+                      SizedBox(height: 16),
+                      
+                      // Value comparison section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Last Week",
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[400],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    baselineValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Current",
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: progressPercent >= 1.0
+                                          ? Colors.green[600]
+                                          : progressPercent >= 0.5
+                                              ? Colors.orange[600]
+                                              : Colors.blue[600],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    currentValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "Target",
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[800],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    targetValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      
+                      // Status message
+                      if (subgoalType != "maintain") ...[
+                        SizedBox(height: 12),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: progressPercent >= 1.0
+                                ? Colors.green[50]
+                                : progressPercent >= 0.75
+                                    ? Colors.lime[50]
+                                    : progressPercent >= 0.5
+                                        ? Colors.orange[50]
+                                        : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                progressPercent >= 1.0
+                                    ? Icons.check_circle_outline
+                                    : progressPercent >= 0.75
+                                        ? Icons.thumb_up_outlined
+                                        : progressPercent >= 0.5
+                                            ? Icons.trending_up
+                                            : Icons.directions_run,
+                                size: 16,
+                                color: progressPercent >= 1.0
+                                    ? Colors.green[700]
+                                    : progressPercent >= 0.75
+                                        ? Colors.lime[700]
+                                        : progressPercent >= 0.5
+                                            ? Colors.orange[700]
+                                            : Colors.blue[700],
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  progressPercent >= 1.0
+                                      ? "Goal achieved! Great work!"
+                                      : progressPercent >= 0.75
+                                          ? "Almost there! Keep it up!"
+                                          : progressPercent >= 0.5
+                                              ? "Good progress! You're over halfway."
+                                              : "Keep going! You're making progress.",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: progressPercent >= 1.0
+                                        ? Colors.green[700]
+                                        : progressPercent >= 0.75
+                                            ? Colors.lime[700]
+                                            : progressPercent >= 0.5
+                                                ? Colors.orange[700]
+                                                : Colors.blue[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Current Avg: $currentValueText",
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
               ] else ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      currentValueText,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87),
-                    ),
-                  ],
+                // For "maintain" type goals
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.teal[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.verified_outlined, color: Colors.teal[700], size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Consistency Goal",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal[700],
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              currentValueText,
+                              style: TextStyle(fontSize: 13, color: Colors.teal[800]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 8),
               ],
-              Stack(
-                children: [
-                  Container(
-                    height: 8,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  Container(
-                    height: 8,
-                    width: MediaQuery.of(context).size.width * progressPercent,
-                    decoration: BoxDecoration(
-                      color: progressColor,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text(
-                subgoalType == "maintain"
-                    ? "Maintaining consistent performance"
-                    : "${(progressPercent * 100).toInt()}% of goal achieved",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
             ],
           ),
 
@@ -841,7 +1140,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           Text(
             "Action Plan:",
             style: TextStyle(
-              fontFamily: 'Lato',
+              fontFamily: 'Inter',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -880,7 +1179,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             Text(
               "Important Notes:",
               style: TextStyle(
-                fontFamily: 'Lato',
+                fontFamily: 'Inter',
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -2379,8 +2678,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           if (key != 'uid' &&
               key != 'timestamp' &&
               key != 'weight' &&
-              key != 'bodyFat' &&
-              key != 'basalMetabolicRate') {
+              key != 'bodyFat') {
             newData[key] = value;
           }
         });
@@ -2588,7 +2886,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     );
   }
 
-  Widget _buildGoalCard() {
+ Widget _buildGoalCard() {
     if (userGoal == null) {
       return Center(
         child: Column(
@@ -2714,6 +3012,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       durationHelperText = "Excellent! You're meeting your duration targets.";
     }
 
+    // Add a state variable to track whether the main goal card is expanded
+    bool isMainGoalExpanded = true;
+
     if (goalType == 'High Intensity Cycling') {
       return FadeTransition(
         opacity: _fadeAnimation,
@@ -2747,79 +3048,455 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             // Add the subgoal card here
             if (hasActiveSubgoal) _buildActiveSubgoalCard(),
 
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    primaryOrange.withOpacity(0.2),
-                    primaryOrange.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: primaryOrange.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: primaryOrange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Image.asset(
-                                  _getIconForGoalType(goalType),
+            // Make the main goal card collapsible
+            StatefulBuilder(
+              builder: (context, setState) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryOrange.withOpacity(0.2),
+                        primaryOrange.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: primaryOrange.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header with collapse button
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            isMainGoalExpanded = !isMainGoalExpanded;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: primaryOrange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Image.asset(
+                                    _getIconForGoalType(goalType),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    goalType,
-                                    style: const TextStyle(
-                                      fontFamily: 'Fredoka-SemiBold',
-                                      fontSize: 20,
-                                      color: primaryBlack,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      goalType,
+                                      style: const TextStyle(
+                                        fontFamily: 'Fredoka-SemiBold',
+                                        fontSize: 20,
+                                        color: primaryBlack,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    "Started on ${DateFormat('MMM d, yyyy').format(createdAt)}",
-                                    style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 14,
-                                      color: primaryGray,
+                                    Text(
+                                      "Started on ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                                      style: const TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 14,
+                                        color: primaryGray,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              Icon(
+                                isMainGoalExpanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                color: primaryOrange,
+                                size: 30,
+                              ),
+                            ],
+                          ),
                         ),
+                      ),
+                      
+                      // Collapsible content
+                      AnimatedCrossFade(
+                        duration: const Duration(milliseconds: 300),
+                        crossFadeState: isMainGoalExpanded
+                            ? CrossFadeState.showFirst
+                            : CrossFadeState.showSecond,
+                        firstChild: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+
+                              if (goalType != 'Endurance')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: primaryOrange.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.date_range,
+                                        size: 16,
+                                        color: primaryOrange,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "Current Week: $weekRangeStr",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: primaryBlack,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (_bestDistanceDate != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: primaryOrange.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events,
+                                        size: 16,
+                                        color: primaryOrange,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "Best Performance: ${DateFormat('MMM d, yyyy').format(_bestDistanceDate!)}",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: primaryBlack,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              const SizedBox(height: 24),
+
+                              // Progress metrics based on goal type
+                              // Weight Progress Card
+                              _buildProgressCard(
+                                "Weight Progress",
+                                _getWeightLossProgress(),
+                                100,
+                                "%",
+                                primaryOrange,
+                                Icons.monitor_weight_outlined,
+                                helpText: _getWeightHelperText(targetWeight),
+                              ),
+                              _buildProgressCard(
+                                "Weekly Cycling Days",
+                                _weeklyDaysProgress,
+                                daysTarget,
+                                "days",
+                                Colors.green,
+                                Icons.calendar_today_rounded,
+                                helpText: daysHelperText,
+                              ),
+                              _buildProgressCard(
+                                "Weekly Cycling Duration",
+                                _totalWeeklyDuration,
+                                durationTarget,
+                                "mins",
+                                Colors.blue,
+                                Icons.timer,
+                                helpText: _getDurationHelperText(durationTarget),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.green.shade200,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: Colors.green.shade700,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        "High intensity cycling helps burn more calories. Your daily target is to cycle with elevated heart rate to maximize weight loss results. Update your weight in your profile to track progress.",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Weekly Activities Summary - only for non-endurance goals
+                              if (_weeklyActivities.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 10,
+                                        spreadRadius: 0,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.directions_bike,
+                                            color: primaryOrange,
+                                            size: 22,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            "Week's Activities",
+                                            style: TextStyle(
+                                              fontFamily: 'Fredoka-SemiBold',
+                                              fontSize: 16,
+                                              color: primaryBlack,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        "You've completed ${_weeklyActivities.length} cycling ${_weeklyActivities.length == 1 ? 'activity' : 'activities'} this week.",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          color: primaryGray,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 16),
+
+                              // Tips based on goal type
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 10,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(
+                                          Icons.lightbulb_outline,
+                                          color: primaryOrange,
+                                          size: 22,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "Cycling Tips",
+                                          style: TextStyle(
+                                            fontFamily: 'Fredoka-SemiBold',
+                                            fontSize: 16,
+                                            color: primaryBlack,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      "For maximum calorie burn, incorporate interval training into your rides. Alternate between high intensity sprints and recovery periods.",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 14,
+                                        color: primaryGray,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        secondChild: const SizedBox(height: 0),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For other goal types (Leisure or Endurance)
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryOrange.withOpacity(0.2),
+                  primaryOrange.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: primaryOrange.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with collapse button
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      isMainGoalExpanded = !isMainGoalExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: primaryOrange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Image.asset(
+                              _getIconForGoalType(goalType),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                goalType,
+                                style: const TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 20,
+                                  color: primaryBlack,
+                                ),
+                              ),
+                              Text(
+                                "Started on ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: primaryGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isMainGoalExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          color: primaryOrange,
+                          size: 30,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Collapsible content
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 300),
+                  crossFadeState: isMainGoalExpanded
+                      ? CrossFadeState.showFirst
+                      : CrossFadeState.showSecond,
+                  firstChild: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         const SizedBox(height: 16),
 
+                        // Current Week Display based on goal type
                         if (goalType != 'Endurance')
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -2851,8 +3528,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                           )
                         else if (_bestDistanceDate != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -2936,66 +3613,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               ],
                             ),
                           ),
-                        ] else if (goalType == 'High Intensity Cycling') ...[
-                          // Weight Progress Card
-                          _buildProgressCard(
-                            "Weight Progress",
-                            _getWeightLossProgress(),
-                            100,
-                            "%",
-                            primaryOrange,
-                            Icons.monitor_weight_outlined,
-                            helpText: _getWeightHelperText(targetWeight),
-                          ),
-                          _buildProgressCard(
-                            "Weekly Cycling Days",
-                            _weeklyDaysProgress,
-                            daysTarget,
-                            "days",
-                            Colors.green,
-                            Icons.calendar_today_rounded,
-                            helpText: daysHelperText,
-                          ),
-                          _buildProgressCard(
-                            "Weekly Cycling Duration",
-                            _totalWeeklyDuration,
-                            durationTarget,
-                            "mins",
-                            Colors.blue,
-                            Icons.timer,
-                            helpText: _getDurationHelperText(durationTarget),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.green.shade200,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.green.shade700,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Text(
-                                    "High intensity cycling helps burn more calories. Your daily target is to cycle with elevated heart rate to maximize weight loss results. Update your weight in your profile to track progress.",
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ] else if (goalType == 'Endurance') ...[
                           // Best Distance Card
                           _buildProgressCard(
@@ -3017,8 +3634,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               "mins",
                               Colors.blue,
                               Icons.timer,
-                              helpText:
-                                  _getBestDurationHelperText(durationTarget),
+                              helpText: _getBestDurationHelperText(durationTarget),
                             ),
                           ],
 
@@ -3059,8 +3675,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                         const SizedBox(height: 16),
 
                         // Weekly Activities Summary - only for non-endurance goals
-                        if (_weeklyActivities.isNotEmpty &&
-                            goalType != 'Endurance') ...[
+                        if (_weeklyActivities.isNotEmpty && goalType != 'Endurance') ...[
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -3222,15 +3837,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                                     color: primaryGray,
                                   ),
                                 )
-                              else if (goalType == 'High Intensity Cycling')
-                                const Text(
-                                  "For maximum calorie burn, incorporate interval training into your rides. Alternate between high intensity sprints and recovery periods.",
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 14,
-                                    color: primaryGray,
-                                  ),
-                                )
                               else
                                 const Text(
                                   "Gradually increase your distance over time. Focus on proper nutrition and recovery to build endurance.",
@@ -3245,511 +3851,13 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                  secondChild: const SizedBox(height: 0),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              primaryOrange.withOpacity(0.2),
-              primaryOrange.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: primaryOrange.withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: primaryOrange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Image.asset(
-                        _getIconForGoalType(goalType),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          goalType,
-                          style: const TextStyle(
-                            fontFamily: 'Fredoka-SemiBold',
-                            fontSize: 20,
-                            color: primaryBlack,
-                          ),
-                        ),
-                        Text(
-                          "Started on ${DateFormat('MMM d, yyyy').format(createdAt)}",
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: primaryGray,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Current Week Display based on goal type
-              if (goalType != 'Endurance')
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: primaryOrange.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.date_range,
-                        size: 16,
-                        color: primaryOrange,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "Current Week: $weekRangeStr",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: primaryBlack,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_bestDistanceDate != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: primaryOrange.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.emoji_events,
-                        size: 16,
-                        color: primaryOrange,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "Best Performance: ${DateFormat('MMM d, yyyy').format(_bestDistanceDate!)}",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: primaryBlack,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-
-              // Progress metrics based on goal type
-              if (goalType == 'Leisure') ...[
-                _buildProgressCard(
-                  "Weekly Cycling Days",
-                  _weeklyDaysProgress,
-                  daysTarget,
-                  "days",
-                  primaryOrange,
-                  Icons.calendar_today_rounded,
-                  helpText: daysHelperText,
-                ),
-                _buildProgressCard(
-                  "Weekly Cycling Duration",
-                  _totalWeeklyDuration,
-                  durationTarget,
-                  "mins",
-                  Colors.blue,
-                  Icons.timer,
-                  helpText: _getDurationHelperText(durationTarget),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.blue.shade200,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.refresh_rounded,
-                        color: Colors.blue.shade700,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          "Leisure goals reset every Monday. Your weekly target is the total duration you should cycle this week.",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ] else if (goalType == 'High Intensity Cycling') ...[
-                _buildProgressCard(
-                  "Weight Progress",
-                  _getWeightLossProgress(),
-                  100,
-                  "%",
-                  primaryOrange,
-                  Icons.monitor_weight_outlined,
-                  helpText: _getWeightHelperText(targetWeight),
-                ),
-                _buildProgressCard(
-                  "Weekly Cycling Days",
-                  _weeklyDaysProgress,
-                  daysTarget,
-                  "days",
-                  Colors.green,
-                  Icons.calendar_today_rounded,
-                  helpText: daysHelperText,
-                ),
-                _buildProgressCard(
-                  "Weekly Cycling Duration",
-                  _totalWeeklyDuration,
-                  durationTarget,
-                  "mins",
-                  Colors.blue,
-                  Icons.timer,
-                  helpText: _getDurationHelperText(durationTarget),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.green.shade200,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.green.shade700,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          "High intensity cycling helps burn more calories. Your daily target is to cycle with elevated heart rate to maximize weight loss results. Update your weight in your profile to track progress.",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ] else if (goalType == 'Endurance') ...[
-                // Best Distance Card
-                _buildProgressCard(
-                  "Best Distance",
-                  _bestDistance,
-                  targetDistance,
-                  "km",
-                  primaryOrange,
-                  Icons.straighten_rounded,
-                  helpText: _getEnduranceHelperText(targetDistance),
-                ),
-
-                // Best Duration Card
-                if (_bestDistanceActivity != null) ...[
-                  _buildProgressCard(
-                    "Duration",
-                    _getBestActivityDuration(),
-                    durationTarget,
-                    "mins",
-                    Colors.blue,
-                    Icons.timer,
-                    helpText: _getBestDurationHelperText(durationTarget),
-                  ),
-                ],
-
-                // Endurance Goals Info Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.purple.shade200,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.purple.shade700,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          "Endurance goals track your best performance. Each time you beat your distance record, your progress will update. Focus on gradually increasing your distance while maintaining a good pace.",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // Weekly Activities Summary - only for non-endurance goals
-              if (_weeklyActivities.isNotEmpty && goalType != 'Endurance') ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.directions_bike,
-                            color: primaryOrange,
-                            size: 22,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            "Week's Activities",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              color: primaryBlack,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "You've completed ${_weeklyActivities.length} cycling ${_weeklyActivities.length == 1 ? 'activity' : 'activities'} this week.",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // Latest activity summary for endurance goals
-              if (goalType == 'Endurance' &&
-                  _latestActivityDate != null &&
-                  _latestActivityDate != _bestDistanceDate) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            color: primaryOrange,
-                            size: 22,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            "Latest Activity",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              color: primaryBlack,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "Your latest activity on ${DateFormat('MMM d, yyyy').format(_latestActivityDate!)} was ${_latestDistance.toStringAsFixed(1)} km.",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
-                      ),
-                      _latestDistance < _bestDistance
-                          ? Text(
-                              "Keep pushing! You're ${(_bestDistance - _latestDistance).toStringAsFixed(1)} km away from your personal best.",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: primaryOrange,
-                              ),
-                            )
-                          : Container(),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // Tips based on goal type
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.lightbulb_outline,
-                          color: primaryOrange,
-                          size: 22,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          "Cycling Tips",
-                          style: TextStyle(
-                            fontFamily: 'Fredoka-SemiBold',
-                            fontSize: 16,
-                            color: primaryBlack,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (goalType == 'Leisure')
-                      const Text(
-                        "Try to maintain a consistent cycling schedule. Even short rides can be beneficial for your health and enjoyment!",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
-                      )
-                    else if (goalType == 'High Intensity Cycling')
-                      const Text(
-                        "For maximum calorie burn, incorporate interval training into your rides. Alternate between high intensity sprints and recovery periods.",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
-                      )
-                    else
-                      const Text(
-                        "Gradually increase your distance over time. Focus on proper nutrition and recovery to build endurance.",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: primaryGray,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -3997,4 +4105,46 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       ),
     );
   }
+}
+
+class ProgressMarkerPainter extends CustomPainter {
+  final double baselinePosition;
+  final double targetPosition;
+  final double containerWidth;
+
+  ProgressMarkerPainter({
+    required this.baselinePosition,
+    required this.targetPosition,
+    required this.containerWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey[400]!
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    // Draw baseline marker
+    canvas.drawLine(
+      Offset(baselinePosition * containerWidth, 0),
+      Offset(baselinePosition * containerWidth, size.height),
+      paint,
+    );
+
+    // Draw target marker
+    final targetPaint = Paint()
+      ..color = Colors.green[800]!
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(targetPosition * containerWidth, 0),
+      Offset(targetPosition * containerWidth, size.height),
+      targetPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
