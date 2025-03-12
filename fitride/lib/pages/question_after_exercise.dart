@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 
 class FoodQuestionnairePage extends StatefulWidget {
@@ -22,6 +21,19 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   double _breakfastCalories = 0;
   double _lunchCalories = 0;
   double _dinnerCalories = 0;
+  
+  // Nutrient tracking for each meal
+  double _breakfastCarbs = 0;
+  double _lunchCarbs = 0;
+  double _dinnerCarbs = 0;
+  
+  double _breakfastProtein = 0;
+  double _lunchProtein = 0;
+  double _dinnerProtein = 0;
+  
+  double _breakfastFat = 0;
+  double _lunchFat = 0;
+  double _dinnerFat = 0;
 
   bool _isCalculatingBreakfast = false;
   bool _isCalculatingLunch = false;
@@ -31,6 +43,9 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   // Define the orange color from profile page
   final Color orangeColor = const Color(0xffFFA500);
   final Color darkGrey = const Color(0xFF303030);
+
+  // CaloriesNinja API Key
+  final String _apiKey = 'vRBy09Rf/CSLlSJO0iK3Vw==m5ujHrsqBMljyyFP';
 
   @override
   void dispose() {
@@ -108,11 +123,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                     _isCalculatingBreakfast = true;
                   });
 
-                  final calories =
-                      await _getCaloriesFromUSDA(_breakfastController.text);
+                  final nutritionData =
+                      await _getNutritionFromCaloriesNinja(_breakfastController.text);
 
                   setState(() {
-                    _breakfastCalories = calories;
+                    _breakfastCalories = nutritionData['calories'] ?? 0.0;
+                    _breakfastCarbs = nutritionData['carbs'] ?? 0.0;
+                    _breakfastProtein = nutritionData['protein'] ?? 0.0;
+                    _breakfastFat = nutritionData['fat'] ?? 0.0;
                     _isCalculatingBreakfast = false;
                   });
                 },
@@ -133,11 +151,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                     _isCalculatingLunch = true;
                   });
 
-                  final calories =
-                      await _getCaloriesFromUSDA(_lunchController.text);
+                  final nutritionData =
+                      await _getNutritionFromCaloriesNinja(_lunchController.text);
 
                   setState(() {
-                    _lunchCalories = calories;
+                    _lunchCalories = nutritionData['calories'] ?? 0.0;
+                    _lunchCarbs = nutritionData['carbs'] ?? 0.0;
+                    _lunchProtein = nutritionData['protein'] ?? 0.0;
+                    _lunchFat = nutritionData['fat'] ?? 0.0;
                     _isCalculatingLunch = false;
                   });
                 },
@@ -158,11 +179,14 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                     _isCalculatingDinner = true;
                   });
 
-                  final calories =
-                      await _getCaloriesFromUSDA(_dinnerController.text);
+                  final nutritionData =
+                      await _getNutritionFromCaloriesNinja(_dinnerController.text);
 
                   setState(() {
-                    _dinnerCalories = calories;
+                    _dinnerCalories = nutritionData['calories'] ?? 0.0;
+                    _dinnerCarbs = nutritionData['carbs'] ?? 0.0;
+                    _dinnerProtein = nutritionData['protein'] ?? 0.0;
+                    _dinnerFat = nutritionData['fat'] ?? 0.0;
                     _isCalculatingDinner = false;
                   });
                 },
@@ -217,14 +241,44 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                         ),
                       ],
                     ),
-                    Text(
-                      '${(_breakfastCalories + _lunchCalories + _dinnerCalories).toStringAsFixed(0)} kcal',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: orangeColor,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${(_breakfastCalories + _lunchCalories + _dinnerCalories).toStringAsFixed(0)} kcal',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: orangeColor,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Carbs: ${(_breakfastCarbs + _lunchCarbs + _dinnerCarbs).toStringAsFixed(1)}g',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          'Protein: ${(_breakfastProtein + _lunchProtein + _dinnerProtein).toStringAsFixed(1)}g',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          'Fat: ${(_breakfastFat + _lunchFat + _dinnerFat).toStringAsFixed(1)}g',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -438,25 +492,69 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
             ],
           ),
           SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'Calories: ',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'Calories: ',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    '${calories.toStringAsFixed(0)} kcal',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: orangeColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '${calories.toStringAsFixed(0)} kcal',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  color: orangeColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
+              SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'C: ${mealTitle == 'Breakfast' ? _breakfastCarbs.toStringAsFixed(1) : 
+                        mealTitle == 'Lunch' ? _lunchCarbs.toStringAsFixed(1) : 
+                        _dinnerCarbs.toStringAsFixed(1)}g',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'P: ${mealTitle == 'Breakfast' ? _breakfastProtein.toStringAsFixed(1) : 
+                        mealTitle == 'Lunch' ? _lunchProtein.toStringAsFixed(1) : 
+                        _dinnerProtein.toStringAsFixed(1)}g',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'F: ${mealTitle == 'Breakfast' ? _breakfastFat.toStringAsFixed(1) : 
+                        mealTitle == 'Lunch' ? _lunchFat.toStringAsFixed(1) : 
+                        _dinnerFat.toStringAsFixed(1)}g',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -465,54 +563,61 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     );
   }
 
-  Future<double> _getCaloriesFromUSDA(String foodInput) async {
-    if (foodInput.isEmpty) return 0.0;
+  Future<Map<String, double>> _getNutritionFromCaloriesNinja(String foodInput) async {
+    // Initialize result map with default values
+    Map<String, double> nutritionData = {
+      'calories': 0.0,
+      'carbs': 0.0,
+      'protein': 0.0,
+      'fat': 0.0,
+    };
+    
+    if (foodInput.isEmpty) return nutritionData;
 
-    final apiKey = dotenv.env['API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      print("API key is missing!");
-      return 0.0;
-    }
-
-    final RegExp regex = RegExp(r'(\d+)\s*(.*)');
-    int quantity = 1;
-    String food = foodInput.trim();
-
-    final match = regex.firstMatch(foodInput);
-    if (match != null) {
-      quantity = int.parse(match.group(1)!);
-      food = match.group(2)!.trim();
-    }
-
-    final url = Uri.parse(
-        "https://api.nal.usda.gov/fdc/v1/foods/search?query=$food&api_key=$apiKey");
-
+    final url = Uri.parse('https://api.calorieninjas.com/v1/nutrition?query=$foodInput');
+    
     try {
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'X-Api-Key': _apiKey,
+          'Content-Type': 'application/json',
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        if (data["foods"] != null && data["foods"].isNotEmpty) {
-          final firstFood = data["foods"][0];
-
-          for (var nutrient in firstFood["foodNutrients"]) {
-            if (nutrient["nutrientName"] == "Energy" &&
-                nutrient["unitName"] == "KCAL") {
-              double caloriesPerUnit = nutrient["value"].toDouble();
-              return caloriesPerUnit * quantity;
+        
+        if (data['items'] != null && data['items'].isNotEmpty) {
+          // Sum up nutritional values from all items in the response
+          for (var item in data['items']) {
+            if (item['calories'] != null) {
+              nutritionData['calories'] = nutritionData['calories']! + item['calories'].toDouble();
+            }
+            
+            if (item['carbohydrates_total_g'] != null) {
+              nutritionData['carbs'] = nutritionData['carbs']! + item['carbohydrates_total_g'].toDouble();
+            }
+            
+            if (item['protein_g'] != null) {
+              nutritionData['protein'] = nutritionData['protein']! + item['protein_g'].toDouble();
+            }
+            
+            if (item['fat_total_g'] != null) {
+              nutritionData['fat'] = nutritionData['fat']! + item['fat_total_g'].toDouble();
             }
           }
+        } else {
+          print("No food items found for '$foodInput'");
         }
-        print("No calorie data found for '$food'.");
-        return 0.0;
       } else {
-        print("USDA API Error: ${response.body}");
-        return 0.0;
+        print("CaloriesNinja API Error: ${response.statusCode} - ${response.body}");
       }
     } catch (e) {
-      print("Error fetching calorie data: $e");
-      return 0.0;
+      print("Error fetching nutrition data: $e");
     }
+    
+    return nutritionData;
   }
 
   Future<void> _saveToFirestore() async {
@@ -543,14 +648,37 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
+      // Calculate totals
+      final totalCalories = _breakfastCalories + _lunchCalories + _dinnerCalories;
+      final totalCarbs = _breakfastCarbs + _lunchCarbs + _dinnerCarbs;
+      final totalProtein = _breakfastProtein + _lunchProtein + _dinnerProtein;
+      final totalFat = _breakfastFat + _lunchFat + _dinnerFat;
+      
       // Create data entry
       final foodEntry = {
         'userId': user.uid,
         'date': Timestamp.fromDate(today),
+        // Calories
         'breakfast_calories': _breakfastCalories,
         'lunch_calories': _lunchCalories,
         'dinner_calories': _dinnerCalories,
-        'total_calories': _breakfastCalories + _lunchCalories + _dinnerCalories,
+        'total_calories': totalCalories,
+        // Carbs
+        'breakfast_carbs': _breakfastCarbs,
+        'lunch_carbs': _lunchCarbs,
+        'dinner_carbs': _dinnerCarbs,
+        'total_carbs': totalCarbs,
+        // Protein
+        'breakfast_protein': _breakfastProtein,
+        'lunch_protein': _lunchProtein,
+        'dinner_protein': _dinnerProtein,
+        'total_protein': totalProtein,
+        // Fat
+        'breakfast_fat': _breakfastFat,
+        'lunch_fat': _lunchFat,
+        'dinner_fat': _dinnerFat,
+        'total_fat': totalFat,
+        // Food descriptions
         'breakfast': _breakfastController.text,
         'lunch': _lunchController.text,
         'dinner': _dinnerController.text,
