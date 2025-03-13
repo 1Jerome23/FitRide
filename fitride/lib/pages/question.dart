@@ -32,7 +32,6 @@ class _QuestionPageState extends State<QuestionPage>
   String? _weatherCondition;
   String? _heartRateLimit;
   String? _maxDuration;
-  String? _gender;
 
   final TextEditingController weightController = TextEditingController();
   final TextEditingController basalMetabolicRateController =
@@ -89,10 +88,6 @@ class _QuestionPageState extends State<QuestionPage>
     'High humidity affects me',
     'Poor air quality affects me',
     'Rain or strong winds affect me'
-  ];
-  final List<String> selectedGender = [
-    'Male',
-    'Female',
   ];
 
   final List<String> _heartRateOptions = [
@@ -245,7 +240,6 @@ class _QuestionPageState extends State<QuestionPage>
         userData['weight'] = weightController.text;
         userData['basalMetabolicRate'] = basalMetabolicRateController.text;
         userData['bodyFat'] = bodyFatController.text;
-        userData['gender'] = _gender;
 
         goalData['targetWeight'] = targetWeightController.text;
         goalData['initialWeight'] = initialWeight;
@@ -1672,77 +1666,6 @@ class _QuestionPageState extends State<QuestionPage>
                           fontFamily: "Inter",
                           color: Colors.white,
                           fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 15),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 5,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          padding: EdgeInsets.all(15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "What is your gender?",
-                style: TextStyle(
-                  fontFamily: "Inter",
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: primaryBlack,
-                ),
-              ),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _gender,
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _gender = newValue;
-                        });
-                        print("Selected gender: $_gender");
-                      },
-                      items: selectedGender.map((String gender) {
-                        return DropdownMenuItem<String>(
-                          value: gender,
-                          child: Text(
-                            gender,
-                            style: TextStyle(
-                              fontFamily: "Inter",
-                              color: primaryBlack,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      decoration: InputDecoration(
-                        hintText: "Select your gender",
-                        hintStyle: TextStyle(
-                          fontFamily: "Inter",
-                          color: primaryGray,
-                          fontSize: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-                      ),
                     ),
                   ),
                 ],
