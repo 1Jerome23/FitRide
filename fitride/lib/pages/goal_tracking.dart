@@ -17,8 +17,97 @@ class GoalTrackingPage extends StatefulWidget {
   _GoalTrackingPageState createState() => _GoalTrackingPageState();
 }
 
+int _currentWeekNumber = 1;
+Map<int, Map<String, dynamic>> _weeklyGoalData = {};
+Map<int, List<Map<String, dynamic>>> _weeklySubgoalData = {};
+
+// Weekly progress structure for different goal types
+class WeeklyProgress {
+  // Common fields
+  final int weekNumber;
+  final DateTime weekStartDate;
+  final DateTime weekEndDate;
+
+  // Leisure goal tracking
+  int sessionsCompleted = 0;
+  double totalDuration = 0.0;
+
+  // High Intensity Cycling tracking
+  double weekStartWeight = 0.0;
+  double weekEndWeight = 0.0;
+  double caloriesBurned = 0.0;
+
+  // Endurance tracking
+  double bestDistance = 0.0;
+  double bestPace = 0.0;
+  DateTime? bestDistanceDate;
+
+  // Subgoal progress
+  double subgoalStartValue = 0.0;
+  double subgoalCurrentValue = 0.0;
+  double subgoalTargetValue = 0.0;
+  String subgoalType = "";
+
+  WeeklyProgress(
+      {required this.weekNumber,
+      required this.weekStartDate,
+      required this.weekEndDate});
+
+  // Convert to map for Firestore storage
+  Map<String, dynamic> toMap() {
+    return {
+      'weekNumber': weekNumber,
+      'weekStartDate': weekStartDate,
+      'weekEndDate': weekEndDate,
+      'sessionsCompleted': sessionsCompleted,
+      'totalDuration': totalDuration,
+      'weekStartWeight': weekStartWeight,
+      'weekEndWeight': weekEndWeight,
+      'caloriesBurned': caloriesBurned,
+      'bestDistance': bestDistance,
+      'bestPace': bestPace,
+      'bestDistanceDate': bestDistanceDate,
+      'subgoalStartValue': subgoalStartValue,
+      'subgoalCurrentValue': subgoalCurrentValue,
+      'subgoalTargetValue': subgoalTargetValue,
+      'subgoalType': subgoalType,
+    };
+  }
+
+  // Create from Firestore data
+  factory WeeklyProgress.fromMap(Map<String, dynamic> map) {
+    WeeklyProgress progress = WeeklyProgress(
+      weekNumber: map['weekNumber'] ?? 0,
+      weekStartDate:
+          (map['weekStartDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      weekEndDate:
+          (map['weekEndDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+
+    progress.sessionsCompleted = map['sessionsCompleted'] ?? 0;
+    progress.totalDuration = map['totalDuration']?.toDouble() ?? 0.0;
+    progress.weekStartWeight = map['weekStartWeight']?.toDouble() ?? 0.0;
+    progress.weekEndWeight = map['weekEndWeight']?.toDouble() ?? 0.0;
+    progress.caloriesBurned = map['caloriesBurned']?.toDouble() ?? 0.0;
+    progress.bestDistance = map['bestDistance']?.toDouble() ?? 0.0;
+    progress.bestPace = map['bestPace']?.toDouble() ?? 0.0;
+    progress.bestDistanceDate =
+        (map['bestDistanceDate'] as Timestamp?)?.toDate();
+    progress.subgoalStartValue = map['subgoalStartValue']?.toDouble() ?? 0.0;
+    progress.subgoalCurrentValue =
+        map['subgoalCurrentValue']?.toDouble() ?? 0.0;
+    progress.subgoalTargetValue = map['subgoalTargetValue']?.toDouble() ?? 0.0;
+    progress.subgoalType = map['subgoalType'] ?? "";
+
+    return progress;
+  }
+}
+
 class _GoalTrackingPageState extends State<GoalTrackingPage>
     with SingleTickerProviderStateMixin {
+  Map<int, Map<String, dynamic>> _weeklyProgressData = {};
+  bool _isLoadingWeeklyData = false;
+
   int _selectedIndex = 2;
   Map<String, dynamic>? userGoal;
   bool _isLoading = true;
@@ -67,6 +156,432 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   static const Color primaryGray = Color(0xFF676767);
   late DateTime _weekStartDate;
   late DateTime _weekEndDate;
+
+  Future<void> _fetchAllWeeklyGoalData() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Get the current week number
+      _currentWeekNumber = getCurrentWeekNumber();
+      print("Current week number: $_currentWeekNumber");
+
+      // Get the goal ID
+      String goalId = userGoal!['id'] ?? "";
+      if (goalId.isEmpty) {
+        print("Goal ID is empty");
+        return;
+      }
+
+      // Fetch all weekly data for this goal
+      QuerySnapshot weeklySnapshot = await FirebaseFirestore.instance
+          .collection('weekly_progress')
+          .where('uid', isEqualTo: uid)
+          .where('goalId', isEqualTo: goalId)
+          .orderBy('weekNumber', descending: true)
+          .get();
+
+      // Clear existing data
+      _weeklyGoalData.clear();
+
+      // Process results
+      for (var doc in weeklySnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        int weekNum = data['weekNumber'] ?? 0;
+
+        if (weekNum > 0) {
+          // Store the document ID for future updates
+          data['docId'] = doc.id;
+          _weeklyGoalData[weekNum] = data;
+
+          print("Loaded weekly data for week $weekNum");
+        }
+      }
+
+      // Fetch subgoal data (if needed)
+      if (hasActiveSubgoal) {
+        await _fetchWeeklySubgoalData(uid, goalId);
+      }
+
+      // Initialize data for the current week if it doesn't exist
+      if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+        _initializeCurrentWeekData(uid, goalId);
+      }
+    } catch (e) {
+      print("Error fetching weekly data: $e");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+// Initialize data structure for the current week
+  void _initializeCurrentWeekData(String uid, String goalId) {
+    DateTime weekStart = _getWeekStartDate();
+    DateTime weekEnd = _getWeekEndDate();
+
+    // Base data structure
+    Map<String, dynamic> weekData = {
+      'uid': uid,
+      'goalId': goalId,
+      'weekNumber': _currentWeekNumber,
+      'weekStartDate': Timestamp.fromDate(weekStart), // Convert to Timestamp
+      'weekEndDate': Timestamp.fromDate(weekEnd), // Convert to Timestamp
+      'timestamp': FieldValue.serverTimestamp(),
+      'sessionsCompleted': 0,
+      'totalDuration': 0.0,
+      'totalDistance': 0.0,
+      'uniqueDays': [],
+    };
+
+    // Add goal-specific fields
+    if (userGoal?['goalType'] == 'High Intensity Cycling') {
+      weekData['weekStartWeight'] = _currentUserWeight;
+      weekData['weekEndWeight'] = _currentUserWeight;
+      weekData['caloriesBurned'] = 0.0;
+      weekData['targetWeight'] = targetWeight;
+      weekData['initialWeight'] =
+          userGoal?['initialWeight'] ?? _currentUserWeight;
+    } else if (userGoal?['goalType'] == 'Endurance') {
+      weekData['bestDistance'] = 0.0;
+      weekData['bestPace'] = 0.0;
+      weekData['targetDistance'] = userGoal?['targetDistance'] ?? 0.0;
+    } else if (userGoal?['goalType'] == 'Leisure') {
+      weekData['targetDaysPerWeek'] = userGoal?['daysPerWeek'] ?? 3;
+      weekData['targetDuration'] = userGoal?['sessionDuration'] ?? 30.0;
+    }
+
+    // Add subgoal tracking if there's an active subgoal
+    if (hasActiveSubgoal) {
+      weekData['subgoalType'] = subgoalType;
+      weekData['subgoalTargetValue'] = subgoalTargetValue;
+      weekData['subgoalCurrentValue'] = 0.0;
+      weekData['subgoalBaseline'] = _getSubgoalBaselineValue();
+    }
+
+    // Store in the data structure
+    _weeklyGoalData[_currentWeekNumber] = weekData;
+
+    print("Initialized data for week $_currentWeekNumber");
+  }
+
+// Helper method to get the appropriate baseline value for the active subgoal
+  double _getSubgoalBaselineValue() {
+    switch (subgoalType) {
+      case "distance":
+        return baselineDistance;
+      case "pace":
+        return baselinePace;
+      case "duration":
+        return baselineDuration;
+      default:
+        return 0.0;
+    }
+  }
+
+// Fetch subgoal data by week
+  Future<void> _fetchWeeklySubgoalData(String uid, String goalId) async {
+    try {
+      // Clear existing data
+      _weeklySubgoalData.clear();
+
+      // Get all subgoals for this user and goal
+      QuerySnapshot subgoalSnapshot = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      // Process results
+      for (var doc in subgoalSnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+        // Calculate which week this subgoal belongs to
+        DateTime startDate = (data['startDate'] as Timestamp).toDate();
+        int weekNum = _calculateWeekNumber(startDate);
+
+        // Initialize the week's subgoal list if needed
+        if (!_weeklySubgoalData.containsKey(weekNum)) {
+          _weeklySubgoalData[weekNum] = [];
+        }
+
+        // Add the document ID for future updates
+        data['docId'] = doc.id;
+        _weeklySubgoalData[weekNum]!.add(data);
+
+        print("Added subgoal to week $weekNum: ${data['subgoalType']}");
+      }
+    } catch (e) {
+      print("Error fetching subgoal data: $e");
+    }
+  }
+
+// Calculate which week number a given date belongs to
+  int _calculateWeekNumber(DateTime date) {
+    if (_goalCreationDate == null) return 1;
+
+    // Calculate days since goal creation
+    int daysSinceCreation = date.difference(_goalCreationDate).inDays;
+
+    // Calculate week number (using integer division which rounds down)
+    int weekNumber = daysSinceCreation ~/ 7;
+
+    // Add 1 to make it 1-based (week 1, week 2, etc.) rather than 0-based
+    return weekNumber + 1;
+  }
+
+// Update the weekly progress with latest activity data
+  Future<void> _updateWeeklyProgressData() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
+
+    // Ensure we have the current week's data
+    if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+      String goalId = userGoal!['id'] ?? "";
+      _initializeCurrentWeekData(uid, goalId);
+    }
+
+    // Get the current week's data
+    Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
+
+    // Update common fields
+    weekData['sessionsCompleted'] = _weeklyActivities.length;
+    weekData['totalDuration'] = _totalWeeklyDuration;
+    weekData['totalDistance'] = _totalWeeklyDistance;
+    weekData['uniqueDays'] = _uniqueDays.toList();
+
+    // Update goal-specific fields
+    switch (userGoal!['goalType']) {
+      case 'Leisure':
+        weekData['dayProgress'] = _weeklyDaysProgress;
+        break;
+
+      case 'High Intensity Cycling':
+        // Only update end weight if current weight is valid
+        if (_currentUserWeight > 0) {
+          weekData['weekEndWeight'] = _currentUserWeight;
+        }
+
+        // Calculate calories burned from activities
+        double totalCalories = 0.0;
+        for (var activity in _weeklyActivities) {
+          if (activity.containsKey('calories_burned')) {
+            totalCalories += safeParseDouble(activity['calories_burned']);
+          }
+        }
+        weekData['caloriesBurned'] = totalCalories;
+
+        // Calculate weight loss progress
+        if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
+          weekData['weeklyWeightChange'] =
+              weekData['weekEndWeight'] - weekData['weekStartWeight'];
+        }
+        break;
+
+      case 'Endurance':
+        weekData['bestDistance'] = _bestDistance;
+
+        // Calculate pace if we have valid duration and distance
+        if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
+          double pace =
+              _getBestActivityDuration() / _bestDistance; // minutes per km
+          weekData['bestPace'] = pace;
+        }
+
+        if (_bestDistanceDate != null) {
+          weekData['bestDistanceDate'] = _bestDistanceDate;
+        }
+        break;
+    }
+
+    // Update subgoal progress if there's an active subgoal
+    if (hasActiveSubgoal) {
+      weekData['subgoalType'] = subgoalType;
+      weekData['subgoalTargetValue'] = subgoalTargetValue;
+
+      // Set current value based on subgoal type
+      switch (subgoalType) {
+        case "distance":
+          // Average distance per activity this week
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDistance / _weeklyActivities.length;
+          break;
+
+        case "pace":
+          // Calculate average pace this week
+          if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+            double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+            weekData['subgoalCurrentValue'] = avgPace;
+          }
+          break;
+
+        case "duration":
+          // Average duration per activity
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDuration / _weeklyActivities.length;
+          break;
+
+        case "maintain":
+          // Just count the number of activities as a progress indicator
+          weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+          break;
+      }
+
+      // Calculate progress percentage for the subgoal
+      if (weekData['subgoalBaseline'] != null &&
+          weekData['subgoalTargetValue'] != null &&
+          weekData['subgoalCurrentValue'] != null) {
+        double baseline = weekData['subgoalBaseline'];
+        double target = weekData['subgoalTargetValue'];
+        double current = weekData['subgoalCurrentValue'];
+
+        // Different calculation based on subgoal type
+        if (subgoalType == "pace") {
+          // For pace, lower is better (improvement is baseline → target where baseline > target)
+          if (baseline > target) {
+            double progress = (baseline - current) / (baseline - target);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
+        } else {
+          // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
+          if (target > baseline) {
+            double progress = (current - baseline) / (target - baseline);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
+        }
+      }
+    }
+
+    // Save to Firestore
+    await _saveWeeklyProgressToFirestore(weekData);
+  }
+
+// Save weekly progress data to Firestore
+  Future<void> _saveWeeklyProgressToFirestore(
+      Map<String, dynamic> weekData) async {
+    try {
+      // Check if this document already exists (by docId)
+      if (weekData.containsKey('docId')) {
+        // Update existing document
+        await FirebaseFirestore.instance
+            .collection('weekly_progress')
+            .doc(weekData['docId'])
+            .update(weekData);
+
+        print("Updated weekly progress for week ${weekData['weekNumber']}");
+      } else {
+        // Create new document
+        DocumentReference docRef = await FirebaseFirestore.instance
+            .collection('weekly_progress')
+            .add(weekData);
+
+        // Store the doc ID for future updates
+        weekData['docId'] = docRef.id;
+
+        print(
+            "Created new weekly progress record for week ${weekData['weekNumber']}");
+      }
+    } catch (e) {
+      print("Error saving weekly progress: $e");
+    }
+  }
+
+// Add method to get week-over-week progress comparison
+  Map<String, dynamic> getWeekOverWeekProgress() {
+    Map<String, dynamic> comparison = {};
+
+    // Current week data
+    Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
+
+    // Previous week data
+    Map<String, dynamic>? previousWeekData =
+        _weeklyGoalData[_currentWeekNumber - 1];
+
+    if (currentWeekData == null) {
+      return {'hasComparison': false};
+    }
+
+    comparison['hasComparison'] = previousWeekData != null;
+    comparison['currentWeek'] = _currentWeekNumber;
+
+    // Common metrics for all goal types
+    comparison['currentSessionsCount'] =
+        currentWeekData['sessionsCompleted'] ?? 0;
+    comparison['currentTotalDuration'] =
+        currentWeekData['totalDuration'] ?? 0.0;
+    comparison['currentTotalDistance'] =
+        currentWeekData['totalDistance'] ?? 0.0;
+    comparison['currentUniqueDays'] =
+        currentWeekData['uniqueDays']?.length ?? 0;
+
+    if (previousWeekData != null) {
+      // Add previous week data
+      comparison['previousSessionsCount'] =
+          previousWeekData['sessionsCompleted'] ?? 0;
+      comparison['previousTotalDuration'] =
+          previousWeekData['totalDuration'] ?? 0.0;
+      comparison['previousTotalDistance'] =
+          previousWeekData['totalDistance'] ?? 0.0;
+      comparison['previousUniqueDays'] =
+          previousWeekData['uniqueDays']?.length ?? 0;
+
+      // Calculate changes
+      comparison['sessionsChange'] = (comparison['currentSessionsCount'] -
+          comparison['previousSessionsCount']);
+      comparison['durationChange'] = (comparison['currentTotalDuration'] -
+          comparison['previousTotalDuration']);
+      comparison['distanceChange'] = (comparison['currentTotalDistance'] -
+          comparison['previousTotalDistance']);
+      comparison['daysChange'] =
+          (comparison['currentUniqueDays'] - comparison['previousUniqueDays']);
+
+      // Goal-specific comparisons
+      if (userGoal?['goalType'] == 'High Intensity Cycling') {
+        comparison['currentWeight'] = currentWeekData['weekEndWeight'] ?? 0.0;
+        comparison['previousWeight'] = previousWeekData['weekEndWeight'] ?? 0.0;
+        comparison['weightChange'] =
+            comparison['currentWeight'] - comparison['previousWeight'];
+
+        comparison['currentCaloriesBurned'] =
+            currentWeekData['caloriesBurned'] ?? 0.0;
+        comparison['previousCaloriesBurned'] =
+            previousWeekData['caloriesBurned'] ?? 0.0;
+        comparison['caloriesChange'] = comparison['currentCaloriesBurned'] -
+            comparison['previousCaloriesBurned'];
+      } else if (userGoal?['goalType'] == 'Endurance') {
+        comparison['currentBestDistance'] =
+            currentWeekData['bestDistance'] ?? 0.0;
+        comparison['previousBestDistance'] =
+            previousWeekData['bestDistance'] ?? 0.0;
+        comparison['bestDistanceChange'] = comparison['currentBestDistance'] -
+            comparison['previousBestDistance'];
+
+        comparison['currentBestPace'] = currentWeekData['bestPace'] ?? 0.0;
+        comparison['previousBestPace'] = previousWeekData['bestPace'] ?? 0.0;
+        comparison['bestPaceChange'] =
+            comparison['currentBestPace'] - comparison['previousBestPace'];
+      }
+    }
+
+    return comparison;
+  }
+
+// Method to get all active subgoals for the current week
+  List<Map<String, dynamic>> getCurrentWeekSubgoals() {
+    if (!_weeklySubgoalData.containsKey(_currentWeekNumber)) {
+      return [];
+    }
+
+    return _weeklySubgoalData[_currentWeekNumber]!;
+  }
+
   // Method to fetch active subgoal when loading the page
   Future<void> _fetchActiveSubgoal() async {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -123,31 +638,48 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       print("Error fetching active subgoal: $e");
     }
   }
+
+  Map<String, dynamic>? getProgressForWeek(int weekNumber) {
+    return _weeklyProgressData[weekNumber];
+  }
+
+// Method to get current week progress
+  Map<String, dynamic>? getCurrentWeekProgress() {
+    int currentWeek = getCurrentWeekNumber();
+    return getProgressForWeek(currentWeek);
+  }
+
+  // Helper function to safely parse double values from various types
+  double safeParseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
   DateTime _goalCreationDate = DateTime.now();
 
   DateTime _getWeekStartDate() {
     DateTime now = DateTime.now();
-    
+
     int daysSinceCreation = now.difference(_goalCreationDate).inDays;
-    
+
     int weekNumber = daysSinceCreation ~/ 7;
-    
-    return DateTime(
-      _goalCreationDate.year,
-      _goalCreationDate.month,
-      _goalCreationDate.day + (weekNumber * 7),
-      0, 0, 0, 0
-    );
+
+    return DateTime(_goalCreationDate.year, _goalCreationDate.month,
+        _goalCreationDate.day + (weekNumber * 7), 0, 0, 0, 0);
   }
 
   DateTime _getWeekEndDate() {
-    return _getWeekStartDate().add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
+    return _getWeekStartDate().add(Duration(
+        days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
   }
 
   @override
   void initState() {
     super.initState();
-
+    _currentWeekNumber = 1;
     _weekStartDate = DateTime.now();
     _weekEndDate = DateTime.now().add(Duration(days: 7));
     _confettiController =
@@ -245,6 +777,86 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     );
   }
 
+  Future<void> _fetchWeeklyProgressData() async {
+    setState(() {
+      _isLoadingWeeklyData = true;
+    });
+
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() {
+        _isLoadingWeeklyData = false;
+      });
+      return;
+    }
+
+    try {
+      // Get the current week number
+      int currentWeek = getCurrentWeekNumber();
+
+      // Fetch progress data for all weeks up to the current one
+      QuerySnapshot progressSnapshot = await FirebaseFirestore.instance
+          .collection('weekly_progress')
+          .where('uid', isEqualTo: uid)
+          .where('goalId', isEqualTo: userGoal?['id'])
+          .get();
+
+      // Clear existing data
+      _weeklyProgressData.clear();
+
+      // Process the results
+      for (var doc in progressSnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        int weekNum = data['weekNumber'] ?? 0;
+
+        if (weekNum > 0) {
+          _weeklyProgressData[weekNum] = data;
+        }
+      }
+
+      // If current week data doesn't exist, initialize it
+      if (!_weeklyProgressData.containsKey(currentWeek)) {
+        DateTime weekStart = _getWeekStartDate();
+        DateTime weekEnd = _getWeekEndDate();
+
+        _weeklyProgressData[currentWeek] = {
+          'uid': uid,
+          'goalId': userGoal?['id'],
+          'weekNumber': currentWeek,
+          'weekStartDate': weekStart,
+          'weekEndDate': weekEnd,
+          'sessionsCompleted': 0,
+          'totalDuration': 0.0,
+          'subgoalType': subgoalType,
+          'subgoalStartValue': 0.0,
+          'subgoalCurrentValue': 0.0,
+          'subgoalTargetValue': subgoalTargetValue,
+        };
+
+        // Initialize goal-specific data
+        if (userGoal?['goalType'] == 'High Intensity Cycling') {
+          _weeklyProgressData[currentWeek]!['weekStartWeight'] =
+              _currentUserWeight;
+          _weeklyProgressData[currentWeek]!['weekEndWeight'] =
+              _currentUserWeight;
+          _weeklyProgressData[currentWeek]!['caloriesBurned'] = 0.0;
+        } else if (userGoal?['goalType'] == 'Endurance') {
+          _weeklyProgressData[currentWeek]!['bestDistance'] = 0.0;
+          _weeklyProgressData[currentWeek]!['bestPace'] = 0.0;
+        }
+      }
+
+      print(
+          "Weekly progress data loaded. Weeks available: ${_weeklyProgressData.keys.toList()}");
+    } catch (e) {
+      print("Error fetching weekly progress data: $e");
+    } finally {
+      setState(() {
+        _isLoadingWeeklyData = false;
+      });
+    }
+  }
+
   Future<void> _loadUserGoalAndActivities() async {
     setState(() {
       _isLoading = true;
@@ -270,11 +882,26 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 
           print("Most recent goal data: $goalData");
 
-        Timestamp goalCreationTimestamp = goalData!['timestamp'] as Timestamp;
-        _goalCreationDate = goalCreationTimestamp.toDate();
-        
-        _weekStartDate = _getWeekStartDate();
-        _weekEndDate = _getWeekEndDate();
+          if (goalData != null) {
+            Timestamp goalCreationTimestamp =
+                goalData['timestamp'] as Timestamp;
+            _goalCreationDate = goalCreationTimestamp.toDate();
+
+            _weekStartDate = _getWeekStartDate();
+            _weekEndDate = _getWeekEndDate();
+
+            // Calculate the current week number
+            _currentWeekNumber = getCurrentWeekNumber();
+            print("Current Week Number: $_currentWeekNumber");
+
+            // Also store the goal ID in the goal data
+            goalData['id'] = mostRecentGoalDoc.id;
+
+            // Fetch all weekly progress data
+            await _fetchAllWeeklyGoalData();
+          }
+
+          print("Current Week Number: ${getCurrentWeekNumber()}");
 
           if (goalData!['goalType'] == 'High Intensity Cycling') {
             try {
@@ -501,6 +1128,13 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
               userGoal!['goalType'] == 'High Intensity Cycling') {
             await _fetchActiveSubgoal();
           }
+          // After fetching the goal and before setting state
+          await _fetchWeeklyProgressData();
+
+          // After fetching activities
+          await _updateWeeklyProgressData();
+          await _updateWeeklyProgressData();
+
           setState(() {
             userGoal = goalData;
             _hasActivityAfterGoal = hasActivity;
@@ -536,6 +1170,623 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         _isLoading = false;
       });
     }
+  }
+
+  Widget _buildWeekComparisonCard() {
+    Map<String, dynamic> comparison = getWeekOverWeekProgress();
+
+    if (!comparison['hasComparison']) {
+      return Container(
+        margin: EdgeInsets.only(bottom: 20),
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Week $_currentWeekNumber Progress",
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 18,
+                color: primaryBlack,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              "This is your first week with this goal. Weekly comparisons will be available after you complete this week.",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: primaryGray,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Get the comparison values
+    int sessionsChange = comparison['sessionsChange'] ?? 0;
+    double durationChange = comparison['durationChange'] ?? 0.0;
+    double distanceChange = comparison['distanceChange'] ?? 0.0;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Week-over-Week Progress",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 18,
+                  color: primaryBlack,
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[300]!, width: 1),
+                ),
+                child: Text(
+                  "Week $_currentWeekNumber",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+
+          // Comparison metrics
+          _buildComparisonRow(
+              "Sessions",
+              comparison['currentSessionsCount'] ?? 0,
+              comparison['previousSessionsCount'] ?? 0,
+              "",
+              Icons.event_available),
+
+          _buildComparisonRow(
+              "Duration",
+              comparison['currentTotalDuration'] ?? 0.0,
+              comparison['previousTotalDuration'] ?? 0.0,
+              "mins",
+              Icons.timer),
+
+          _buildComparisonRow(
+              "Distance",
+              comparison['currentTotalDistance'] ?? 0.0,
+              comparison['previousTotalDistance'] ?? 0.0,
+              "km",
+              Icons.straighten),
+
+          // Goal-specific metrics
+          if (userGoal?['goalType'] == 'High Intensity Cycling') ...[
+            Divider(height: 24),
+            _buildComparisonRow(
+              "Weight",
+              comparison['currentWeight'] ?? 0.0,
+              comparison['previousWeight'] ?? 0.0,
+              "kg",
+              Icons.monitor_weight,
+              // For weight, negative change is good
+              invertComparison: true,
+            ),
+            _buildComparisonRow(
+                "Calories Burned",
+                comparison['currentCaloriesBurned'] ?? 0.0,
+                comparison['previousCaloriesBurned'] ?? 0.0,
+                "kcal",
+                Icons.local_fire_department),
+          ] else if (userGoal?['goalType'] == 'Endurance') ...[
+            Divider(height: 24),
+            _buildComparisonRow(
+                "Best Distance",
+                comparison['currentBestDistance'] ?? 0.0,
+                comparison['previousBestDistance'] ?? 0.0,
+                "km",
+                Icons.emoji_events),
+            if (comparison['currentBestPace'] != null &&
+                comparison['previousBestPace'] != null)
+              _buildComparisonRow(
+                "Best Pace",
+                comparison['currentBestPace'],
+                comparison['previousBestPace'],
+                "min/km",
+                Icons.speed,
+                // For pace, negative change is good (lower pace = faster)
+                invertComparison: true,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+// Helper widget to build a comparison row
+  Widget _buildComparisonRow(
+      String label, num current, num previous, String unit, IconData icon,
+      {bool invertComparison = false}) {
+    num change = current - previous;
+    bool isPositiveChange = invertComparison ? change < 0 : change > 0;
+    bool isNegativeChange = invertComparison ? change > 0 : change < 0;
+    bool isUnchanged = change == 0;
+
+    Color changeColor = isPositiveChange
+        ? Colors.green
+        : isNegativeChange
+            ? Colors.red
+            : Colors.grey;
+
+    IconData changeIcon = isPositiveChange
+        ? Icons.arrow_upward
+        : isNegativeChange
+            ? Icons.arrow_downward
+            : Icons.remove;
+
+    String changeText = (change == 0)
+        ? "No change"
+        : "${change > 0 ? '+' : ''}${change.toStringAsFixed(1)} $unit";
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: Colors.grey[700]),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: primaryBlack,
+                  ),
+                ),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: "${current.toStringAsFixed(1)} $unit",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      TextSpan(
+                        text:
+                            " (previous: ${previous.toStringAsFixed(1)} $unit)",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: changeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: changeColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(changeIcon, size: 12, color: changeColor),
+                SizedBox(width: 4),
+                Text(
+                  changeText,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: changeColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Method to display weekly progress history
+  void _showWeeklyProgressHistory() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            "Weekly Progress History",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 22,
+              color: primaryBlack,
+            ),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: _isLoadingWeeklyData
+                ? Center(child: CircularProgressIndicator(color: primaryOrange))
+                : _weeklyProgressData.isEmpty
+                    ? Center(child: Text("No weekly progress data available"))
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _weeklyProgressData.length,
+                        itemBuilder: (context, index) {
+                          // Get weeks sorted in descending order (newest first)
+                          final weeks = _weeklyProgressData.keys.toList()
+                            ..sort((a, b) => b.compareTo(a));
+                          final weekNum = weeks[index];
+                          final weekData = _weeklyProgressData[weekNum]!;
+
+                          final weekStart =
+                              (weekData['weekStartDate'] as Timestamp?)
+                                      ?.toDate() ??
+                                  DateTime.now();
+                          final weekEnd =
+                              (weekData['weekEndDate'] as Timestamp?)
+                                      ?.toDate() ??
+                                  DateTime.now();
+
+                          // Format week date range
+                          final dateRangeStr =
+                              "${DateFormat('MMM d').format(weekStart)} - ${DateFormat('MMM d').format(weekEnd)}";
+
+                          // Display different data based on goal type
+                          Widget progressContent;
+
+                          switch (userGoal?['goalType']) {
+                            case 'Leisure':
+                              progressContent = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              );
+                              break;
+
+                            case 'High Intensity Cycling':
+                              final startWeight =
+                                  weekData['weekStartWeight'] ?? 0.0;
+                              final endWeight =
+                                  weekData['weekEndWeight'] ?? 0.0;
+                              final weightChange = endWeight - startWeight;
+
+                              // Determine color for weight change (green for weight loss, red for weight gain)
+                              final weightChangeColor = weightChange <= 0
+                                  ? Colors.green[700]
+                                  : Colors.red[700];
+
+                              progressContent = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Weight: ${startWeight.toStringAsFixed(1)} → ${endWeight.toStringAsFixed(1)} kg",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        "Change: ",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Text(
+                                        "${weightChange.toStringAsFixed(1)} kg",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          color: weightChangeColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    "Calories Burned: ${(weekData['caloriesBurned'] ?? 0.0).toStringAsFixed(0)}",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              );
+                              break;
+
+                            case 'Endurance':
+                              progressContent = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Best Distance: ${(weekData['bestDistance'] ?? 0.0).toStringAsFixed(1)} km",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (weekData['bestPace'] != null &&
+                                      weekData['bestPace'] > 0)
+                                    Text(
+                                      "Pace: ${(weekData['bestPace'] ?? 0.0).toStringAsFixed(1)} min/km",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 14,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                ],
+                              );
+                              break;
+
+                            default:
+                              progressContent = Text(
+                                "No data available",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              );
+                          }
+
+// Additional subgoal progress if available
+                          if (weekData['subgoalType'] != null &&
+                              weekData['subgoalType'].toString().isNotEmpty) {
+                            String subgoalDesc = "Subgoal: ";
+
+                            switch (weekData['subgoalType']) {
+                              case "distance":
+                                subgoalDesc +=
+                                    "Distance ${(weekData['subgoalCurrentValue'] ?? 0.0).toStringAsFixed(1)}/${(weekData['subgoalTargetValue'] ?? 0.0).toStringAsFixed(1)} km";
+                                break;
+                              case "pace":
+                                subgoalDesc +=
+                                    "Pace ${(weekData['subgoalCurrentValue'] ?? 0.0).toStringAsFixed(1)}/${(weekData['subgoalTargetValue'] ?? 0.0).toStringAsFixed(1)} min/km";
+                                break;
+                              case "duration":
+                                subgoalDesc +=
+                                    "Duration ${(weekData['subgoalCurrentValue'] ?? 0.0).toStringAsFixed(0)}/${(weekData['subgoalTargetValue'] ?? 0.0).toStringAsFixed(0)} mins";
+                                break;
+                              case "maintain":
+                                subgoalDesc +=
+                                    "Maintaining consistent performance";
+                                break;
+                            }
+
+                            // Calculate progress percentage for display
+                            double progress = 0.0;
+                            if (weekData['subgoalProgress'] != null) {
+                              progress = weekData['subgoalProgress'];
+                            }
+
+                            // Determine progress color
+                            Color progressColor = progress >= 0.8
+                                ? Colors.green[700]!
+                                : progress >= 0.5
+                                    ? Colors.orange[700]!
+                                    : Colors.blue[700]!;
+
+                            progressContent = Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                progressContent,
+                                Divider(height: 16, thickness: 0.5),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        subgoalDesc,
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    // Add progress indicator
+                                    if (weekData['subgoalProgress'] != null)
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: progressColor.withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: progressColor, width: 1),
+                                        ),
+                                        child: Text(
+                                          "${(progress * 100).toInt()}%",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 12,
+                                            color: progressColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          }
+                          // Returns the card for each week
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 10),
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: weekNum == getCurrentWeekNumber()
+                                  ? primaryOrange.withOpacity(0.1)
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: weekNum == getCurrentWeekNumber()
+                                    ? primaryOrange
+                                    : Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Week $weekNum",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: primaryBlack),
+                                    ),
+                                    Text(
+                                      dateRangeStr,
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 8),
+                                progressContent,
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                "Close",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: primaryGray,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // This method gets the current week number based on the goal creation date
+  int getCurrentWeekNumber() {
+    if (_goalCreationDate == null) {
+      return 1; // Default to week 1 if no goal creation date is available
+    }
+
+    DateTime now = DateTime.now();
+
+    // Calculate days since goal creation
+    int daysSinceCreation = now.difference(_goalCreationDate).inDays;
+
+    // Calculate week number (using integer division which rounds down)
+    int weekNumber = daysSinceCreation ~/ 7;
+
+    // Add 1 to make it 1-based (week 1, week 2, etc.) rather than 0-based
+    return weekNumber + 1;
   }
 
   Widget _buildActiveSubgoalCard() {
@@ -721,9 +1972,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                   color: Colors.orangeAccent,
                   shadows: [
                     Shadow(
-                      offset: Offset(2, 2), 
-                      blurRadius: 6.0, 
-                      color: Colors.orange.withOpacity(0.3), 
+                      offset: Offset(2, 2),
+                      blurRadius: 6.0,
+                      color: Colors.orange.withOpacity(0.3),
                     ),
                   ],
                 ),
@@ -790,40 +2041,40 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                             ),
                           ),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: progressPercent >= 1.0 
-                                  ? Colors.green[50] 
-                                  : progressPercent >= 0.5 
+                              color: progressPercent >= 1.0
+                                  ? Colors.green[50]
+                                  : progressPercent >= 0.5
                                       ? Colors.orange[50]
                                       : Colors.blue[50],
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: progressPercent >= 1.0 
-                                  ? Colors.green[300]! 
-                                  : progressPercent >= 0.5 
-                                      ? Colors.orange[300]!
-                                      : Colors.blue[300]!,
-                                width: 1
-                              ),
+                                  color: progressPercent >= 1.0
+                                      ? Colors.green[300]!
+                                      : progressPercent >= 0.5
+                                          ? Colors.orange[300]!
+                                          : Colors.blue[300]!,
+                                  width: 1),
                             ),
                             child: Text(
                               "${(progressPercent * 100).toInt()}%",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: progressPercent >= 1.0 
-                                  ? Colors.green[700] 
-                                  : progressPercent >= 0.5 
-                                      ? Colors.orange[700]
-                                      : Colors.blue[700],
+                                color: progressPercent >= 1.0
+                                    ? Colors.green[700]
+                                    : progressPercent >= 0.5
+                                        ? Colors.orange[700]
+                                        : Colors.blue[700],
                               ),
                             ),
                           ),
                         ],
                       ),
                       SizedBox(height: 12),
-                      
+
                       // Enhanced animated progress bar
                       Stack(
                         children: [
@@ -835,11 +2086,13 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               painter: ProgressMarkerPainter(
                                 baselinePosition: 0.0,
                                 targetPosition: 1.0,
-                                containerWidth: MediaQuery.of(context).size.width - 80, // Adjust based on your padding
+                                containerWidth:
+                                    MediaQuery.of(context).size.width -
+                                        80, // Adjust based on your padding
                               ),
                             ),
                           ),
-                          
+
                           // Background track
                           Container(
                             height: 12,
@@ -849,84 +2102,98 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
-                          
+
                           // Animated progress fill
                           TweenAnimationBuilder<double>(
-                            tween: Tween<double>(begin: 0.0, end: progressPercent),
-                            duration: Duration(milliseconds: 1500),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, animatedProgress, child) {
-                              return Container(
-                                height: 12,
-                                width: (MediaQuery.of(context).size.width - 64) * animatedProgress,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: progressPercent >= 1.0
-                                        ? [Colors.green[400]!, Colors.green[600]!]
-                                        : progressPercent >= 0.5
-                                            ? [Colors.orange[300]!, Colors.orange[500]!]
-                                            : [Colors.blue[300]!, Colors.blue[500]!],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (progressPercent >= 1.0
-                                              ? Colors.green
-                                              : progressPercent >= 0.5
-                                                  ? Colors.orange
-                                                  : Colors.blue)
-                                          .withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          ),
-                          
-                          // Current value marker
-                          TweenAnimationBuilder<double>(
-                            tween: Tween<double>(begin: 0.0, end: progressPercent),
-                            duration: Duration(milliseconds: 1500),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, animatedProgress, child) {
-                              return Positioned(
-                                left: (MediaQuery.of(context).size.width - 64) * animatedProgress - 7,
-                                top: -3,
-                                child: Container(
-                                  width: 14,
-                                  height: 18,
+                              tween: Tween<double>(
+                                  begin: 0.0, end: progressPercent),
+                              duration: Duration(milliseconds: 1500),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, animatedProgress, child) {
+                                return Container(
+                                  height: 12,
+                                  width:
+                                      (MediaQuery.of(context).size.width - 64) *
+                                          animatedProgress,
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: progressPercent >= 1.0
-                                          ? Colors.green[600]!
+                                    gradient: LinearGradient(
+                                      colors: progressPercent >= 1.0
+                                          ? [
+                                              Colors.green[400]!,
+                                              Colors.green[600]!
+                                            ]
                                           : progressPercent >= 0.5
-                                              ? Colors.orange[600]!
-                                              : Colors.blue[600]!,
-                                      width: 2,
+                                              ? [
+                                                  Colors.orange[300]!,
+                                                  Colors.orange[500]!
+                                                ]
+                                              : [
+                                                  Colors.blue[300]!,
+                                                  Colors.blue[500]!
+                                                ],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
                                     ),
+                                    borderRadius: BorderRadius.circular(6),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
+                                        color: (progressPercent >= 1.0
+                                                ? Colors.green
+                                                : progressPercent >= 0.5
+                                                    ? Colors.orange
+                                                    : Colors.blue)
+                                            .withOpacity(0.3),
                                         blurRadius: 4,
                                         offset: Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                ),
-                              );
-                            }
-                          ),
+                                );
+                              }),
+
+                          // Current value marker
+                          TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                  begin: 0.0, end: progressPercent),
+                              duration: Duration(milliseconds: 1500),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, animatedProgress, child) {
+                                return Positioned(
+                                  left:
+                                      (MediaQuery.of(context).size.width - 64) *
+                                              animatedProgress -
+                                          7,
+                                  top: -3,
+                                  child: Container(
+                                    width: 14,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: progressPercent >= 1.0
+                                            ? Colors.green[600]!
+                                            : progressPercent >= 0.5
+                                                ? Colors.orange[600]!
+                                                : Colors.blue[600]!,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                         ],
                       ),
-                      
+
                       SizedBox(height: 16),
-                      
+
                       // Value comparison section
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -936,7 +2203,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                             children: [
                               Text(
                                 "Last Week",
-                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
                               ),
                               SizedBox(height: 2),
                               Row(
@@ -967,7 +2235,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                             children: [
                               Text(
                                 "Current",
-                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
                               ),
                               SizedBox(height: 2),
                               Row(
@@ -1002,7 +2271,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                             children: [
                               Text(
                                 "Target",
-                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
                               ),
                               SizedBox(height: 2),
                               Row(
@@ -1030,7 +2300,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                           ),
                         ],
                       ),
-                      
+
                       // Status message
                       if (subgoalType != "maintain") ...[
                         SizedBox(height: 12),
@@ -1104,7 +2374,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.verified_outlined, color: Colors.teal[700], size: 24),
+                      Icon(Icons.verified_outlined,
+                          color: Colors.teal[700], size: 24),
                       SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -1121,7 +2392,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                             SizedBox(height: 4),
                             Text(
                               currentValueText,
-                              style: TextStyle(fontSize: 13, color: Colors.teal[800]),
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.teal[800]),
                             ),
                           ],
                         ),
@@ -2886,7 +4158,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     );
   }
 
- Widget _buildGoalCard() {
+  Widget _buildGoalCard() {
     if (userGoal == null) {
       return Center(
         child: Column(
@@ -3048,6 +4320,30 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             // Add the subgoal card here
             if (hasActiveSubgoal) _buildActiveSubgoalCard(),
 
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showWeeklyProgressHistory,
+                icon: const Icon(Icons.history, color: Colors.white),
+                label: const Text(
+                  "View Weekly Progress History",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueGrey[700],
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
             // Make the main goal card collapsible
             StatefulBuilder(
               builder: (context, setState) {
@@ -3131,7 +4427,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                           ),
                         ),
                       ),
-                      
+
                       // Collapsible content
                       AnimatedCrossFade(
                         duration: const Duration(milliseconds: 300),
@@ -3147,35 +4443,27 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 
                               if (goalType != 'Endurance')
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: primaryOrange.withOpacity(0.3),
-                                      width: 1,
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.green[300]!,
+                                        width: 1,
+                                      ),
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.date_range,
-                                        size: 16,
-                                        color: primaryOrange,
+                                    child: Text(
+                                      "Week ${getCurrentWeekNumber()}",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green[700],
                                       ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        "Current Week: $weekRangeStr",
-                                        style: TextStyle(
-                                          fontFamily: 'Inter',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: primaryBlack,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 )
                               else if (_bestDistanceDate != null)
@@ -3241,7 +4529,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                                 "mins",
                                 Colors.blue,
                                 Icons.timer,
-                                helpText: _getDurationHelperText(durationTarget),
+                                helpText:
+                                    _getDurationHelperText(durationTarget),
                               ),
                               Container(
                                 padding: const EdgeInsets.all(16),
@@ -3294,7 +4583,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -3478,7 +4768,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                     ),
                   ),
                 ),
-                
+
                 // Collapsible content
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 300),
@@ -3495,8 +4785,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                         // Current Week Display based on goal type
                         if (goalType != 'Endurance')
                           Container(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -3528,8 +4818,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                           )
                         else if (_bestDistanceDate != null)
                           Container(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -3634,7 +4924,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               "mins",
                               Colors.blue,
                               Icons.timer,
-                              helpText: _getBestDurationHelperText(durationTarget),
+                              helpText:
+                                  _getBestDurationHelperText(durationTarget),
                             ),
                           ],
 
@@ -3675,7 +4966,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                         const SizedBox(height: 16),
 
                         // Weekly Activities Summary - only for non-endurance goals
-                        if (_weeklyActivities.isNotEmpty && goalType != 'Endurance') ...[
+                        if (_weeklyActivities.isNotEmpty &&
+                            goalType != 'Endurance') ...[
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
