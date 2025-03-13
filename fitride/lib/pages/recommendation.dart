@@ -4442,8 +4442,7 @@ Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
     return [];
   }
 }
-
- Widget _buildPaceCaloriesCorrelationGraph() {
+Widget _buildPaceCaloriesCorrelationGraph() {
   return FutureBuilder<List<PaceCaloriesData>>(
     future: _fetchAllPaceCaloriesData(),
     builder: (context, snapshot) {
@@ -4488,240 +4487,130 @@ Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
       PaceCaloriesData highestCalorieSession = chartData.reduce((a, b) => a.calories > b.calories ? a : b);
       int fastestIdx = chartData.indexOf(fastestSession);
       int highestCalorieIdx = chartData.indexOf(highestCalorieSession);
-      
-      // Generate efficiency ratings (calories burned per minute per km)
-      List<double> efficiencyRatings = chartData.map((e) => e.calories / e.pace).toList();
-      PaceCaloriesData mostEfficientSession = chartData[efficiencyRatings.indexOf(efficiencyRatings.reduce(math.max))];
-      int mostEfficientIdx = chartData.indexOf(mostEfficientSession);
-      
-      // Prepare data for efficiency pie chart
-      List<PieEfficiencyData> pieData = [];
-      for (int i = 0; i < chartData.length; i++) {
-        pieData.add(PieEfficiencyData(
-          "Session ${i+1}", 
-          efficiencyRatings[i],
-          i == mostEfficientIdx ? true : false
-        ));
-      }
 
       return _buildGraphContainer(
         title: "Pace & Calories Analysis",
         subtitle: "Recent Activities",
-        height: 380,
+        height: 480,
         child: Column(
           children: [
-            // Main charts section
+            // Main charts section - Now full width
             Expanded(
-              child: Row(
-                children: [
-                  // Left side: Bar & Line chart
-                  Expanded(
-                    flex: 2,
-                    child: SfCartesianChart(
-                      margin: EdgeInsets.all(10),
-                      primaryXAxis: CategoryAxis(
-                        majorGridLines: MajorGridLines(width: 0),
-                        labelStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      primaryYAxis: NumericAxis(
-                        name: 'Calories',
-                        labelFormat: '{value} kcal',
-                        labelStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.orange[700],
-                        ),
-                        majorGridLines: MajorGridLines(
-                          width: 0.5,
-                          color: Colors.grey[200],
-                          dashArray: <double>[3, 3],
-                        ),
-                        plotBands: [
-                          PlotBand(
-                            isVisible: true,
-                            start: avgCalories,
-                            end: avgCalories,
-                            borderColor: Colors.orange,
-                            borderWidth: 1,
-                            dashArray: <double>[3, 3],
-                          )
-                        ],
-                      ),
-                      axes: <ChartAxis>[
-                        NumericAxis(
-                          name: 'Pace',
-                          opposedPosition: true,
-                          labelFormat: '{value} min/km',
-                          labelStyle: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 10,
-                            color: Colors.blue[700],
-                          ),
-                          majorGridLines: MajorGridLines(width: 0),
-                          isInversed: true, // Lower is better for pace
-                          plotBands: [
-                            PlotBand(
-                              isVisible: true,
-                              start: avgPace,
-                              end: avgPace,
-                              borderColor: Colors.blue,
-                              borderWidth: 1,
-                              dashArray: <double>[3, 3],
-                            )
-                          ],
-                        ),
-                      ],
-                      series: <ChartSeries>[
-                        // Calories as bar chart
-                        ColumnSeries<PaceCaloriesData, String>(
-                          name: 'Calories',
-                          dataSource: chartData,
-                          xValueMapper: (PaceCaloriesData data, index) => sessionDates[index],
-                          yValueMapper: (PaceCaloriesData data, _) => data.calories,
-                          width: 0.6,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.orange[300]!,
-                              Colors.orange[500]!,
-                            ],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                          ),
-                          dataLabelSettings: DataLabelSettings(
-                            isVisible: false,
-                          ),
-                          pointColorMapper: (PaceCaloriesData data, _) => 
-                            data == highestCalorieSession ? Colors.orange[700] : null,
-                        ),
-                        // Pace as line chart
-                        SplineSeries<PaceCaloriesData, String>(
-                          name: 'Pace',
-                          dataSource: chartData,
-                          xValueMapper: (PaceCaloriesData data, index) => sessionDates[index],
-                          yValueMapper: (PaceCaloriesData data, _) => data.pace,
-                          yAxisName: 'Pace',
-                          color: Colors.blue[600],
-                          width: 2.5,
-                          markerSettings: MarkerSettings(
-                            isVisible: true,
-                            shape: DataMarkerType.circle,
-                            width: 8,
-                            height: 8,
-                            borderWidth: 2,
-                            borderColor: Colors.white,
-                          ),
-                          pointColorMapper: (PaceCaloriesData data, _) => 
-                            data == fastestSession ? Colors.green[600] : Colors.blue[600],
-                        ),
-                      ],
-                      tooltipBehavior: TooltipBehavior(
-                        enable: true,
-                        color: Colors.grey[800],
-                        textStyle: TextStyle(color: Colors.white, fontSize: 12),
-                        header: '',
-                      ),
-                      legend: Legend(
-                        isVisible: true,
-                        position: LegendPosition.bottom,
-                        overflowMode: LegendItemOverflowMode.wrap,
-                      ),
-                    ),
+              child: SfCartesianChart(
+                margin: EdgeInsets.all(10),
+                primaryXAxis: CategoryAxis(
+                  majorGridLines: MajorGridLines(width: 0),
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.grey[700],
                   ),
-                  
-                  // Right side: Efficiency Donut Chart
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      margin: EdgeInsets.fromLTRB(0, 5, 10, 5),
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 5),
-                            child: Text(
-                              "Efficiency Comparison",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[800],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          Expanded(
-                            child: SfCircularChart(
-                              margin: EdgeInsets.zero,
-                              series: <CircularSeries>[
-                                DoughnutSeries<PieEfficiencyData, String>(
-                                  dataSource: pieData,
-                                  xValueMapper: (PieEfficiencyData data, _) => data.sessionLabel,
-                                  yValueMapper: (PieEfficiencyData data, _) => data.efficiency,
-                                  pointColorMapper: (PieEfficiencyData data, _) => 
-                                    data.isBest ? Colors.green[600] : Colors.blue[300 + (pieData.indexOf(data) * 50)],
-                                  dataLabelSettings: DataLabelSettings(
-                                    isVisible: true,
-                                    labelPosition: ChartDataLabelPosition.outside,
-                                    textStyle: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 10,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                  innerRadius: '60%',
-                                  explode: true,
-                                  explodeIndex: mostEfficientIdx,
-                                )
-                              ],
-                              annotations: <CircularChartAnnotation>[
-                                CircularChartAnnotation(
-                                  widget: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        "Most\nEfficient",
-                                        style: TextStyle(
-                                          fontFamily: 'Inter',
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        sessionDates[mostEfficientIdx],
-                                        style: TextStyle(
-                                          fontFamily: 'Inter',
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green[700],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              ],
-                              tooltipBehavior: TooltipBehavior(
-                                enable: true,
-                                format: 'point.x: point.y',
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+                primaryYAxis: NumericAxis(
+                  name: 'Calories',
+                  labelFormat: '{value} kcal',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.orange[700],
+                  ),
+                  majorGridLines: MajorGridLines(
+                    width: 0.5,
+                    color: Colors.grey[200],
+                    dashArray: <double>[3, 3],
+                  ),
+                  plotBands: [
+                    PlotBand(
+                      isVisible: true,
+                      start: avgCalories,
+                      end: avgCalories,
+                      borderColor: Colors.orange,
+                      borderWidth: 1,
+                      dashArray: <double>[3, 3],
+                    )
+                  ],
+                ),
+                axes: <ChartAxis>[
+                  NumericAxis(
+                    name: 'Pace',
+                    opposedPosition: true,
+                    labelFormat: '{value} min/km',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      color: Colors.blue[700],
                     ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    isInversed: true, // Lower is better for pace
+                    plotBands: [
+                      PlotBand(
+                        isVisible: true,
+                        start: avgPace,
+                        end: avgPace,
+                        borderColor: Colors.blue,
+                        borderWidth: 1,
+                        dashArray: <double>[3, 3],
+                      )
+                    ],
                   ),
                 ],
+                series: <ChartSeries>[
+                  // Calories as bar chart
+                  ColumnSeries<PaceCaloriesData, String>(
+                    name: 'Calories',
+                    dataSource: chartData,
+                    xValueMapper: (PaceCaloriesData data, index) => sessionDates[index],
+                    yValueMapper: (PaceCaloriesData data, _) => data.calories,
+                    width: 0.6,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange[300]!,
+                        Colors.orange[500]!,
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                    ),
+                    pointColorMapper: (PaceCaloriesData data, _) => 
+                      data == highestCalorieSession ? Colors.orange[700] : null,
+                  ),
+                  // Pace as line chart
+                  SplineSeries<PaceCaloriesData, String>(
+                    name: 'Pace',
+                    dataSource: chartData,
+                    xValueMapper: (PaceCaloriesData data, index) => sessionDates[index],
+                    yValueMapper: (PaceCaloriesData data, _) => data.pace,
+                    yAxisName: 'Pace',
+                    color: Colors.blue[600],
+                    width: 2.5,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.circle,
+                      width: 8,
+                      height: 4,
+                      borderWidth: 2,
+                      borderColor: Colors.white,
+                    ),
+                    pointColorMapper: (PaceCaloriesData data, _) => 
+                      data == fastestSession ? Colors.green[600] : Colors.blue[600],
+                  ),
+                ],
+                tooltipBehavior: TooltipBehavior(
+                  enable: true,
+                  color: Colors.grey[800],
+                  textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                  header: '',
+                ),
+                legend: Legend(
+                  isVisible: true,
+                  position: LegendPosition.bottom,
+                  overflowMode: LegendItemOverflowMode.wrap,
+                ),
               ),
             ),
-            
-            // Key performance indicators
             Container(
               margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               padding: EdgeInsets.fromLTRB(10, 8, 10, 0),
@@ -4732,25 +4621,8 @@ Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
               ),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      _buildPerformanceIndicator(
-                        "Fastest Pace",
-                        "${fastestSession.pace.toStringAsFixed(2)} min/km",
-                        sessionDates[fastestIdx],
-                        Icons.speed,
-                        Colors.blue[600]!,
-                      ),
-                      _buildPerformanceIndicator(
-                        "Highest Burn",
-                        "${highestCalorieSession.calories.toStringAsFixed(0)} kcal",
-                        sessionDates[highestCalorieIdx],
-                        Icons.local_fire_department,
-                        Colors.orange[600]!,
-                      ),
-                    ],
-                  ),
-                  Divider(height: 16, thickness: 1, color: Colors.grey[200]),
+                  
+                  Divider(height: 1, thickness: 5, color: Colors.grey[200]),
                   // Insight message
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
