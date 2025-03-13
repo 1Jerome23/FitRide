@@ -1626,7 +1626,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               weekData['subgoalType'].toString().isNotEmpty) {
                             String subgoalDesc = "Subgoal: ";
 
-                            switch (weekData['subgoalType']) {
+                            switch (weekData['subgoalType']) {   
                               case "distance":
                                 subgoalDesc +=
                                     "Distance ${(weekData['subgoalCurrentValue'] ?? 0.0).toStringAsFixed(1)}/${(weekData['subgoalTargetValue'] ?? 0.0).toStringAsFixed(1)} km";
