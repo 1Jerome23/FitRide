@@ -77,7 +77,16 @@ class RecommendationPage extends StatefulWidget {
   @override
   _RecommendationPageState createState() => _RecommendationPageState();
 }
+class TemperatureActivityData {
+  final double temperature;
+  final double speed;      // km/h
+  final double distance;   // km
+  final double duration;   // minutes
+  final DateTime date;
 
+  TemperatureActivityData(
+      this.temperature, this.speed, this.distance, this.duration, this.date);
+}
 class ErrorBoundary extends StatelessWidget {
   final Widget child;
 
@@ -550,7 +559,6 @@ void _setCyclingSubgoal(String type, double targetValue) {
       break;
   }
   
-  // Set state variables
   setState(() {
     hasActiveSubgoal = true;
     subgoalType = type;
@@ -561,7 +569,6 @@ void _setCyclingSubgoal(String type, double targetValue) {
     subgoalWarnings = warnings;
   });
   
-  // Store in Firestore
   _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
 }
 Future<void> _fetchFoodDiaryData() async {
@@ -604,7 +611,6 @@ Future<void> _fetchFoodDiaryData() async {
       setState(() {
         nutritionData = newNutritionData;
         if (nutritionData.isNotEmpty) {
-          // Update food data for recommendations
           foodIntake = "${nutritionData[0]['breakfast']}, ${nutritionData[0]['lunch']}, ${nutritionData[0]['dinner']}";
           caloriesConsumed = nutritionData[0]['total_calories'].toString();
           print('Calories Consumed: $caloriesConsumed');
@@ -617,44 +623,37 @@ Future<void> _fetchFoodDiaryData() async {
 }
 
 void _generateNutritionRecommendationsFromFoodDiary() {
-  // Clear previous recommendations
   nutritionRecommendations.clear();
   
-  // Check if we have recent nutrition data
   if (nutritionData.isEmpty) {
     nutritionRecommendations.add("Complete your food diary to get personalized nutrition recommendations.");
     return;
   }
   
-  // Get latest food entry
   var latestFoodEntry = nutritionData[0];
   double totalCalories = safeParseDouble(latestFoodEntry['total_calories'].toString());
   double breakfastCalories = safeParseDouble(latestFoodEntry['breakfast_calories'].toString());
   double lunchCalories = safeParseDouble(latestFoodEntry['lunch_calories'].toString());
   double dinnerCalories = safeParseDouble(latestFoodEntry['dinner_calories'].toString());
   
-  // Calculate caloric needs based on activity level and goal
   double bmr = safeParseDouble(basalMetabolicRate);
-  // Activity factor based on goal type
-  double activityFactor = 1.2; // Base sedentary
+  double activityFactor = 1.2;
   if (goalType == "Leisure") {
-    activityFactor = 1.375; // Lightly active
+    activityFactor = 1.375; 
   } else if (goalType == "Endurance") {
-    activityFactor = 1.55; // Moderately active
+    activityFactor = 1.55; 
   } else if (goalType == "High Intensity Cycling") {
-    activityFactor = 1.725; // Very active
+    activityFactor = 1.725; 
   }
   
   double dailyCalorieNeeds = bmr * activityFactor;
   
-  // Generate recommendations based on meal distribution and overall intake
   if (totalCalories < dailyCalorieNeeds * 0.7) {
     nutritionRecommendations.add("Your calorie intake is significantly below your estimated needs (${dailyCalorieNeeds.toInt()} kcal). Consider increasing your intake for optimal performance.");
   } else if (totalCalories > dailyCalorieNeeds * 1.2 && goalType == "High Intensity Cycling") {
     nutritionRecommendations.add("Your calorie intake exceeds your calculated needs by ${(totalCalories - dailyCalorieNeeds).toInt()} kcal. Adjust portion sizes to align with your weight management goals.");
   }
   
-  // Meal distribution recommendations
   double breakfastPercent = totalCalories > 0 ? (breakfastCalories / totalCalories) * 100 : 0;
   double lunchPercent = totalCalories > 0 ? (lunchCalories / totalCalories) * 100 : 0;
   double dinnerPercent = totalCalories > 0 ? (dinnerCalories / totalCalories) * 100 : 0;
@@ -663,10 +662,8 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.add("Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than recommended. Aim for 20-25% of daily calories at breakfast for sustained energy.");
   }
   
-  // Tailored lunch content recommendations based on goal type
   if (goalType == "Endurance") {
     nutritionRecommendations.add("For endurance training, include a balanced lunch with lean protein, complex carbs, and healthy fats. Good options include whole grain sandwiches with lean protein, pasta with vegetables, or grain bowls.");
-    // If an afternoon ride is likely
     nutritionRecommendations.add("If cycling in the afternoon, have a lunch rich in complex carbs 2-3 hours before your ride, and include easily digestible foods.");
   } else if (goalType == "High Intensity Cycling") {
     nutritionRecommendations.add("For high-intensity training, your lunch should include quality protein (chicken, fish, tofu, legumes) paired with complex carbs and plenty of vegetables.");
@@ -674,11 +671,9 @@ void _generateNutritionRecommendationsFromFoodDiary() {
   } else if (goalType == "Leisure") {
     nutritionRecommendations.add("For leisure cycling, focus on balanced lunches with colorful vegetables, lean proteins, and whole grains. This supports general health and provides steady energy for casual rides.");
   }
-  // Activity-specific recommendations
   if (goalType == "Endurance") {
     nutritionRecommendations.add("For endurance training, focus on complex carbs (50-60% of calories) like whole grains, fruits, and starchy vegetables.");
     
-    // If activity data exists, add specific pre-ride recommendations
     if (activityData.isNotEmpty) {
       nutritionRecommendations.add("For rides longer than 90 minutes, consume 30-60g carbs/hour during your ride.");
     }
@@ -692,14 +687,13 @@ void _generateNutritionRecommendationsFromFoodDiary() {
   nutritionRecommendations.add("Remember to stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
 }
 
-// Method to save the subgoal to Firestore
 void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String> suggestions, List<String> warnings) {
   try {
     FirebaseFirestore.instance.collection('cycling_subgoals').add({
       'userId': userId,
       'subgoalType': type,
-      'targetValue': targetValue, // This is the target weekly average
-      'baselineDistance': baselineDistance, // Current weekly average
+      'targetValue': targetValue, 
+      'baselineDistance': baselineDistance, 
       'baselinePace': baselinePace,
       'baselineDuration': baselineDuration,
       'suggestions': suggestions,
@@ -707,72 +701,446 @@ void _saveCyclingSubgoalToFirestore(String type, double targetValue, List<String
       'startDate': subgoalStartDate,
       'endDate': subgoalEndDate,
       'createdAt': DateTime.now(),
-      'isWeeklyAverage': true, // Flag to indicate this is a weekly average goal
+      'isWeeklyAverage': true,
     });
   } catch (e) {
     print("Error saving cycling subgoal: $e");
   }
 }
+Widget _buildTemperatureCyclingCorrelationGraph() {
+  return FutureBuilder<Map<String, dynamic>>(
+    future: _fetchTemperatureCyclingData(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-Widget _buildFoodItem(String meal, String description, String calories) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 10),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              meal[0], // First letter
-              style: TextStyle(
-                fontFamily: 'Fredoka-SemiBold',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.green[700],
-              ),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  description,
-                  style: TextStyle(
+      if (snapshot.hasError || !snapshot.hasData) {
+        return _buildEmptyGraph("Error loading temperature and activity data");
+      }
+
+      var correlationData = snapshot.data!;
+      List<TemperatureActivityData> data = correlationData['temperatureActivityData'] ?? [];
+      
+      if (data.isEmpty) {
+        return _buildEmptyGraph("No matching temperature and activity data found");
+      }
+
+      if (data.length > 7) {
+        data = data.sublist(data.length - 7);
+      }
+
+      List<String> sessionDates = [];
+
+      for (var item in data) {
+        sessionDates.add(DateFormat('MM/dd').format(item.date));
+      }
+
+      // Convert sessionDates to DateTime objects for sorting
+      List<DateTime> parsedDates = sessionDates.map((date) => DateFormat('MM/dd').parse(date)).toList();
+
+      // Sort the dates in ascending order (oldest to latest)
+      parsedDates.sort((a, b) => a.compareTo(b));
+
+      // Convert the sorted DateTime objects back to strings
+      sessionDates = parsedDates.map((date) => DateFormat('MM/dd').format(date)).toList();
+      double tempSpeedCorrelation = 0.0;
+      double tempDistanceCorrelation = 0.0;
+      double tempDurationCorrelation = 0.0;
+      
+      if (data.length > 2) {
+        List<double> temps = [];
+        List<double> speeds = [];
+        List<double> distances = [];
+        List<double> durations = [];
+        
+        for (var item in data) {
+          temps.add(item.temperature);
+          speeds.add(item.speed);
+          distances.add(item.distance);
+          durations.add(item.duration);
+        }
+        
+        tempSpeedCorrelation = _calculatePearsonCorrelation(temps, speeds);
+        tempDistanceCorrelation = _calculatePearsonCorrelation(temps, distances);
+        tempDurationCorrelation = _calculatePearsonCorrelation(temps, durations);
+      }
+
+      double maxSpeed = 0, maxDistance = 0, maxDuration = 0;
+      for (var item in data) {
+        if (item.speed > maxSpeed) maxSpeed = item.speed;
+        if (item.distance > maxDistance) maxDistance = item.distance;
+        if (item.duration > maxDuration) maxDuration = item.duration;
+      }
+
+      return _buildGraphContainer(
+        title: "Temperature\n Analysis",
+        subtitle: "Weather impact on cycling",
+        height: 2000,
+        child: Column(
+          children: [
+            // Main chart section
+            Expanded(
+              child: SfCartesianChart(
+                margin: EdgeInsets.all(10),
+                primaryXAxis: CategoryAxis(
+                  majorGridLines: MajorGridLines(width: 0),
+                  labelStyle: TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 14,
-                    color: Colors.grey[800],
+                    fontSize: 10,
+                    color: Colors.grey[700],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  labelRotation: 0,
+                  title: AxisTitle(
+                    text: 'Date',
+                    textStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[800],
+                    ),
+                  ),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  calories,
-                  style: TextStyle(
+                primaryYAxis: NumericAxis(
+                  name: 'Temperature',
+                  labelFormat: '{value}°C',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.red[600],
+                  ),
+                  majorGridLines: MajorGridLines(
+                    width: 0.5,
+                    color: Colors.grey[200],
+                    dashArray: <double>[3, 3],
+                  ),
+                  title: AxisTitle(
+                    text: 'Temperature (°C)',
+                    textStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red[600],
+                    ),
+                  ),
+                ),
+                axes: <ChartAxis>[
+                  NumericAxis(
+                    name: 'Speed',
+                    opposedPosition: true,
+                    labelFormat: '{value} km/h',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      color: Colors.blue[700],
+                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    title: AxisTitle(
+                      text: 'Speed',
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                  NumericAxis(
+                    name: 'Distance',
+                    opposedPosition: true,
+                    labelFormat: '{value} km',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 0,  
+                      color: Colors.green[700],
+                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    minimum: 0,
+                    maximum: maxDistance * 1.1,
+                    axisLine: AxisLine(width: 0),
+                  ),
+                  NumericAxis(
+                    name: 'Duration',
+                    opposedPosition: true,
+                    labelFormat: '{value} min',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 0,  
+                      color: Colors.purple[700],
+                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    minimum: 0,
+                    maximum: maxDuration * 1.1,
+                    axisLine: AxisLine(width: 0),
+                  ),
+                ],
+                series: <ChartSeries>[
+                  ColumnSeries<TemperatureActivityData, String>(
+                    name: 'Temperature (°C)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) => sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) => data.temperature,
+                    width: 0.6,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red[300]!,
+                        Colors.red[500]!,
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.red[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Speed (km/h)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) => sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) => data.speed,
+                    yAxisName: 'Speed',
+                    color: Colors.blue[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.circle,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.blue[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.blue[800],
+                      ),
+                    ),
+                  ),
+                  
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Distance (km)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) => sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) => data.distance,
+                    yAxisName: 'Distance',
+                    color: Colors.green[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.diamond,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.green[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                  ),
+                  
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Duration (min)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) => sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) => data.duration,
+                    yAxisName: 'Duration',
+                    color: Colors.purple[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.triangle,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.purple[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.purple[800],
+                      ),
+                    ),
+                  ),
+                ],
+                tooltipBehavior: TooltipBehavior(
+                  enable: true,
+                  color: Colors.grey[800],
+                  textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                legend: Legend(
+                  isVisible: true,
+                  position: LegendPosition.bottom,
+                  overflowMode: LegendItemOverflowMode.wrap,
+                  textStyle: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Colors.grey[800],
                   ),
+                  iconHeight: 14,
+                  iconWidth: 14,
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+            
+            Container(
+              margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[200]!, width: 1),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.insights_rounded,
+                    color: Colors.blue[700],
+                  ),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getTemperatureInsightText(tempSpeedCorrelation, tempDistanceCorrelation, tempDurationCorrelation),
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: Colors.grey[800],
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          ],
+        ),
+      );
+    },
+  );
+}
+// Helper method to create a correlation strength indicator
+String _getTemperatureInsightText(double speedCorr, double distanceCorr, double durationCorr) {
+  String insight = "";
+  
+  // Determine strongest correlation
+  if (speedCorr.abs() >= distanceCorr.abs() && speedCorr.abs() >= durationCorr.abs() && speedCorr.abs() > 0.3) {
+    insight = speedCorr > 0 
+        ? "Your cycling speed tends to increase in warmer weather." 
+        : "Your cycling speed tends to be faster in cooler weather.";
+  } 
+  else if (distanceCorr.abs() >= speedCorr.abs() && distanceCorr.abs() >= durationCorr.abs() && distanceCorr.abs() > 0.3) {
+    insight = distanceCorr > 0 
+        ? "You tend to ride longer distances in warmer weather." 
+        : "You tend to ride longer distances in cooler weather.";
   }
+  else if (durationCorr.abs() > 0.3) {
+    insight = durationCorr > 0 
+        ? "Your rides tend to last longer in warmer weather." 
+        : "Your rides tend to be shorter in warmer weather.";
+  }
+  else {
+    insight = "Temperature has minimal effect on your cycling performance.";
+  }
+  
+  return insight;
+}
+// Method to fetch temperature and activity data
+Future<Map<String, dynamic>> _fetchTemperatureCyclingData() async {
+  if (userId == null) return {'temperatureActivityData': []};
 
+  try {
+    // Fetch activities for the user
+    QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('uid', isEqualTo: userId)
+        .orderBy('start_date', descending: true)
+        .limit(20)
+        .get();
+
+    // Fetch weather data for the user
+    QuerySnapshot weatherSnapshot = await FirebaseFirestore.instance
+        .collection('weatherData')
+        .where('userId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(30)
+        .get();
+
+    // Organize weather data by date for easy lookup
+    Map<String, double> weatherByDate = {};
+    for (var doc in weatherSnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      if (data['timestamp'] != null && data['temperature'] != null) {
+        DateTime date = data['timestamp'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+        double temperature = safeParseDouble(data['temperature']);
+        weatherByDate[dateKey] = temperature;
+      }
+    }
+
+    // Create correlation data points
+    List<TemperatureActivityData> temperatureActivityData = [];
+    for (var doc in activitySnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      
+      if (data['start_date'] != null) {
+        DateTime activityDate = data['start_date'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(activityDate);
+        
+        if (weatherByDate.containsKey(dateKey)) {
+          double temperature = weatherByDate[dateKey]!;
+          double speed = safeParseDouble(data['average_speed']);
+          double distance = safeParseDouble(data['distance']);
+          double durationSeconds = safeParseDouble(data['elapsed_time']);
+          double durationMinutes = durationSeconds / 60.0;
+          
+          if (temperature > -50 && temperature < 50 && speed > 0) {
+            temperatureActivityData.add(
+              TemperatureActivityData(
+                temperature,
+                speed,
+                distance,
+                durationMinutes,
+                activityDate
+              )
+            );
+          }
+        }
+      }
+    }
+
+    return {'temperatureActivityData': temperatureActivityData};
+  } catch (e) {
+    print("Error fetching temperature-activity data: $e");
+    return {'temperatureActivityData': []};
+  }
+}
 // Widget to display subgoal selection options
 // Modify the _buildSubgoalSelectionCard() method to check if the user has completed their weekly commitment:
 
@@ -2944,7 +3312,7 @@ void _generateWeightManagementRecommendations() {
     double currentDistanceValue = safeParseDouble(distance);
     double targetDurationValue = safeParseDouble(targetDuration);
     double currentDurationValue =
-        safeParseDouble(sessionDuration) / 60; // Convert to minutes
+        safeParseDouble(sessionDuration) / 60; 
 
     // Heart rate zones
     double maxHeartRate = 220 - age.toDouble();
@@ -2953,10 +3321,8 @@ void _generateWeightManagementRecommendations() {
     double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
     double thresholdZoneUpper = maxHeartRate * 0.90; // 90% of max HR
 
-    // Latest HR
     double latestHeartRate = safeParseDouble(averageHeartrate);
 
-    // Primary feedback based on recent activities
     if (latestDistance > previousDistance &&
         latestDistance > 0 &&
         previousDistance > 0) {
@@ -3015,7 +3381,6 @@ void _generateWeightManagementRecommendations() {
 
     // Historical distance progression analysis
     if (distanceProgression.length >= 5) {
-      // Calculate the long-term trend
       double oldestAvg = 0;
       double newestAvg = 0;
 
@@ -3205,7 +3570,6 @@ void _generateWeightManagementRecommendations() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 16),
-                  // Header with welcome message
                   _buildHeaderSection(),
                   
                   // Primary recommendation card with animation
@@ -3302,7 +3666,7 @@ void _generateWeightManagementRecommendations() {
                     child: _buildSectionTitle("Your Analytics", Icons.insert_chart_outlined_rounded),
                   ),
                   
-                  SizedBox(height: 12),
+                  SizedBox(height: 50),
 
                   _buildWeeklySummary(),
                   
@@ -3323,7 +3687,7 @@ void _generateWeightManagementRecommendations() {
                     child: _buildGoalBasedGraphs(),
                   ),
                   
-                  SizedBox(height: 24),
+                  SizedBox(height: 50),
                   
                   // Activity section title
                   TweenAnimationBuilder(
@@ -3513,8 +3877,8 @@ void _generateWeightManagementRecommendations() {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xffFFF8E1), // Cream color
-            Color(0xffFFE0B2), // Lighter cream with orange tint
+            Color(0xffFFF8E1), 
+            Color(0xffFFE0B2), 
           ],
         ),
         borderRadius: BorderRadius.circular(16),
@@ -3553,7 +3917,7 @@ void _generateWeightManagementRecommendations() {
                     fontFamily: 'Fredoka-SemiBold',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xffE65100), // Dark orange text
+                    color: Color(0xffE65100), 
                   ),
                 ),
               ),
@@ -3565,11 +3929,10 @@ void _generateWeightManagementRecommendations() {
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 16,
-              color: Colors.brown[700], // Darker text for readability on cream
+              color: Colors.brown[700],
             ),
           ),
 
-          // Activity history summary
           if (activityData.length >= 3) ...[
             SizedBox(height: 16),
             Divider(color: Color(0xffFFA500).withOpacity(0.3), thickness: 1),
@@ -3584,7 +3947,7 @@ void _generateWeightManagementRecommendations() {
                     fontFamily: 'Inter',
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
-                    color: Color(0xffF57C00), // Medium orange text
+                    color: Color(0xffF57C00), 
                   ),
                 ),
               ],
@@ -3595,7 +3958,6 @@ void _generateWeightManagementRecommendations() {
     );
   }
 
-  // Activity log header with view all/hide toggle
   Widget _buildActivityLogHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3854,7 +4216,7 @@ void _generateWeightManagementRecommendations() {
                                 Icons.local_fire_department_rounded,
                                 Colors.orange[700]!,
                               ),
-                              Expanded(child: SizedBox()), // Empty space for alignment
+                              Expanded(child: SizedBox()), 
                             ],
                           ),
                         ],
@@ -3869,8 +4231,6 @@ void _generateWeightManagementRecommendations() {
       },
     );
   }
-
-
 
   // Calculate how many days the activity data spans
   String _calculateActivitySpan() {
@@ -3974,7 +4334,6 @@ void _generateWeightManagementRecommendations() {
       );
     }
 
-    // Create a PageController for the carousel
     PageController pageController = PageController(
       initialPage: 0,
       viewportFraction: 0.92,
@@ -4007,7 +4366,6 @@ void _generateWeightManagementRecommendations() {
               ),
             ),
             SizedBox(height: 16),
-            // Enhanced page indicator
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -4052,7 +4410,6 @@ void _generateWeightManagementRecommendations() {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with icon and title
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -4090,7 +4447,6 @@ void _generateWeightManagementRecommendations() {
             ),
           ),
 
-          // Recommendation content - scrollable section
           Expanded(
             child: ListView.builder(
               physics: BouncingScrollPhysics(),
@@ -4214,189 +4570,26 @@ void _generateWeightManagementRecommendations() {
       return Icons.lightbulb_rounded;
     }
   }
-
-  Color _getRecommendationGradientStart(String recommendation) {
-    if (recommendation.contains("✅") ||
-        recommendation.contains("Good") ||
-        recommendation.contains("Improving") ||
-        recommendation.contains("Progress")) {
-      return Colors.green[600]!;
-    } else if (recommendation.contains("⚠️") ||
-        recommendation.contains("Warning") ||
-        recommendation.contains("Needs") ||
-        recommendation.contains("Decreasing")) {
-      return Colors.orange[600]!;
-    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
-      return Colors.red[600]!;
-    } else if (recommendation.contains("ℹ️") ||
-        recommendation.contains("Info") ||
-        recommendation.contains("Building") ||
-        recommendation.contains("In Progress")) {
-      return Colors.blue[600]!;
-    } else {
-      return Color(0xffFFA500);
-    }
-  }
-
-  Color _getRecommendationGradientEnd(String recommendation) {
-    if (recommendation.contains("✅") ||
-        recommendation.contains("Good") ||
-        recommendation.contains("Improving") ||
-        recommendation.contains("Progress")) {
-      return Colors.green[400]!;
-    } else if (recommendation.contains("⚠️") ||
-        recommendation.contains("Warning") ||
-        recommendation.contains("Needs") ||
-        recommendation.contains("Decreasing")) {
-      return Colors.orange[400]!;
-    } else if (recommendation.contains("❌") || recommendation.contains("Bad")) {
-      return Colors.red[400]!;
-    } else if (recommendation.contains("ℹ️") ||
-        recommendation.contains("Info") ||
-        recommendation.contains("Building") ||
-        recommendation.contains("In Progress")) {
-      return Colors.blue[400]!;
-    } else {
-      return Color(0xffFFB74D);
-    }
-  }
-
-  Color _getPaceCaloriesColor(double pace, double calories, double avgPace, double avgCalories) {
-  // Efficient pace (faster than average with above average calories)
-  if (pace < avgPace && calories > avgCalories) {
-    return Colors.green[600]!; // Good performance
-  } 
-  // Slower pace with below average calories
-  else if (pace > avgPace && calories < avgCalories) {
-    return Colors.red[600]!; // Area for improvement
-  }
-  // Faster pace with below average calories or slower pace with above average calories
-  else {
-    return Colors.blue[600]!; // Mixed performance
-  }
-}
-
-Future<Map<String, dynamic>> _fetchWeeklyPaceCaloriesData() async {
-  if (userId == null) {
-    return {
-      'chartData': <PaceCaloriesData>[],
-      'avgPace': 0.0,
-      'avgCalories': 0.0,
-    };
-  }
-  
-  try {
-    // Use the existing activity data if available, which should match what's shown in the recommendations page
-    List<PaceCaloriesData> chartData = [];
-    
-    if (activityData.isNotEmpty) {
-      // Calculate the start of the current week (Sunday)
-      DateTime now = DateTime.now();
-      DateTime startOfWeek = now.subtract(Duration(days: now.weekday % 7));
-      startOfWeek = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-      
-      // Filter for activities from the current week
-      for (var activity in activityData) {
-        double elapsedTime = safeParseDouble(activity['elapsed_time']); // in seconds
-        double distance = safeParseDouble(activity['distance']); // in kilometers
-        double calories = safeParseDouble(activity['calories_burned']);
-        String activityName = activity['name'] ?? 'Cycling Activity';
-        
-        if (activity['start_date'] != null) {
-          DateTime date = activity['start_date'].toDate();
-          
-          // Check if this activity is from the current week
-          if (date.isAfter(startOfWeek) && elapsedTime > 0 && distance > 0 && calories > 0) {
-            // Calculate pace in minutes per kilometer
-            double paceMinPerKm = (elapsedTime / 60) / distance;
-            
-            chartData.add(PaceCaloriesData(date, paceMinPerKm, calories, activityName));
-          }
-        }
-      }
-    } else {
-      // If no activity data is loaded in memory, query from Firestore
-      // Calculate the start of the current week (Sunday)
-      DateTime now = DateTime.now();
-      DateTime startOfWeek = now.subtract(Duration(days: now.weekday % 7));
-      startOfWeek = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-      
-      // Fetch activities for the current week
-      QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('uid', isEqualTo: userId)
-          .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-          .orderBy('start_date', descending: false)
-          .get();
-      
-      for (var doc in activitySnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        
-        double elapsedTime = safeParseDouble(data['elapsed_time']); // in seconds
-        double distance = safeParseDouble(data['distance']); // in kilometers
-        double calories = safeParseDouble(data['calories_burned']);
-        String activityName = data['name'] ?? 'Cycling Activity';
-        
-        // Only include activities with valid data
-        if (elapsedTime > 0 && distance > 0 && calories > 0) {
-          // Calculate pace in minutes per kilometer
-          double paceMinPerKm = (elapsedTime / 60) / distance;
-          
-          DateTime date = data['start_date'].toDate();
-          
-          chartData.add(PaceCaloriesData(date, paceMinPerKm, calories, activityName));
-        }
-      }
-    }
-    
-    // Calculate averages
-    double avgPace = 0.0;
-    double avgCalories = 0.0;
-    
-    if (chartData.isNotEmpty) {
-      avgPace = chartData.map((e) => e.pace).reduce((a, b) => a + b) / chartData.length;
-      avgCalories = chartData.map((e) => e.calories).reduce((a, b) => a + b) / chartData.length;
-    }
-    
-    return {
-      'chartData': chartData,
-      'avgPace': avgPace,
-      'avgCalories': avgCalories,
-    };
-  } catch (e) {
-    print("Error fetching pace-calories data: $e");
-    return {
-      'chartData': <PaceCaloriesData>[],
-      'avgPace': 0.0,
-      'avgCalories': 0.0,
-    };
-  }
-}
-
 Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
   if (userId == null) {
     return [];
   }
   
   try {
-    // Use the existing activity data if available
     List<PaceCaloriesData> chartData = [];
     
     if (activityData.isNotEmpty) {
       for (var activity in activityData) {
-        double elapsedTime = safeParseDouble(activity['elapsed_time']); // in seconds
-        double distance = safeParseDouble(activity['distance']); // in kilometers
+        double elapsedTime = safeParseDouble(activity['elapsed_time']); 
+        double distance = safeParseDouble(activity['distance']); 
         double calories = safeParseDouble(activity['calories_burned']);
         String activityName = activity['name'] ?? 'Cycling Activity';
         
         if (activity['start_date'] != null) {
           DateTime date = activity['start_date'].toDate();
           
-          // Only include activities with valid data
           if (elapsedTime > 0 && distance > 0 && calories > 0) {
-            // Calculate pace in minutes per kilometer, limiting to 2 decimal places
             double paceMinPerKm = (elapsedTime / 60) / distance;
-            // Round to 2 decimal places
             paceMinPerKm = double.parse(paceMinPerKm.toStringAsFixed(2));
             calories = double.parse(calories.toStringAsFixed(2));
             
@@ -4405,27 +4598,23 @@ Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
         }
       }
     } else {
-      // If no activity data is loaded in memory, query from Firestore
       QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
           .collection('activities')
           .where('uid', isEqualTo: userId)
           .orderBy('start_date', descending: true)
-          .limit(30) // Get more activities for a better overview
+          .limit(30) 
           .get();
       
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         
-        double elapsedTime = safeParseDouble(data['elapsed_time']); // in seconds
-        double distance = safeParseDouble(data['distance']); // in kilometers
+        double elapsedTime = safeParseDouble(data['elapsed_time']); 
+        double distance = safeParseDouble(data['distance']); 
         double calories = safeParseDouble(data['calories_burned']);
         String activityName = data['name'] ?? 'Cycling Activity';
         
-        // Only include activities with valid data
         if (elapsedTime > 0 && distance > 0 && calories > 0) {
-          // Calculate pace in minutes per kilometer
           double paceMinPerKm = (elapsedTime / 60) / distance;
-          // Round to 2 decimal places
           paceMinPerKm = double.parse(paceMinPerKm.toStringAsFixed(2));
           calories = double.parse(calories.toStringAsFixed(2));
           
@@ -4460,41 +4649,33 @@ Widget _buildPaceCaloriesCorrelationGraph() {
         return _buildEmptyGraph("No activities found");
       }
 
-      // Sort activities by date (newest to oldest)
       chartData.sort((a, b) => b.date.compareTo(a.date));
 
-      // Limit to most recent 7 activities for better visualization
       if (chartData.length > 7) {
         chartData = chartData.sublist(0, 7);
       }
 
-      // Reverse to show oldest to newest (left to right)
       chartData = chartData.reversed.toList();
 
-      // Format dates for X-axis
       List<String> sessionDates = chartData.map((e) => DateFormat('MM/dd').format(e.date)).toList();
       
-      // Calculate averages for reference lines
       double avgPace = chartData.map((e) => e.pace).reduce((a, b) => a + b) / chartData.length;
       double avgCalories = chartData.map((e) => e.calories).reduce((a, b) => a + b) / chartData.length;
       
-      // Find minimum and maximum for better scaling
       double minCalories = chartData.map((e) => e.calories).reduce(math.min);
       double maxCalories = chartData.map((e) => e.calories).reduce(math.max);
       
-      // Find the best sessions
       PaceCaloriesData fastestSession = chartData.reduce((a, b) => a.pace < b.pace ? a : b);
       PaceCaloriesData highestCalorieSession = chartData.reduce((a, b) => a.calories > b.calories ? a : b);
       int fastestIdx = chartData.indexOf(fastestSession);
       int highestCalorieIdx = chartData.indexOf(highestCalorieSession);
 
       return _buildGraphContainer(
-        title: "Pace & Calories Analysis",
+        title: "Pace & Calories\nAnalysis",
         subtitle: "Recent Activities",
-        height: 480,
+        height: 2000,
         child: Column(
           children: [
-            // Main charts section - Now full width
             Expanded(
               child: SfCartesianChart(
                 margin: EdgeInsets.all(10),
@@ -4541,7 +4722,7 @@ Widget _buildPaceCaloriesCorrelationGraph() {
                       color: Colors.blue[700],
                     ),
                     majorGridLines: MajorGridLines(width: 0),
-                    isInversed: true, // Lower is better for pace
+                    isInversed: true, 
                     plotBands: [
                       PlotBand(
                         isVisible: true,
@@ -4555,7 +4736,6 @@ Widget _buildPaceCaloriesCorrelationGraph() {
                   ),
                 ],
                 series: <ChartSeries>[
-                  // Calories as bar chart
                   ColumnSeries<PaceCaloriesData, String>(
                     name: 'Calories',
                     dataSource: chartData,
@@ -4647,64 +4827,9 @@ Widget _buildPaceCaloriesCorrelationGraph() {
   );
 }
 
-Widget _buildPerformanceIndicator(String label, String value, String date, IconData icon, Color color) {
-  return Expanded(
-    child: Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 18,
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 10,
-                  color: Colors.grey[600],
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[900],
-                ),
-              ),
-              Text(
-                date,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 10,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 String _generateEnhancedInsightText(List<PaceCaloriesData> data, double avgPace, double avgCalories, 
     PaceCaloriesData fastestSession, PaceCaloriesData highestCalorieSession) {
   
-  // Check patterns in the most recent 3 sessions
   List<PaceCaloriesData> recentSessions = data.length >= 3 ? data.sublist(data.length - 3) : data;
   bool improvingPace = true;
   bool increasingCalories = true;
@@ -4718,7 +4843,6 @@ String _generateEnhancedInsightText(List<PaceCaloriesData> data, double avgPace,
     }
   }
   
-  // Generate insights based on patterns
   if (fastestSession == highestCalorieSession) {
     return "Your most efficient ride combined both your fastest pace and highest calorie burn. Aim to replicate this intensity level for optimal results.";
   } else if (improvingPace && increasingCalories) {
@@ -4728,8 +4852,7 @@ String _generateEnhancedInsightText(List<PaceCaloriesData> data, double avgPace,
   } else if (increasingCalories) {
     return "Your calorie burn is trending upward. Try incorporating interval training to improve your pace while maintaining high calorie burn.";
   } else {
-    // Compare to average
-    bool aboveAvgPace = data.last.pace < avgPace; // Remember lower pace is better
+    bool aboveAvgPace = data.last.pace < avgPace; 
     bool aboveAvgCalories = data.last.calories > avgCalories;
     
     if (aboveAvgPace && aboveAvgCalories) {
@@ -4764,16 +4887,13 @@ Widget _buildCalorieWeightCorrelationGraph() {
         return _buildEmptyGraph("Not enough data for correlation analysis");
       }
 
-      // Calculate the correlation coefficient if we have enough data points
       String correlationStrength = "No correlation";
       String correlationExplanation = "Need more data points to determine correlation.";
       
-      // Determine if user is currently in surplus or deficit based on most recent data
       bool isInSurplus = false;
       double latestNetCalories = 0;
       
       if (chartData.isNotEmpty) {
-        // Sort by date to find the most recent entry
         chartData.sort((a, b) => b.date.compareTo(a.date));
         latestNetCalories = chartData[0].netCalories;
         isInSurplus = latestNetCalories >= 0;
@@ -4782,7 +4902,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
       if (chartData.length >= 3) {
         double correlationCoefficient = data['correlationCoefficient'];
         
-        // Interpret the correlation coefficient
         if (correlationCoefficient < -0.7) {
           correlationStrength = "Strong negative";
           correlationExplanation = isInSurplus ? 
@@ -4810,16 +4929,13 @@ Widget _buildCalorieWeightCorrelationGraph() {
             "Unexpected trend: Despite tracking deficits, weight is increasing. Consider reviewing measurement accuracy or consulting a nutritionist.";
         }
       } else {
-        // Default explanation when not enough data for correlation
         correlationExplanation = isInSurplus ? 
           "You're currently in a caloric surplus, which may slow weight loss progress. Track more data for better insights." : 
           "You're currently in a caloric deficit, which supports weight loss goals. Track more data for personalized insights.";
       }
 
-      // Sort chronologically for the chart
       chartData.sort((a, b) => a.date.compareTo(b.date));
       
-      // Split the data into surplus and deficit series for separate rendering
       List<WeightCalorieData> surplusData = [];
       List<WeightCalorieData> deficitData = [];
       
@@ -4834,19 +4950,17 @@ Widget _buildCalorieWeightCorrelationGraph() {
       return _buildGraphContainer(
         title: "Calories &\nWeight Correlation",
         subtitle: isInSurplus ? "Caloric Surplus" : "Caloric Deficit",
-        height: 320,
+        height: 2000,
         child: Column(
           children: [
             Expanded(
               child: SfCartesianChart(
                 margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
-                // Enable zooming and panning for better data exploration
                 zoomPanBehavior: ZoomPanBehavior(
                   enablePinching: true,
                   enablePanning: true,
                   zoomMode: ZoomMode.x,
                 ),
-                // Primary X axis for dates
                 primaryXAxis: DateTimeAxis(
                   majorGridLines: MajorGridLines(width: 0),
                   minorGridLines: MinorGridLines(width: 0),
@@ -4877,11 +4991,10 @@ Widget _buildCalorieWeightCorrelationGraph() {
                     fontSize: 10,
                   ),
                 ),
-                // Secondary Y axis for calories
                 axes: <ChartAxis>[
                   NumericAxis(
                     name: 'Calories',
-                    opposedPosition: true, // Display on right side
+                    opposedPosition: true, 
                     majorGridLines: MajorGridLines(width: 0),
                     axisLine: AxisLine(width: 0),
                     labelFormat: '{value} kcal',
@@ -4890,7 +5003,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
                       fontFamily: 'Inter',
                       fontSize: 10,
                     ),
-                    // Add zero line to show deficit/surplus separation
                     plotBands: <PlotBand>[
                       PlotBand(
                         isVisible: true,
@@ -4903,7 +5015,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
                     ],
                   ),
                 ],
-                // Legend for the chart
                 legend: Legend(
                   isVisible: true,
                   position: LegendPosition.bottom,
@@ -4913,15 +5024,12 @@ Widget _buildCalorieWeightCorrelationGraph() {
                     fontSize: 10,
                   ),
                 ),
-                // Tooltip for data points
                 tooltipBehavior: TooltipBehavior(
                   enable: true,
                   color: Colors.grey[800],
                   textStyle: TextStyle(color: Colors.white, fontSize: 12),
                 ),
-                // Chart series
                 series: <ChartSeries>[
-                  // Series for weight
                   SplineSeries<WeightCalorieData, DateTime>(
                     name: 'Weight (kg)',
                     dataSource: chartData,
@@ -4939,7 +5047,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
                       width: 8,
                     ),
                   ),
-                  // Series for calorie surplus (positive values) - only if surplus data exists
                   if (surplusData.isNotEmpty)
                     SplineSeries<WeightCalorieData, DateTime>(
                       name: 'Calorie Surplus',
@@ -4962,7 +5069,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
                         mode: EmptyPointMode.gap,
                       ),
                     ),
-                  // Series for calorie deficit (negative values) - only if deficit data exists
                   if (deficitData.isNotEmpty)
                     SplineSeries<WeightCalorieData, DateTime>(
                       name: 'Calorie Deficit',
@@ -4986,7 +5092,6 @@ Widget _buildCalorieWeightCorrelationGraph() {
                       ),
                     ),
                 ],
-                // Add annotations to highlight current status
                 annotations: <CartesianChartAnnotation>[
                   CartesianChartAnnotation(
                     widget: Container(
@@ -5007,7 +5112,7 @@ Widget _buildCalorieWeightCorrelationGraph() {
                       ),
                     ),
                     coordinateUnit: CoordinateUnit.point,
-                    x: chartData[0].date, // First date
+                    x: chartData[0].date,
                     y: -400,
                     yAxisName: 'Calories',
                   ),
@@ -5030,14 +5135,13 @@ Widget _buildCalorieWeightCorrelationGraph() {
                       ),
                     ),
                     coordinateUnit: CoordinateUnit.point,
-                    x: chartData[0].date, // First date
+                    x: chartData[0].date, 
                     y: 400,
                     yAxisName: 'Calories',
                   ),
                 ],
               ),
             ),
-            // Explanation of the correlation with actionable advice
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4, left: 16, right: 16),
               child: Container(
@@ -5079,10 +5183,9 @@ Widget _buildCalorieWeightCorrelationGraph() {
   );
 }
 
-// Helper methods for common UI elements
   Widget _buildLoadingGraph() {
     return Container(
-      height: 280,
+      height: 1000,
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -5164,14 +5267,10 @@ Widget _buildCalorieWeightCorrelationGraph() {
     );
   }
 
-// Function that decides which graph to display based on goal type
 Widget _buildGoalBasedGraphs() {
-  // If loading, show a loading indicator
   if (_isLoadingGraphs) {
     return _buildLoadingGraph();
   }
-
-  // If the user goal is unknown or if Strava is not connected, show a message
   if (goalType == '-' || _stravaUserId == null) {
     return Container(
       padding: EdgeInsets.all(16),
@@ -5196,7 +5295,7 @@ Widget _buildGoalBasedGraphs() {
               color: Colors.red[400],
               size: 36,
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 18),
             Text(
               _stravaUserId == null
                   ? "No Strava account connected"
@@ -5254,7 +5353,6 @@ Widget _buildGoalBasedGraphs() {
     );
   }
 
-  // Build the appropriate graphs based on the user's goal
   switch (goalType) {
     case 'Leisure':
       goalGraphs.add(_buildSessionsPerWeekGraph());
@@ -5264,10 +5362,9 @@ Widget _buildGoalBasedGraphs() {
       goalGraphs.add(_buildDurationPerSessionGraph());
       break;
     case 'High Intensity Cycling':
-      // Replace the weight over time graph with our new correlation graph
       goalGraphs.add(_buildCalorieWeightCorrelationGraph());
       goalGraphs.add(_buildPaceCaloriesCorrelationGraph());
-      goalGraphs.add(_buildBMRTrendGraph());
+      goalGraphs.add(_buildTemperatureCyclingCorrelationGraph());
       break;
     default:
       goalGraphs.add(
@@ -5287,19 +5384,17 @@ Widget _buildGoalBasedGraphs() {
     goalGraphs.add(_buildBaselineComparisonGraph());
   }
 
-  // If there's only one graph, return it directly
   if (goalGraphs.length == 1) {
     return Container(
-      height: 320, // Increased from 250
+      height: 320, 
       child: goalGraphs.first,
     );
   }
 
-  // Otherwise, create a carousel with page indicator
   return Column(
     children: [
       Container(
-        height: 320, // Increased from 250
+        height: 320, 
         child: PageView(
           controller: _pageController,
           onPageChanged: (index) {
@@ -5311,7 +5406,6 @@ Widget _buildGoalBasedGraphs() {
         ),
       ),
       SizedBox(height: 10),
-      // Page indicator dots
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(
@@ -5569,10 +5663,10 @@ Widget _buildGoalBasedGraphs() {
     required String title,
     required String subtitle,
     required Widget child,
-    double height = 280,
+    double height = 2000,
   }) {
     return Container(
-      height: height,
+      height: 2000,
       margin: EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -5701,7 +5795,7 @@ Widget _buildGoalBasedGraphs() {
     return _buildGraphContainer(
       title: "Baseline Comparison",
       subtitle: "Progress from initial week",
-      height: 300, 
+      height: 2000, 
       child: SfCartesianChart(
         primaryXAxis: CategoryAxis(
           majorGridLines: MajorGridLines(width: 0),
@@ -5802,143 +5896,6 @@ Widget _buildGoalBasedGraphs() {
       ),
     );
   }
-Widget _buildBMRTrendGraph() {
-  return FutureBuilder<QuerySnapshot>(
-    future: FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: userId)
-        .orderBy('timestamp', descending: true)
-        .limit(10) // Get the last 10 entries
-        .get(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return _buildLoadingGraph();
-      }
-
-      if (snapshot.hasError ||
-          !snapshot.hasData ||
-          snapshot.data!.docs.isEmpty) {
-        return _buildEmptyGraph("No BMR tracking data available");
-      }
-
-      List<MetricData> chartData = [];
-      
-      // Check if we have at least 2 entries to show a trend
-      if (snapshot.data!.docs.length < 2) {
-        return _buildEmptyGraph("Need more data to show BMR trend");
-      }
-
-      // Process the data in chronological order (oldest first)
-      for (var doc in snapshot.data!.docs.reversed) {
-        var data = doc.data() as Map<String, dynamic>;
-        if (data.containsKey('basalMetabolicRate')) {
-          double bmr = safeParseDouble(data['basalMetabolicRate']);
-          
-          // Get the timestamp for the x-axis
-          Timestamp timestamp = data['timestamp'];
-          DateTime date = timestamp.toDate();
-          
-          // Format date for display
-          String dateLabel = DateFormat('MM/dd HH:mm').format(date);
-          
-          if (bmr > 0) { // Only add valid BMR readings
-            chartData.add(MetricData(dateLabel, bmr));
-          }
-        }
-      }
-      
-      // If after filtering we don't have enough data
-      if (chartData.length < 2) {
-        return _buildEmptyGraph("Need more BMR data to show trend");
-      }
-
-      return _buildGraphContainer(
-        title: "Basal Metabolic Rate Trend",
-        subtitle: "Changes over time",
-        child: SfCartesianChart(
-          margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
-          primaryXAxis: CategoryAxis(
-            majorGridLines: MajorGridLines(width: 0),
-            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-            labelStyle: TextStyle(
-              color: Colors.grey[700],
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-            labelRotation: 0,
-          ),
-          primaryYAxis: NumericAxis(
-            majorGridLines: MajorGridLines(
-              width: 0.5,
-              color: Colors.grey[200],
-              dashArray: <double>[3, 3],
-            ),
-            axisLine: AxisLine(width: 0),
-            labelFormat: '{value} kcal',
-            labelStyle: TextStyle(
-              color: Colors.grey[700],
-              fontFamily: 'Inter',
-              fontSize: 10,
-            ),
-          ),
-          tooltipBehavior: TooltipBehavior(
-            enable: true,
-            color: Colors.grey[800],
-            textStyle: TextStyle(color: Colors.white, fontSize: 12),
-            format: 'BMR: point.y kcal\nDate: point.x',
-          ),
-          series: <ChartSeries>[
-            SplineSeries<MetricData, String>(
-              dataSource: chartData,
-              xValueMapper: (MetricData data, _) => data.date,
-              yValueMapper: (MetricData data, _) => data.value,
-              color: Colors.orange, // Purple for BMR
-              width: 3,
-              markerSettings: MarkerSettings(
-                isVisible: true,
-                shape: DataMarkerType.circle,
-                color: Colors.orange,
-                borderColor: Colors.white,
-                borderWidth: 2,
-                height: 8,
-                width: 8,
-              ),
-              dataLabelSettings: DataLabelSettings(
-                isVisible: true,
-                textStyle: TextStyle(
-                  color: Colors.black87,
-                  fontFamily: 'Inter',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-                labelAlignment: ChartDataLabelAlignment.top,
-                useSeriesColor: true,
-              ),
-            ),
-          ],
-          // Add annotations to highlight important information
-          annotations: <CartesianChartAnnotation>[
-            CartesianChartAnnotation(
-              widget: Container(
-                padding: EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: Colors.orange[200]!, width: 1),
-                ),
-              ),
-              coordinateUnit: CoordinateUnit.point,
-              x: chartData[chartData.length ~/ 2].date,
-              y: chartData.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 0.9,
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
 Widget _buildWeeklySummary() {
   var media = MediaQuery.of(context).size;
   
