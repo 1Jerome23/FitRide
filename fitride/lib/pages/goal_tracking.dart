@@ -4439,14 +4439,13 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 6),
 
                               if (goalType != 'Endurance')
                                 Container(
-                                  padding: const EdgeInsets.only(top: 8.0),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
+                                        horizontal: 10, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: Colors.green[50],
                                       borderRadius: BorderRadius.circular(12),
