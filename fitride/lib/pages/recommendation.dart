@@ -72,7 +72,27 @@ class ActivitySessionData {
 
   ActivitySessionData(this.session, this.value);
 }
+class NutritionActivityData {
+  final DateTime date;
+  final double? totalCalories;
+  final double? totalCarbs;
+  final double? totalFat;
+  final double? totalProtein;
+  final double? elapsedTime;
+  final double? distance;
+  final double? averageSpeed;
 
+  NutritionActivityData({
+    required this.date,
+    this.totalCalories,
+    this.totalCarbs,
+    this.totalFat,
+    this.totalProtein,
+    this.elapsedTime,
+    this.distance,
+    this.averageSpeed,
+  });
+}
 class RecommendationPage extends StatefulWidget {
   @override
   _RecommendationPageState createState() => _RecommendationPageState();
@@ -275,6 +295,511 @@ class _RecommendationPageState extends State<RecommendationPage> {
     _pageController.dispose();
     super.dispose();
   }
+  Future<List<NutritionActivityData>> _fetchNutritionActivityData() async {
+  if (userId == null) return [];
+  
+  try {
+    // Fetch food entries data
+    QuerySnapshot foodSnapshot = await FirebaseFirestore.instance
+        .collection('food_entries')
+        .where('userId', isEqualTo: userId)
+        .orderBy('date', descending: true)
+        .limit(30)
+        .get();
+        
+    // Fetch activity data
+    QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('uid', isEqualTo: userId)
+        .orderBy('start_date', descending: true)
+        .limit(30)
+        .get();
+    
+    // Map food entries by date
+    Map<String, Map<String, dynamic>> foodByDate = {};
+    for (var doc in foodSnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      
+      if (data['date'] != null) {
+        DateTime date = data['date'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+        
+        foodByDate[dateKey] = {
+          'totalCalories': safeParseDouble(data['total_calories']),
+          'totalCarbs': safeParseDouble(data['total_carbs']),
+          'totalFat': safeParseDouble(data['total_fat']),
+          'totalProtein': safeParseDouble(data['total_protein']),
+          'date': date,
+        };
+      }
+    }
+    
+    // Map activities by date
+    Map<String, Map<String, dynamic>> activitiesByDate = {};
+    for (var doc in activitySnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      
+      if (data['start_date'] != null) {
+        DateTime date = data['start_date'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+        
+        // If we already have an activity for this date, choose the one with higher distance
+        if (activitiesByDate.containsKey(dateKey)) {
+          double existingDistance = safeParseDouble(activitiesByDate[dateKey]!['distance']);
+          double newDistance = safeParseDouble(data['distance']);
+          
+          if (newDistance > existingDistance) {
+            activitiesByDate[dateKey] = {
+              'elapsedTime': safeParseDouble(data['elapsed_time']) / 60, // Convert to minutes
+              'distance': safeParseDouble(data['distance']),
+              'averageSpeed': safeParseDouble(data['average_speed']),
+              'date': date,
+            };
+          }
+        } else {
+          activitiesByDate[dateKey] = {
+            'elapsedTime': safeParseDouble(data['elapsed_time']) / 60, // Convert to minutes
+            'distance': safeParseDouble(data['distance']),
+            'averageSpeed': safeParseDouble(data['average_speed']),
+            'date': date,
+          };
+        }
+      }
+    }
+    
+    // Merge food and activity data
+    List<NutritionActivityData> combinedData = [];
+    
+    // Get all unique dates
+    Set<String> allDates = {...foodByDate.keys, ...activitiesByDate.keys};
+    
+    for (String dateKey in allDates) {
+      var foodData = foodByDate[dateKey];
+      var activityData = activitiesByDate[dateKey];
+      
+      // Only include dates where we have both food and activity data
+      if (foodData != null && activityData != null) {
+        combinedData.add(
+          NutritionActivityData(
+            date: foodData['date'],
+            totalCalories: foodData['totalCalories'],
+            totalCarbs: foodData['totalCarbs'],
+            totalFat: foodData['totalFat'],
+            totalProtein: foodData['totalProtein'],
+            elapsedTime: activityData['elapsedTime'],
+            distance: activityData['distance'],
+            averageSpeed: activityData['averageSpeed'],
+          )
+        );
+      }
+    }
+    
+    // Sort by date (oldest to newest)
+    combinedData.sort((a, b) => a.date.compareTo(b.date));
+    
+    return combinedData;
+  } catch (e) {
+    print("Error fetching nutrition and activity data: $e");
+    return [];
+  }
+}
+Widget _buildNutritionActivityGraph() {
+  return FutureBuilder<List<NutritionActivityData>>(
+    future: _fetchNutritionActivityData(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
+
+      if (snapshot.hasError || !snapshot.hasData) {
+        return _buildEmptyGraph("Error loading nutrition and activity data");
+      }
+
+      List<NutritionActivityData> data = snapshot.data!;
+      
+      if (data.isEmpty) {
+        return _buildEmptyGraph("No matching nutrition and activity data found");
+      }
+
+      // Default selections
+      String selectedNutritionMetric = 'totalCalories';
+      String selectedActivityMetric = 'averageSpeed';
+      
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return _buildGraphContainer(
+            title: "Nutrition &\nPerformance",
+            subtitle: "Correlation Analysis",
+            height: 340, // Match other graphs
+            child: Column(
+              children: [
+                // Main chart section
+                Expanded(
+                  child: SfCartesianChart(
+                    margin: EdgeInsets.all(10),
+                    primaryXAxis: DateTimeAxis(
+                      majorGridLines: MajorGridLines(width: 0),
+                      minorGridLines: MinorGridLines(width: 0),
+                      axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+                      labelStyle: TextStyle(
+                        color: Colors.grey[700],
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      dateFormat: DateFormat('MM/dd'),
+                      intervalType: DateTimeIntervalType.days,
+                    ),
+                    primaryYAxis: NumericAxis(
+                      name: 'Nutrition',
+                      majorGridLines: MajorGridLines(
+                        width: 0.5,
+                        color: Colors.grey[200],
+                        dashArray: <double>[3, 3],
+                      ),
+                      axisLine: AxisLine(width: 0),
+                      labelFormat: _getNutritionYAxisFormat(selectedNutritionMetric),
+                      labelStyle: TextStyle(
+                        color: _getNutritionColor(selectedNutritionMetric),
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                      ),
+                    ),
+                    axes: <ChartAxis>[
+                      NumericAxis(
+                        name: 'Activity',
+                        opposedPosition: true,
+                        majorGridLines: MajorGridLines(width: 0),
+                        axisLine: AxisLine(width: 0),
+                        labelFormat: _getActivityYAxisFormat(selectedActivityMetric),
+                        labelStyle: TextStyle(
+                          color: _getActivityColor(selectedActivityMetric),
+                          fontFamily: 'Inter',
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                    series: <ChartSeries>[
+                      // Nutrition series
+                      SplineSeries<NutritionActivityData, DateTime>(
+                        name: _getNutritionSeriesName(selectedNutritionMetric),
+                        dataSource: data,
+                        xValueMapper: (NutritionActivityData data, _) => data.date,
+                        yValueMapper: (NutritionActivityData data, _) => _getNutritionValue(data, selectedNutritionMetric),
+                        color: _getNutritionColor(selectedNutritionMetric),
+                        width: 2.5,
+                        markerSettings: MarkerSettings(
+                          isVisible: true,
+                          shape: DataMarkerType.circle,
+                          height: 6,
+                          width: 6,
+                          color: _getNutritionColor(selectedNutritionMetric),
+                          borderColor: Colors.white,
+                          borderWidth: 2,
+                        ),
+                      ),
+                      
+                      // Activity series
+                      SplineSeries<NutritionActivityData, DateTime>(
+                        name: _getActivitySeriesName(selectedActivityMetric),
+                        dataSource: data,
+                        xValueMapper: (NutritionActivityData data, _) => data.date,
+                        yValueMapper: (NutritionActivityData data, _) => _getActivityValue(data, selectedActivityMetric),
+                        yAxisName: 'Activity',
+                        color: _getActivityColor(selectedActivityMetric),
+                        width: 2.5,
+                        markerSettings: MarkerSettings(
+                          isVisible: true,
+                          shape: DataMarkerType.diamond,
+                          height: 6,
+                          width: 6,
+                          color: _getActivityColor(selectedActivityMetric),
+                          borderColor: Colors.white,
+                          borderWidth: 2,
+                        ),
+                      ),
+                    ],
+                    tooltipBehavior: TooltipBehavior(
+                      enable: true,
+                      color: Colors.grey[800],
+                      textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    legend: Legend(
+                      isVisible: true,
+                      position: LegendPosition.bottom,
+                      overflowMode: LegendItemOverflowMode.wrap,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: Colors.grey[800],
+                      ),
+                      iconHeight: 14,
+                      iconWidth: 14,
+                    ),
+                  ),
+                ),
+                
+                // Toggle buttons row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Nutrition toggle buttons
+                      _buildMetricToggleButton(
+                        'Calories', 
+                        selectedNutritionMetric == 'totalCalories',
+                        Colors.orange[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalCalories'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Carbs', 
+                        selectedNutritionMetric == 'totalCarbs',
+                        Colors.green[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalCarbs'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Fat', 
+                        selectedNutritionMetric == 'totalFat',
+                        Colors.yellow[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalFat'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Protein', 
+                        selectedNutritionMetric == 'totalProtein',
+                        Colors.purple[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalProtein'),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Activity toggle buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildMetricToggleButton(
+                        'Time', 
+                        selectedActivityMetric == 'elapsedTime',
+                        Colors.blue[700]!,
+                        () => setState(() => selectedActivityMetric = 'elapsedTime'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Distance', 
+                        selectedActivityMetric == 'distance',
+                        Colors.indigo[700]!,
+                        () => setState(() => selectedActivityMetric = 'distance'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Speed', 
+                        selectedActivityMetric == 'averageSpeed',
+                        Colors.teal[700]!,
+                        () => setState(() => selectedActivityMetric = 'averageSpeed'),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Insight section
+                Container(
+                  margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!, width: 1),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        color: Colors.blue[700],
+                      ),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _getInsightText(data, selectedNutritionMetric, selectedActivityMetric),
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11,
+                                color: Colors.grey[800],
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+// Update the metric toggle button for a more compact design
+Widget _buildMetricToggleButton(String label, bool isSelected, Color color, VoidCallback onTap) {
+  return InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? color.withOpacity(0.1) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? color : Colors.grey[300]!,
+          width: 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 10,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? color : Colors.grey[600],
+        ),
+      ),
+    ),
+  );
+}
+
+// Helper methods for nutrition metrics
+String _getNutritionSeriesName(String metric) {
+  switch (metric) {
+    case 'totalCalories': return 'Calories';
+    case 'totalCarbs': return 'Carbs (g)';
+    case 'totalFat': return 'Fat (g)';
+    case 'totalProtein': return 'Protein (g)';
+    default: return 'Calories';
+  }
+}
+
+Color _getNutritionColor(String metric) {
+  switch (metric) {
+    case 'totalCalories': return Colors.orange[700]!;
+    case 'totalCarbs': return Colors.green[700]!;
+    case 'totalFat': return Colors.yellow[700]!;
+    case 'totalProtein': return Colors.purple[700]!;
+    default: return Colors.orange[700]!;
+  }
+}
+
+String _getNutritionYAxisFormat(String metric) {
+  switch (metric) {
+    case 'totalCalories': return '{value} kcal';
+    case 'totalCarbs': return '{value} g';
+    case 'totalFat': return '{value} g';
+    case 'totalProtein': return '{value} g';
+    default: return '{value} kcal';
+  }
+}
+
+double? _getNutritionValue(NutritionActivityData data, String metric) {
+  switch (metric) {
+    case 'totalCalories': return data.totalCalories;
+    case 'totalCarbs': return data.totalCarbs;
+    case 'totalFat': return data.totalFat;
+    case 'totalProtein': return data.totalProtein;
+    default: return data.totalCalories;
+  }
+}
+
+// Helper methods for activity metrics
+String _getActivitySeriesName(String metric) {
+  switch (metric) {
+    case 'elapsedTime': return 'Time (min)';
+    case 'distance': return 'Distance (km)';
+    case 'averageSpeed': return 'Speed (km/h)';
+    default: return 'Speed (km/h)';
+  }
+}
+
+Color _getActivityColor(String metric) {
+  switch (metric) {
+    case 'elapsedTime': return Colors.blue[700]!;
+    case 'distance': return Colors.indigo[700]!;
+    case 'averageSpeed': return Colors.teal[700]!;
+    default: return Colors.teal[700]!;
+  }
+}
+
+String _getActivityYAxisFormat(String metric) {
+  switch (metric) {
+    case 'elapsedTime': return '{value} min';
+    case 'distance': return '{value} km';
+    case 'averageSpeed': return '{value} km/h';
+    default: return '{value} km/h';
+  }
+}
+
+double? _getActivityValue(NutritionActivityData data, String metric) {
+  switch (metric) {
+    case 'elapsedTime': return data.elapsedTime;
+    case 'distance': return data.distance;
+    case 'averageSpeed': return data.averageSpeed;
+    default: return data.averageSpeed;
+  }
+}
+
+// Generate insight text based on selected metrics
+String _getInsightText(List<NutritionActivityData> data, String nutritionMetric, String activityMetric) {
+  if (data.length < 3) {
+    return "Track more nutrition and activity data to see correlation insights.";
+  }
+  
+  // Extract the values for correlation analysis
+  List<double> nutritionValues = [];
+  List<double> activityValues = [];
+  
+  for (var point in data) {
+    double? nutritionValue = _getNutritionValue(point, nutritionMetric);
+    double? activityValue = _getActivityValue(point, activityMetric);
+    
+    if (nutritionValue != null && activityValue != null) {
+      nutritionValues.add(nutritionValue);
+      activityValues.add(activityValue);
+    }
+  }
+  
+  if (nutritionValues.length < 3 || activityValues.length < 3) {
+    return "Need more complete data points to analyze correlation.";
+  }
+  
+  // Calculate correlation
+  double correlation = _calculatePearsonCorrelation(nutritionValues, activityValues);
+  
+  String nutritionName = _getNutritionSeriesName(nutritionMetric);
+  String activityName = _getActivitySeriesName(activityMetric);
+  
+  if (correlation > 0.6) {
+    return "Strong positive correlation detected. Higher $nutritionName appears to relate to higher $activityName.";
+  } else if (correlation > 0.3) {
+    return "Moderate positive correlation. $nutritionName may have a positive effect on your $activityName.";
+  } else if (correlation > -0.3) {
+    return "No significant correlation between $nutritionName and $activityName detected in your data.";
+  } else if (correlation > -0.6) {
+    return "Moderate negative correlation. Lower $nutritionName appears to relate to higher $activityName.";
+  } else {
+    return "Strong negative correlation detected. Lower $nutritionName strongly relates to higher $activityName.";
+  }
+}
   // Helper method to calculate the weekly calories consumed
 double _calculateWeeklyCaloriesConsumed() {
   if (nutritionData.isEmpty) return 0.0;
@@ -776,7 +1301,7 @@ Widget _buildTemperatureCyclingCorrelationGraph() {
       return _buildGraphContainer(
         title: "Temperature\n Analysis",
         subtitle: "Weather impact on cycling",
-        height: 2000,
+        height: 650,
         child: Column(
           children: [
             // Main chart section
@@ -4673,7 +5198,7 @@ Widget _buildPaceCaloriesCorrelationGraph() {
       return _buildGraphContainer(
         title: "Pace & Calories\nAnalysis",
         subtitle: "Recent Activities",
-        height: 2000,
+        height: 650,
         child: Column(
           children: [
             Expanded(
@@ -4950,7 +5475,7 @@ Widget _buildCalorieWeightCorrelationGraph() {
       return _buildGraphContainer(
         title: "Calories &\nWeight Correlation",
         subtitle: isInSurplus ? "Caloric Surplus" : "Caloric Deficit",
-        height: 2000,
+        height: 650,
         child: Column(
           children: [
             Expanded(
@@ -5365,6 +5890,7 @@ Widget _buildGoalBasedGraphs() {
       goalGraphs.add(_buildCalorieWeightCorrelationGraph());
       goalGraphs.add(_buildPaceCaloriesCorrelationGraph());
       goalGraphs.add(_buildTemperatureCyclingCorrelationGraph());
+      goalGraphs.add(_buildNutritionActivityGraph());
       break;
     default:
       goalGraphs.add(
@@ -5386,7 +5912,7 @@ Widget _buildGoalBasedGraphs() {
 
   if (goalGraphs.length == 1) {
     return Container(
-      height: 320, 
+      height: 650, 
       child: goalGraphs.first,
     );
   }
@@ -5394,7 +5920,7 @@ Widget _buildGoalBasedGraphs() {
   return Column(
     children: [
       Container(
-        height: 320, 
+        height: 450, 
         child: PageView(
           controller: _pageController,
           onPageChanged: (index) {
@@ -5659,78 +6185,77 @@ Widget _buildGoalBasedGraphs() {
     );
   }
 
-   Widget _buildGraphContainer({
-    required String title,
-    required String subtitle,
-    required Widget child,
-    double height = 2000,
-  }) {
-    return Container(
-      height: 2000,
-      margin: EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.12),
-            spreadRadius: 0,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: 'Fredoka-SemiBold',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+Widget _buildGraphContainer({
+  required String title,
+  required String subtitle,
+  required Widget child,
+  double height = 650, 
+}) {
+  return Container(
+    height: height,
+    margin: EdgeInsets.only(bottom: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.12),
+          spreadRadius: 0,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Color(0xffFFA500).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Color(0xffFFA500).withOpacity(0.2),
+                    width: 1,
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Color(0xffFFA500).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Color(0xffFFA500).withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xffFFA500),
-                    ),
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xffFFA500),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Expanded(
-            child: ErrorBoundary(child: child),
-          ),
-        ],
-      ),
-    );
-  }
-
+        ),
+        Expanded(
+          child: ErrorBoundary(child: child),
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildBaselineComparisonGraph() {
     if (baselineComparison.isEmpty) {
       return _buildEmptyGraph("No baseline data available yet");
