@@ -21,8 +21,8 @@ class PieEfficiencyData {
 
 class PaceCaloriesData {
   final DateTime date;
-  final double pace; // in minutes per kilometer
-  final double calories; // calories burned
+  final double pace; 
+  final double calories; 
   final String activityName;
 
   PaceCaloriesData(this.date, this.pace, this.calories, this.activityName);
@@ -103,9 +103,9 @@ class RecommendationPage extends StatefulWidget {
 
 class TemperatureActivityData {
   final double temperature;
-  final double speed; // km/h
-  final double distance; // km
-  final double duration; // minutes
+  final double speed; 
+  final double distance; 
+  final double duration; 
   final DateTime date;
 
   TemperatureActivityData(
@@ -138,13 +138,10 @@ class ErrorBoundary extends StatelessWidget {
     return Builder(
       builder: (BuildContext context) {
         try {
-          // Attempt to build the child
           return child;
         } catch (e, stackTrace) {
-          // Log the error
           print('Error in graph rendering: $e\n$stackTrace');
 
-          // Return a fallback widget
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -181,10 +178,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<Map<String, dynamic>> activityData = [];
   List<Map<String, dynamic>> weatherData = [];
   List<Map<String, dynamic>> nutritionData = [];
-  // Baseline comparison data
   Map<String, dynamic> baselineComparison = {};
   bool hasActiveSubgoal = false;
-  String subgoalType = ""; // "distance", "pace", "duration", or "maintain"
+  String subgoalType = ""; 
   double subgoalTargetValue = 0.0;
   DateTime subgoalStartDate = DateTime.now();
   DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
@@ -203,7 +199,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   int _currentPage = 0;
   bool _isLoadingGraphs = true;
   String? _stravaUserId;
-  // User goal data
   String goalType = "-";
   String currentLevel = "0";
   String daysPerWeek = "0";
@@ -211,9 +206,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String targetWeight = "0";
   String targetDuration = "0";
 
-  // User profile data
   int age = 0;
-  String gender = "-";
   String healthCondition = "-";
   String respiratoryCondition = "No";
   String cardiovascularCondition = "No";
@@ -222,7 +215,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String bodyFat = "0";
   String basalMetabolicRate = "0";
 
-  // Activity data
   String levelOfExertion = "0";
   String averageHeartrate = "0";
   String averageSpeed = "0";
@@ -230,18 +222,15 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String distance = "0";
   String sessionDuration = "0";
 
-  // Weather data
   String temperature = "0";
   String humidity = "0";
   String weatherCondition = "-";
-  String airQuality = "Good"; // Air Quality Index category or value
+  String airQuality = "Good"; 
 
-  // Nutrition data
   String foodIntake = "-";
   String foodType = "-";
   String caloriesConsumed = "0";
 
-  // Training metrics
   int recommendedHeartRate = 0;
   int maxHeartRateCalculated = 0;
   int zone1HeartRate = 0;
@@ -250,7 +239,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   int zone4HeartRate = 0;
   int zone5HeartRate = 0;
 
-  // Variables for comparison
   double latestWeight = 0.0;
   double previousWeight = 0.0;
   double latestBodyFat = 0.0;
@@ -264,7 +252,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double latestAverageHeartrate = 0.0;
   double previousAverageHeartrate = 0.0;
 
-  // Historical trend analysis
   Map<String, dynamic> trendAnalysis = {};
   bool isImprovingOverTime = false;
   bool isConsistent = false;
@@ -281,7 +268,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double lowestHeartRate = 0.0;
   DateTime bestPerformanceDate = DateTime.now();
 
-  // Activity patterns with extended analysis
   DateTime lastActivityDate = DateTime.now();
   int daysSinceLastActivity = 0;
   int weeklyActivityCount = 0;
@@ -344,7 +330,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
         }
       }
 
-      // Sort by date (oldest to newest)
       chartData.sort((a, b) => a.date.compareTo(b.date));
 
       return chartData;
@@ -371,7 +356,6 @@ Widget _buildHeartRateSpeedGraph() {
         return _buildEmptyGraph("No activities with heart rate data found");
       }
 
-      // Calculate correlation if enough data points
       double correlationValue = 0.0;
       String correlationText = "Insufficient data for correlation analysis";
       
@@ -398,28 +382,22 @@ Widget _buildHeartRateSpeedGraph() {
         }
       }
 
-      // Find min and max values for better scaling
       double minSpeed = data.map((e) => e.speed).reduce(math.min);
       double maxSpeed = data.map((e) => e.speed).reduce(math.max);
       
-      // Adjust range for better visualization
       double speedRange = maxSpeed - minSpeed;
       double speedMin = math.max(0, minSpeed - (speedRange * 0.1));
       double speedMax = maxSpeed + (speedRange * 0.1);
 
-      // Create zone-based data for visualization
       List<HeartRateZoneData> zoneData = [];
       
-      // Group data points by heart rate zones
       if (age > 0) {
-        // Create empty lists for each zone
         List<HeartRateSpeedData> zone1Points = [];
         List<HeartRateSpeedData> zone2Points = [];
         List<HeartRateSpeedData> zone3Points = [];
         List<HeartRateSpeedData> zone4Points = [];
         List<HeartRateSpeedData> zone5Points = [];
         
-        // Assign each data point to appropriate zone
         for (var point in data) {
           if (point.heartRate < zone2HeartRate) {
             zone1Points.add(point);
@@ -434,7 +412,6 @@ Widget _buildHeartRateSpeedGraph() {
           }
         }
         
-        // Calculate average speed for each zone
         if (zone1Points.isNotEmpty) {
           double avgSpeed = zone1Points.map((e) => e.speed).reduce((a, b) => a + b) / zone1Points.length;
           zoneData.add(HeartRateZoneData('Zone 1', avgSpeed, zone1Points.length, Colors.green[700]!));
@@ -471,7 +448,6 @@ Widget _buildHeartRateSpeedGraph() {
         }
       }
 
-      // If we don't have age data to calculate zones
       if (zoneData.isEmpty) {
         return _buildEmptyGraph("Heart rate zones not available - enter your age in profile");
       }
@@ -487,7 +463,6 @@ Widget _buildHeartRateSpeedGraph() {
               child: SfCartesianChart(
                 margin: EdgeInsets.all(10),
                 plotAreaBorderWidth: 0,
-                // Heart rate zones on X-axis
                 primaryXAxis: CategoryAxis(
                   title: AxisTitle(
                     text: 'Heart Rate Zones',
@@ -507,7 +482,6 @@ Widget _buildHeartRateSpeedGraph() {
                     color: Colors.grey[700],
                   ),
                 ),
-                // Speed on Y-axis
                 primaryYAxis: NumericAxis(
                   title: AxisTitle(
                     text: 'Average Speed (km/h)',
@@ -520,7 +494,7 @@ Widget _buildHeartRateSpeedGraph() {
                   ),
                   minimum: speedMin,
                   maximum: speedMax,
-                  interval: 2, // Set interval for clearer labels
+                  interval: 2,
                   majorGridLines: MajorGridLines(
                     width: 0.5,
                     color: Colors.grey[200],
@@ -534,7 +508,6 @@ Widget _buildHeartRateSpeedGraph() {
                   labelFormat: '{value} km/h',
                 ),
                 series: <ChartSeries>[
-                  // Line graph for speed by heart rate zone
                   LineSeries<HeartRateZoneData, String>(
                     name: 'Average Speed',
                     dataSource: zoneData,
@@ -754,7 +727,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           DateTime date = data['start_date'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
 
-          // If we already have an activity for this date, choose the one with higher distance
           if (activitiesByDate.containsKey(dateKey)) {
             double existingDistance =
                 safeParseDouble(activitiesByDate[dateKey]!['distance']);
@@ -763,7 +735,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             if (newDistance > existingDistance) {
               activitiesByDate[dateKey] = {
                 'elapsedTime': safeParseDouble(data['elapsed_time']) /
-                    60, // Convert to minutes
+                    60, 
                 'distance': safeParseDouble(data['distance']),
                 'averageSpeed': safeParseDouble(data['average_speed']),
                 'date': date,
@@ -781,17 +753,14 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         }
       }
 
-      // Merge food and activity data
       List<NutritionActivityData> combinedData = [];
 
-      // Get all unique dates
       Set<String> allDates = {...foodByDate.keys, ...activitiesByDate.keys};
 
       for (String dateKey in allDates) {
         var foodData = foodByDate[dateKey];
         var activityData = activitiesByDate[dateKey];
 
-        // Only include dates where we have both food and activity data
         if (foodData != null && activityData != null) {
           combinedData.add(NutritionActivityData(
             date: foodData['date'],
@@ -1233,7 +1202,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       return "Track more nutrition and activity data to see correlation insights.";
     }
 
-    // Extract the values for correlation analysis
     List<double> nutritionValues = [];
     List<double> activityValues = [];
 
@@ -1299,7 +1267,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('userData')
           .where('uid', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
-          .limit(14) // Last 2 weeks of data
+          .limit(14) 
           .get();
 
       // Fetch food entries for calorie consumed data
@@ -1307,7 +1275,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('food_entries')
           .where('userId', isEqualTo: userId)
           .orderBy('date', descending: true)
-          .limit(14) // Last 2 weeks of data
+          .limit(14) 
           .get();
 
       // Fetch activity data for calories burned
@@ -1315,7 +1283,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('activities')
           .where('uid', isEqualTo: userId)
           .orderBy('start_date', descending: true)
-          .limit(30) // More activities to ensure we cover the date range
+          .limit(30) 
           .get();
 
       // Process weight data
@@ -1326,13 +1294,11 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
         if (weight > 0 && data['timestamp'] != null) {
           DateTime date = data['timestamp'].toDate();
-          // Convert to date-only key (no time component)
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
           weightByDate[dateKey] = weight;
         }
       }
 
-      // Process food data to get calories consumed by date
       Map<String, double> caloriesConsumedByDate = {};
       for (var doc in foodSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
@@ -1345,7 +1311,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         }
       }
 
-      // Process activity data to get calories burned by date
       Map<String, double> caloriesBurnedByDate = {};
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
@@ -1354,13 +1319,11 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         if (calories > 0 && data['start_date'] != null) {
           DateTime date = data['start_date'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
-          // Sum up multiple activities on the same day
           caloriesBurnedByDate[dateKey] =
               (caloriesBurnedByDate[dateKey] ?? 0) + calories;
         }
       }
 
-      // Create correlated data points where we have both weight and calorie data
       List<WeightCalorieData> correlationData = [];
       Set<String> allDates = {
         ...weightByDate.keys,
@@ -1368,11 +1331,9 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         ...caloriesBurnedByDate.keys
       };
 
-      // Sort dates chronologically
       List<String> sortedDates = allDates.toList()..sort();
 
       for (String dateKey in sortedDates) {
-        // We need at least weight data for the correlation
         if (weightByDate.containsKey(dateKey)) {
           double weight = weightByDate[dateKey]!;
           double caloriesConsumed = caloriesConsumedByDate[dateKey] ?? 0;
@@ -1384,7 +1345,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         }
       }
 
-      // Calculate the correlation coefficient between weight and net calories
       double correlationCoefficient = 0.0;
 
       if (correlationData.length >= 3) {
@@ -1413,11 +1373,9 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   double _calculatePearsonCorrelation(List<double> x, List<double> y) {
     if (x.length != y.length || x.isEmpty) return 0.0;
 
-    // Calculate means
     double xMean = x.reduce((a, b) => a + b) / x.length;
     double yMean = y.reduce((a, b) => a + b) / y.length;
 
-    // Calculate numerator and denominators
     double numerator = 0;
     double xDenominator = 0;
     double yDenominator = 0;
@@ -1430,20 +1388,17 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       yDenominator += yDiff * yDiff;
     }
 
-    // Prevent division by zero
     if (xDenominator == 0 || yDenominator == 0) return 0.0;
 
     return numerator / (math.sqrt(xDenominator) * math.sqrt(yDenominator));
   }
 
-// Helper method to calculate the weekly calories burned from actual activity data
   double _calculateWeeklyCaloriesBurned() {
     if (activityData.isEmpty) return 0.0;
 
     double weeklyCalories = 0.0;
     DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
 
-    // Sum up calories from all activities in the past week
     for (var activity in activityData) {
       if (activity['start_date'] != null) {
         DateTime activityDate = activity['start_date'].toDate();
@@ -1522,7 +1477,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         suggestions.add("Increase your hydration for longer rides");
         suggestions.add("Plan a route with the target distance in advance");
 
-        // Check if it's a big jump and add warnings if needed
         if (targetValue > baselineDistance * 1.3 && baselineDistance > 0) {
           warnings.add(
               "This is a ${((targetValue / baselineDistance - 1) * 100).toStringAsFixed(0)}% increase from your average. Consider a more gradual progression.");
@@ -1536,7 +1490,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         break;
 
       case "pace":
-        // For pace, a lower number is better (faster)
         double currentPaceMinPerKm = baselinePace;
         title =
             "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
@@ -1599,7 +1552,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     if (userId == null) return;
 
     try {
-      // Get the current date (without time)
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final oneWeekAgo = today.subtract(Duration(days: 7));
@@ -1609,7 +1561,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .where('userId', isEqualTo: userId)
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(oneWeekAgo))
           .orderBy('date', descending: true)
-          .limit(7) // Get a week's worth of food data
+          .limit(7) 
           .get();
 
       if (foodEntrySnapshot.docs.isNotEmpty) {
@@ -1789,15 +1741,12 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           sessionDates.add(DateFormat('MM/dd').format(item.date));
         }
 
-        // Convert sessionDates to DateTime objects for sorting
         List<DateTime> parsedDates = sessionDates
             .map((date) => DateFormat('MM/dd').parse(date))
             .toList();
 
-        // Sort the dates in ascending order (oldest to latest)
         parsedDates.sort((a, b) => a.compareTo(b));
 
-        // Convert the sorted DateTime objects back to strings
         sessionDates = parsedDates
             .map((date) => DateFormat('MM/dd').format(date))
             .toList();
@@ -2113,12 +2062,10 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-// Helper method to create a correlation strength indicator
   String _getTemperatureInsightText(
       double speedCorr, double distanceCorr, double durationCorr) {
     String insight = "";
 
-    // Determine strongest correlation
     if (speedCorr.abs() >= distanceCorr.abs() &&
         speedCorr.abs() >= durationCorr.abs() &&
         speedCorr.abs() > 0.3) {
@@ -2147,7 +2094,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     if (userId == null) return {'temperatureActivityData': []};
 
     try {
-      // Fetch activities for the user
       QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
           .collection('activities')
           .where('uid', isEqualTo: userId)
@@ -2155,7 +2101,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .limit(20)
           .get();
 
-      // Fetch weather data for the user
       QuerySnapshot weatherSnapshot = await FirebaseFirestore.instance
           .collection('weatherData')
           .where('userId', isEqualTo: userId)
@@ -2163,7 +2108,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .limit(30)
           .get();
 
-      // Organize weather data by date for easy lookup
       Map<String, double> weatherByDate = {};
       for (var doc in weatherSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
@@ -2175,7 +2119,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         }
       }
 
-      // Create correlation data points
       List<TemperatureActivityData> temperatureActivityData = [];
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
@@ -2205,8 +2148,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       return {'temperatureActivityData': []};
     }
   }
-// Widget to display subgoal selection options
-// Modify the _buildSubgoalSelectionCard() method to check if the user has completed their weekly commitment:
+
 
   Widget _buildSubgoalSelectionCard() {
     if (hasActiveSubgoal || goalType != "High Intensity Cycling")
@@ -2579,7 +2521,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
           SizedBox(height: 16),
 
-          // Distance option
           _buildSubgoalOptionTitle(
               "Weekly Average Distance", Icons.straighten_outlined),
           SizedBox(height: 8),
@@ -2591,8 +2532,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     "${distanceOption1.toStringAsFixed(1)} km/ride",
                     "From ${baselineDistance.toStringAsFixed(1)} km avg",
                     Colors.blue[700]!,
-                    "distance", // Add type parameter
-                    distanceOption1 // Add targetValue parameter
+                    "distance", 
+                    distanceOption1 
                     ),
               ),
               SizedBox(width: 8),
@@ -2602,8 +2543,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     "${distanceOption2.toStringAsFixed(1)} km/ride",
                     "From ${baselineDistance.toStringAsFixed(1)} km avg",
                     Colors.blue[900]!,
-                    "distance", // Add type parameter
-                    distanceOption2 // Add targetValue parameter
+                    "distance", 
+                    distanceOption2 
                     ),
               ),
             ],
@@ -2623,8 +2564,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       "${paceOption1.toStringAsFixed(1)} min/km",
                       "From ${baselinePace.toStringAsFixed(1)} min/km avg",
                       Colors.orange[700]!,
-                      "pace", // Add type parameter
-                      paceOption1 // Add targetValue parameter
+                      "pace", 
+                      paceOption1 
                       ),
                 ),
                 SizedBox(width: 8),
@@ -2634,8 +2575,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       "${paceOption2.toStringAsFixed(1)} min/km",
                       "From ${baselinePace.toStringAsFixed(1)} min/km avg",
                       Colors.orange[900]!,
-                      "pace", // Add type parameter
-                      paceOption2 // Add targetValue parameter
+                      "pace", 
+                      paceOption2
                       ),
                 ),
               ],
@@ -2665,8 +2606,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     "${durationOption2.toStringAsFixed(0)} min/ride",
                     "From ${baselineDuration.toStringAsFixed(0)} min avg",
                     Colors.green[900]!,
-                    "duration", // Add type parameter
-                    durationOption2 // Add targetValue parameter
+                    "duration", 
+                    durationOption2 
                     ),
               ),
             ],
@@ -2745,7 +2686,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   }
 
   void _showSubgoalConfirmationDialog(String type, double targetValue) {
-    // Format the goal text based on type
     String goalText = "";
     switch (type) {
       case "distance":
@@ -2875,7 +2815,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     List<double> durations = [];
     List<double> paces = [];
 
-    // Get activities from the past week
     DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
     List<Map<String, dynamic>> thisWeeksActivities = [];
 
@@ -2889,7 +2828,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     }
 
     if (thisWeeksActivities.isEmpty) {
-      // Get last 5 activities or fewer if less data is available
       int count = math.min(activityData.length, 5);
       thisWeeksActivities = activityData.sublist(0, count);
     }
@@ -3010,7 +2948,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     });
 
     try {
-      // Fetch the most recent document from goals collection
       QuerySnapshot goalsQuery = await FirebaseFirestore.instance
           .collection('goals')
           .where('uid', isEqualTo: userId)
@@ -3042,7 +2979,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           }
         });
       }
-      // Load Strava ID
       try {
         FirebaseAuth auth = FirebaseAuth.instance;
         User? user = auth.currentUser;
@@ -3098,16 +3034,13 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           activityData = newActivityData;
           totalActivities = activityData.length;
 
-          // Calculate stats based on activity history
           if (activityData.isNotEmpty) {
-            // Parse the start_date of the most recent activity
             if (activityData[0]['start_date'] != null) {
               lastActivityDate = activityData[0]['start_date'].toDate();
               daysSinceLastActivity =
                   DateTime.now().difference(lastActivityDate).inDays;
             }
 
-            // Count weekly activities and total distance
             weeklyActivityCount = 0;
             weeklyDistanceTotal = 0.0;
             DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
@@ -3122,7 +3055,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
               }
             }
 
-            // Analyze historical trends
             _analyzeHistoricalTrends();
           }
         });
@@ -3168,20 +3100,19 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           // Calculate heart rate zones
           maxHeartRateCalculated = 220 - age;
           zone1HeartRate =
-              (maxHeartRateCalculated * 0.6).round(); // 50-60% of max HR
+              (maxHeartRateCalculated * 0.6).round(); 
           zone2HeartRate =
-              (maxHeartRateCalculated * 0.7).round(); // 60-70% of max HR
+              (maxHeartRateCalculated * 0.7).round(); 
           zone3HeartRate =
-              (maxHeartRateCalculated * 0.8).round(); // 70-80% of max HR
+              (maxHeartRateCalculated * 0.8).round(); 
           zone4HeartRate =
-              (maxHeartRateCalculated * 0.9).round(); // 80-90% of max HR
+              (maxHeartRateCalculated * 0.9).round(); 
           zone5HeartRate =
-              (maxHeartRateCalculated * 0.95).round(); // 90-100% of max HR
+              (maxHeartRateCalculated * 0.95).round(); 
           recommendedHeartRate = maxHeartRateCalculated;
         });
       }
 
-      // Fetch after_exercise data - now with increased limit (20 instead of 10)
       if (goalType != "Leisure") {
         print("Attempting to fetch user data...");
         QuerySnapshot afterExerciseSnapshot = await FirebaseFirestore.instance
@@ -3207,7 +3138,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
               "bodyFat": data['bodyFat'] ?? bodyFat,
               "basalMetabolicRate":
                   data['basalMetabolicRate'] ?? basalMetabolicRate,
-              "gender": data['gender'] ?? gender,
             });
           }
 
@@ -3216,7 +3146,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           });
           print("Recent data updated: ${recentData.length} entries");
 
-          // Analyze body composition trends if we have enough data
           if (recentData.length >= 2) {
             _analyzeBodyCompositionTrends();
           }
@@ -3268,7 +3197,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             .collection('food_entries')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
-            .limit(7) // Get a week's worth of nutrition data
+            .limit(7) 
             .get();
 
         if (nutritionSnapshot.docs.isNotEmpty) {
@@ -3291,7 +3220,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         print("Nutrition data collection may not exist: $e");
       }
       await _fetchFoodDiaryData();
-      // Generate recommendations based on the fetched data
       _generateRecommendation();
       if (goalType == "High Intensity Cycling") {
         _calculateBaselines();
@@ -3329,7 +3257,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         DateTime date = activity['start_date'].toDate();
         dates.add(date);
 
-        // Track day of week frequency
         String dayOfWeek = DateFormat('EEEE').format(date);
         dayFrequency[dayOfWeek] = (dayFrequency[dayOfWeek] ?? 0) + 1;
       }
@@ -3344,7 +3271,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       }
     }
 
-    // Find most frequent day
     int maxFrequency = 0;
     dayFrequency.forEach((day, frequency) {
       if (frequency > maxFrequency) {
@@ -3353,10 +3279,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       }
     });
 
-    // Check if schedule is regular (most activities on same day)
     hasRegularSchedule = maxFrequency > (activityData.length / 3);
 
-    // Calculate statistical measures
     if (distances.isNotEmpty) {
       bestDistance = distances.reduce(math.max);
       averageDistanceAllTime =
@@ -3401,14 +3325,12 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       }
     }
 
-    // Check for improvement trends
     isImprovingOverTime = _checkImprovementTrend();
 
     isConsistent = dayGaps.isNotEmpty &&
         _calculateCoeffOfVariation(dayGaps.map((g) => g.toDouble()).toList()) <
             0.5;
 
-    // Set the latest and previous values for basic comparison
     if (activityData.length >= 2) {
       var latestActivityData = activityData[0];
       var previousActivityData = activityData[1];
@@ -3430,7 +3352,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       previousAverageHeartrate =
           safeParseDouble(previousActivityData['average_heartrate']);
 
-      // Update relevant activity metrics for recommendations
       averageHeartrate =
           latestActivityData['average_heartrate']?.toString() ?? "0";
       averageSpeed = latestActivityData['average_speed']?.toString() ?? "0";
@@ -3447,7 +3368,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       latestAverageHeartrate =
           safeParseDouble(latestActivityData['average_heartrate']);
 
-      // Update relevant activity metrics for recommendations
       averageHeartrate =
           latestActivityData['average_heartrate']?.toString() ?? "0";
       averageSpeed = latestActivityData['average_speed']?.toString() ?? "0";
@@ -3483,7 +3403,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       latestBodyFat = safeParseDouble(latestData['bodyFat']);
       previousBodyFat = safeParseDouble(previousData['bodyFat']);
 
-      // Update current values for recommendations
       levelOfExertion = latestData['levelOfExertion']?.toString() ?? "0";
     } else if (recentData.length == 1) {
       var latestData = recentData[0];
@@ -3491,7 +3410,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       latestWeight = safeParseDouble(latestData['weight']);
       latestBodyFat = safeParseDouble(latestData['bodyFat']);
 
-      // Update current values for recommendations
       levelOfExertion = latestData['levelOfExertion']?.toString() ?? "0";
     }
   }
@@ -3501,7 +3419,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     double temp = safeParseDouble(temperature);
     double humid = safeParseDouble(humidity);
 
-    // Check if it's indoor training season
     isIndoorSeason = temp < 5 ||
         temp > 35 ||
         (airQuality != "Good" && airQuality != "Moderate") ||
@@ -3524,7 +3441,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             "High humidity: Consider indoor training or early morning rides. Stay hydrated!";
       }
     } else {
-      // Good conditions
       if (temp >= 15 && temp <= 25 && airQuality == "Good" && humid < 70) {
         seasonalAdvice = "Perfect cycling conditions! Enjoy your outdoor ride.";
       } else {
@@ -3611,7 +3527,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
   // Add recommendations based on historical trends
   void _addHistoricalTrendRecommendations() {
-    // Only provide trend recommendations if we have enough data
     if (activityData.length < 3) return;
 
     if (!isConsistent && activityData.length >= 5) {
@@ -3853,778 +3768,492 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   }
 
   void _generateWeightManagementRecommendations() {
-    double targetWeightValue = safeParseDouble(targetWeight);
-    double currentWeightValue = safeParseDouble(weight);
-    double bmr = safeParseDouble(basalMetabolicRate);
-    double bodyFatPercentage = safeParseDouble(bodyFat);
-    double totalCaloriesBurned = safeParseDouble(caloriesBurned);
+  double targetWeightValue = safeParseDouble(targetWeight);
+  double currentWeightValue = safeParseDouble(weight);
+  double bmr = safeParseDouble(basalMetabolicRate);
+  double bodyFatPercentage = safeParseDouble(bodyFat);
+  double totalCaloriesBurned = safeParseDouble(caloriesBurned);
 
-    double maxHeartRate = 220 - age.toDouble();
-    double fatBurningZoneLower = maxHeartRate * 0.7;
-    double fatBurningZoneUpper = maxHeartRate * 0.85;
+  double maxHeartRate = 220 - age.toDouble();
+  double fatBurningZoneLower = maxHeartRate * 0.7;
+  double fatBurningZoneUpper = maxHeartRate * 0.85;
+  double zone2HeartRate = maxHeartRate * 0.65;
 
-    double latestHeartRate = safeParseDouble(averageHeartrate);
+  double latestHeartRate = safeParseDouble(averageHeartrate);
 
-    if (latestWeight < previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
+  // Weight and body fat progress tracking
+  if (latestWeight < previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "✅ Great Progress";
+      feedback = "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
+    });
+  } else if (latestWeight < previousWeight &&
+      latestBodyFat >= previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "⚠️ Mixed Results";
+      feedback = "Losing weight but not body fat. Add more HIIT with short work intervals (<60s) and active recovery periods (<90s).";
+    });
+  } else if (latestWeight > previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "✅ Gaining Muscle";
+      feedback = "Gaining weight while reducing body fat suggests muscle building. Great work!";
+    });
+  } else if (latestWeight == previousWeight &&
+      latestBodyFat < previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "✅ Body Recomposition";
+      feedback = "Stable weight with reduced body fat means you're building muscle. Keep it up!";
+    });
+  } else if (latestWeight >= previousWeight &&
+      latestBodyFat >= previousBodyFat &&
+      latestWeight > 0 &&
+      previousWeight > 0 &&
+      latestBodyFat > 0 &&
+      previousBodyFat > 0) {
+    setState(() {
+      recommendation = "⚠️ Needs Adjustment";
+      feedback = "Adjust your training and nutrition. HIIT sessions 3x weekly for 8+ weeks are most effective for body composition.";
+    });
+  } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
+    setState(() {
+      recommendation = "ℹ️ In Progress";
+      feedback = "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
+    });
+  } else {
+    if (latestWeight > 0 && latestBodyFat > 0) {
       setState(() {
-        recommendation = "✅ Great Progress";
-        feedback =
-            "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
+        recommendation = "ℹ️ Monitoring Progress";
+        feedback = "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. For results, aim for 30 minutes daily.";
       });
-    } else if (latestWeight < previousWeight &&
-        latestBodyFat >= previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
+    } else if (safeParseDouble(weight) > 0) {
       setState(() {
-        recommendation = "⚠️ Mixed Results";
-        feedback =
-            "Losing weight but not body fat. Add interval training and hill climbs to your routine.";
-      });
-    } else if (latestWeight > previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "✅ Gaining Muscle";
-        feedback =
-            "Gaining weight while reducing body fat suggests muscle building. Great work!";
-      });
-    } else if (latestWeight == previousWeight &&
-        latestBodyFat < previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "✅ Body Recomposition";
-        feedback =
-            "Stable weight with reduced body fat means you're building muscle. Keep it up!";
-      });
-    } else if (latestWeight >= previousWeight &&
-        latestBodyFat >= previousBodyFat &&
-        latestWeight > 0 &&
-        previousWeight > 0 &&
-        latestBodyFat > 0 &&
-        previousBodyFat > 0) {
-      setState(() {
-        recommendation = "⚠️ Needs Adjustment";
-        feedback =
-            "Adjust your training and nutrition strategy to kickstart fat loss.";
-      });
-    } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
-      setState(() {
-        recommendation = "ℹ️ In Progress";
-        feedback =
-            "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
+        recommendation = "ℹ️ Starting Point Established";
+        feedback = "Your weight: ${weight} kg. Record post-workout data to track progress. Aim for 3x weekly cycling for 8+ weeks.";
       });
     } else {
-      if (latestWeight > 0 && latestBodyFat > 0) {
-        setState(() {
-          recommendation = "ℹ️ Monitoring Progress";
-          feedback =
-              "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. Continue tracking for trend analysis.";
-        });
-      } else if (safeParseDouble(weight) > 0 && safeParseDouble(bodyFat) > 0) {
-        setState(() {
-          recommendation = "ℹ️ Starting Point Established";
-          feedback =
-              "Your profile metrics: ${weight} kg weight and ${bodyFat}% body fat. Record post-workout data to see progress.";
-          print("latestWeight: $latestWeight");
-          print("PreviousWeight: $previousWeight");
-          print("latestBodyFat: $latestBodyFat");
-          print("PreviousBodyFat: $previousBodyFat");
-        });
-      } else {
-        setState(() {
-          recommendation = "ℹ️ Building Baseline";
-          feedback =
-              "Track metrics consistently for personalized recommendations.";
-        });
-      }
-    }
-
-    if (totalCaloriesBurned > 0) {
-      double monthlyDeficitNeeded = 3500 * 4;
-      double dailyDeficitNeeded = monthlyDeficitNeeded / 30;
-
-      if (totalCaloriesBurned < dailyDeficitNeeded / 2 &&
-          activityData.isNotEmpty) {
-        trainingRecommendations.add(
-            "Your recent average of ${totalCaloriesBurned.toInt()} kcal burned per session may be insufficient for your goals. Try increasing duration by 15-20 minutes.");
-      } else if (totalCaloriesBurned > dailyDeficitNeeded) {
-        trainingRecommendations.add(
-            "You're burning ${totalCaloriesBurned.toInt()} kcal per session, which is excellent for weight loss. Ensure proper recovery and nutrition.");
-      }
-    }
-
-    if (bodyFatPercentage > 0) {
-      bool isMale = gender.toLowerCase() == "male";
-      String userName = FirebaseAuth.instance.currentUser?.displayName ?? "You";
-
-      String bodyFatCategory = "";
-      if (isMale) {
-        if (bodyFatPercentage < 6) {
-          bodyFatCategory = "essential fat";
-        } else if (bodyFatPercentage < 14) {
-          bodyFatCategory = "athletic";
-        } else if (bodyFatPercentage < 18) {
-          bodyFatCategory = "fitness";
-        } else if (bodyFatPercentage < 25) {
-          bodyFatCategory = "average";
-        } else {
-          bodyFatCategory = "obesity";
-        }
-      } else {
-        // Female
-        if (bodyFatPercentage < 16) {
-          bodyFatCategory = "essential fat";
-        } else if (bodyFatPercentage < 24) {
-          bodyFatCategory = "athletic";
-        } else if (bodyFatPercentage < 31) {
-          bodyFatCategory = "fitness";
-        } else if (bodyFatPercentage < 36) {
-          bodyFatCategory = "average";
-        } else {
-          bodyFatCategory = "obesity";
-        }
-      }
-
-      healthRecommendations.add(
-          "$userName, your current body fat percentage (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range for your gender.");
-
-      double targetBodyFat = isMale
-          ? math.max(bodyFatPercentage - 5, 10)
-          : math.max(bodyFatPercentage - 5, 18);
-
-      if (bodyFatCategory == "obesity") {
-        int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
-        double userZoneLower = maxHeartRate * 0.6;
-        double userZoneUpper = maxHeartRate * 0.7;
-
-        healthRecommendations.add(
-            "Based on your current activity level (${weeklyActivityCount} sessions/week), aim to gradually build to ${recommendedSessions}-5 sessions per week with a mix of moderate intensity (${userZoneLower.toInt()}-${userZoneUpper.toInt()} bpm) and short interval sessions.");
-
-        int recommendedDeficit = bmr > 1800 ? 750 : 500;
-
-        healthRecommendations.add(
-            "With your BMR of ${bmr.toInt()} kcal, create a daily deficit of ${recommendedDeficit} kcal through a combination of diet and your cycling routine to work toward your target body fat of ${targetBodyFat.toStringAsFixed(1)}%.");
-      } else if (bodyFatCategory == "average") {
-        bool hasHighIntensitySessions =
-            latestAverageHeartrate > fatBurningZoneLower;
-        String intensityRecommendation = hasHighIntensitySessions
-            ? "continue your high-intensity work"
-            : "incorporate more intervals to your routine";
-
-        healthRecommendations.add(
-            "For your body composition goals, ${intensityRecommendation} with a 2:1 ratio of high-intensity intervals to steady-state cardio to maximize fat loss while preserving muscle.");
-
-        int strengthDays = daysSinceLastActivity > 2 ? 2 : 3;
-
-        healthRecommendations.add(
-            "With your current cycling frequency, add ${strengthDays} resistance training sessions weekly on ${mostFrequentDay != "" ? "days other than $mostFrequentDay" : "your rest days"} to increase muscle mass and boost your metabolic rate.");
-      } else if (bodyFatCategory == "fitness") {
-        String nutritionTiming = nutritionData.isNotEmpty
-            ? "adjust your current meal timing to include more protein daily)"
-            : "focus on nutrition timing with pre-workout carbs and post-workout protein";
-
-        healthRecommendations.add(
-            "To further reduce your body fat from ${bodyFatPercentage.toStringAsFixed(1)}% to your ideal range, ${nutritionTiming} for optimal body composition.");
-
-        // Morning session recommendation based on schedule
-        String morningRecommendation = hasRegularSchedule
-            ? "Based on your regular cycling schedule, add 1-2 fasted morning sessions"
-            : "Consider adding 1-2 early morning sessions before breakfast";
-
-        healthRecommendations.add(
-            "$morningRecommendation to target stubborn fat stores. This complements your current ${averageDistanceAllTime.toStringAsFixed(1)} km average distance rides.");
-      } else if (bodyFatCategory == "athletic") {
-        // Performance focus
-        double bestPerformanceMetric = math.max(bestDistance, 20);
-
-        healthRecommendations.add(
-            "With your athletic ${bodyFatPercentage.toStringAsFixed(1)}% body fat, shift focus to performance goals such as reaching ${(bestPerformanceMetric * 1.1).toStringAsFixed(1)} km distance or improving your average speed of ${averageSpeedAllTime.toStringAsFixed(1)} km/h.");
-
-        // Nutrition cycling based on activity pattern
-        String highCarb =
-            hasRegularSchedule ? mostFrequentDay : "training days";
-        String lowCarb =
-            hasRegularSchedule ? "days after $mostFrequentDay" : "rest days";
-
-        healthRecommendations.add(
-            "Implement carb cycling with higher carbs on $highCarb (${(safeParseDouble(weight) * 4).toInt()}g) and lower carbs on $lowCarb (${(safeParseDouble(weight) * 2).toInt()}g) to maintain your excellent body fat levels.");
-      } else if (bodyFatCategory == "essential fat") {
-        healthRecommendations.add(
-            "At ${bodyFatPercentage.toStringAsFixed(1)}%, your body fat is at or near essential levels. Focus on maintaining this level through consistent performance rather than further reduction.");
-
-        // Personalized fat intake recommendation
-        double idealFatIntake = safeParseDouble(weight) * 0.7;
-
-        healthRecommendations.add(
-            "For hormonal health at your low body fat percentage, ensure you're consuming at least ${idealFatIntake.toInt()}g of healthy fats daily, especially around your ${weeklyActivityCount} weekly high-intensity sessions.");
-      }
-
-      // Add recommendations for optimal monthly body fat reduction
-      if (bodyFatCategory != "essential fat" && bodyFatCategory != "athletic") {
-        // Calculate personalized monthly target
-        double monthlyReductionTarget = bodyFatPercentage > 25 ? 2.0 : 1.0;
-        double currentWeight = safeParseDouble(weight);
-        double fatMassKg = currentWeight * (bodyFatPercentage / 100);
-        double targetFatLossKg =
-            (bodyFatPercentage - monthlyReductionTarget) / 100 * currentWeight;
-        double kgToLose = fatMassKg - targetFatLossKg;
-
-        healthRecommendations.add(
-            "Based on your metrics, aim for a ${monthlyReductionTarget}% body fat reduction this month (approximately ${kgToLose.toStringAsFixed(1)} kg of fat) through your high-intensity cycling, ${totalActivities > 15 ? "maintaining your impressive consistency" : "gradually increasing your cycling frequency"}, and proper nutrition.");
-      }
-    }
-
-    if (bmr > 0) {
-      // Calculate daily calorie targets
-      double maintenanceCalories = bmr * 1.2;
-      double weightLossTarget = maintenanceCalories - 500;
-
-      trainingRecommendations.add(
-          "Based on your BMR of ${bmr.toInt()} kcal, aim for a daily intake of ${weightLossTarget.toInt()} kcal to support weight loss while maintaining energy for cycling.");
-
-      if (bmr > 1800) {
-        trainingRecommendations.add(
-            "With your higher metabolic rate, incorporate 1-2 longer steady-state rides (60+ min) weekly to maximize fat utilization.");
-      } else if (bmr < 1400) {
-        trainingRecommendations.add(
-            "With your current metabolic rate, focus on building muscle through resistance training 2x weekly to boost your BMR.");
-      }
-    }
-
-    // Historical heart rate analysis - extended to consider monthly patterns
-    if (heartrateProgression.length >= 10) {
-      // More data points for monthly analysis
-      double avgHistoricalHR = heartrateProgression.reduce((a, b) => a + b) /
-          heartrateProgression.length;
-      String userName =
-          FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ??
-              "your";
-
-      // Personalized heart rate recommendations
-      if (avgHistoricalHR < fatBurningZoneLower) {
-        // Calculate the intensity gap
-        int intensityGap =
-            fatBurningZoneLower.toInt() - avgHistoricalHR.toInt();
-        String intensityAdvice = intensityGap > 15
-            ? "gradually increase your intensity by adding short 2-minute bursts at ${(avgHistoricalHR + 15).toInt()} bpm"
-            : "increase your intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm";
-
-        trainingRecommendations.add(
-            "${userName}'s monthly heart rate average (${avgHistoricalHR.toInt()} bpm) is ${intensityGap} bpm below your optimal fat-burning zone. To maximize results, $intensityAdvice during your next few workouts.");
-      } else if (avgHistoricalHR > fatBurningZoneUpper) {
-        // Calculate percent above threshold
-        int excessBPM = avgHistoricalHR.toInt() - fatBurningZoneUpper.toInt();
-
-        // Personalize based on health conditions
-        String recoveryAdvice = respiratoryCondition == "Yes" ||
-                cardiovascularCondition == "Yes"
-            ? "incorporate more Zone 2 (${zone2HeartRate} bpm) training sessions for safety and recovery"
-            : "add 1-2 Zone 2 (${zone2HeartRate} bpm) sessions weekly for better fat utilization";
-
-        trainingRecommendations.add(
-            "Your monthly heart rates average ${avgHistoricalHR.toInt()} bpm, which is ${excessBPM} bpm above your ideal zone. For your body composition goals, $recoveryAdvice while maintaining your impressive intensity on key training days.");
-      } else {
-        // If they're in the perfect zone, acknowledge it
-        trainingRecommendations.add(
-            "Excellent work! Your average heart rate of ${avgHistoricalHR.toInt()} bpm is perfectly within your fat-burning zone. This is ideal for your current body composition goals.");
-      }
-
-      // Monthly trend analysis
-      if (heartrateProgression.length >= 20) {
-        // At least 20 data points for reliable trend
-        List<double> recentHRs = heartrateProgression.sublist(0, 10);
-        List<double> earlierHRs = heartrateProgression.sublist(
-            10, math.min(20, heartrateProgression.length));
-
-        double recentAvg = recentHRs.reduce((a, b) => a + b) / recentHRs.length;
-        double earlierAvg =
-            earlierHRs.reduce((a, b) => a + b) / earlierHRs.length;
-
-        double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
-
-        if (hrChangePercent < -5) {
-          // Calculate fitness improvement estimate
-          double fitnessImprovement =
-              (-hrChangePercent) * 0.5; // Rough estimate of VO2max improvement
-          String improvedPerformance = "";
-
-          if (distanceProgression.length >= 10) {
-            List<double> recentDistances = distanceProgression.sublist(0, 5);
-            List<double> earlierDistances = distanceProgression.sublist(5, 10);
-            double recentDistAvg = recentDistances.reduce((a, b) => a + b) /
-                recentDistances.length;
-            double earlierDistAvg = earlierDistances.reduce((a, b) => a + b) /
-                earlierDistances.length;
-
-            if (recentDistAvg > earlierDistAvg) {
-              improvedPerformance =
-                  " This has translated to ${((recentDistAvg - earlierDistAvg) / earlierDistAvg * 100).toStringAsFixed(1)}% longer rides at the same effort level!";
-            }
-          }
-
-          trainingRecommendations.add(
-              "Great progress! Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% over the past month, suggesting a ${fitnessImprovement.toStringAsFixed(1)}% improvement in cardiovascular efficiency.$improvedPerformance Continue with your current training approach.");
-        } else if (hrChangePercent > 5) {
-          // Personalized recovery recommendation based on activity frequency
-          String recoveryAdvice = weeklyActivityCount > 4
-              ? "add an additional rest day this week"
-              : "maintain your current frequency but lower the intensity of 1-2 sessions";
-
-          // Check weather and other factors for additional context
-          String additionalContext = "";
-          if (safeParseDouble(temperature) > 28) {
-            additionalContext =
-                " The higher temperatures (${temperature}°C) may be contributing to this, so consider earlier morning rides when it's cooler.";
-          } else if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
-            additionalContext =
-                " Your training frequency (${weeklyActivityCount} sessions/week) may be limiting recovery time.";
-          }
-
-          trainingRecommendations.add(
-              "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% over the past month, which may indicate accumulated fatigue.$additionalContext To prevent overtraining, $recoveryAdvice and ensure adequate sleep (7-9 hours nightly).");
-        }
-      }
-    }
-    if (latestHeartRate > 0) {
-      if (latestHeartRate < fatBurningZoneLower) {
-        trainingRecommendations.add(
-            "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning.");
-      } else if (latestHeartRate > fatBurningZoneUpper) {
-        trainingRecommendations
-            .add("Try intervals between high intensity and recovery periods.");
-      } else {
-        trainingRecommendations
-            .add("Perfect fat-burning zone! Maintain this intensity.");
-      }
-    }
-
-    // Training structure based on historical data - adjusted for monthly view
-    int totalHighIntensitySessions = 0;
-    List<int> lastFiveHeartRates = [];
-
-    // Count high intensity sessions from historical data - expanded sample size
-    for (int i = 0; i < math.min(activityData.length, 20); i++) {
-      // Increased from 10 to 20
-      double hr = safeParseDouble(activityData[i]['average_heartrate']);
-      if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
-
-      if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
-    }
-
-    // Monthly target adjustment (12 high intensity sessions per month minimum)
-    if (totalHighIntensitySessions < 12 && activityData.length >= 15) {
-      trainingRecommendations.add(
-          "Of your last ${math.min(activityData.length, 20)} rides, only $totalHighIntensitySessions were at high intensity. Aim for at least 12 per month for effective weight management.");
-    }
-
-    if (lastFiveHeartRates.length >= 3) {
-      String hrTrend = lastFiveHeartRates.join(" → ");
-      trainingRecommendations.add(
-          "Your recent heart rate trend (bpm): $hrTrend. Aim for consistent intensity in the fat-burning zone.");
-    }
-
-    // Personalized standard training recommendations based on user profile and history
-    String userName =
-        FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "Your";
-
-    // Calculate personalized monthly session target based on current activity level and health
-    int baseMonthlyTarget =
-        16; // Standard recommendation is 16 sessions/month (4/week)
-
-    // Adjust based on health conditions
-    if (respiratoryCondition == "Yes" || cardiovascularCondition == "Yes") {
-      baseMonthlyTarget = 12; // Lower target for health conditions (3/week)
-    }
-
-    // Adjust based on current activity level for gradual progression
-    int personalizedMonthlyTarget;
-    if (weeklyActivityCount * 4 > baseMonthlyTarget) {
-      // If already exceeding target, recommend maintaining with slight increase
-      personalizedMonthlyTarget = (weeklyActivityCount * 4).round() + 1;
-    } else if (weeklyActivityCount < 1) {
-      // If very inactive, start conservatively
-      personalizedMonthlyTarget = baseMonthlyTarget - 4;
-    } else {
-      // Otherwise, recommend gradual increase toward base target
-      personalizedMonthlyTarget = (weeklyActivityCount * 4 + 2).round();
-      personalizedMonthlyTarget =
-          math.min(personalizedMonthlyTarget, baseMonthlyTarget);
-    }
-
-    // Personalize interval structure based on fitness level and goal
-    int intervalLength = 2; // Default interval length in minutes
-    int recoveryLength = 2; // Default recovery length in minutes
-
-    // Adjust interval structure based on heart rate data
-    if (averageHeartrateAllTime > 0) {
-      if (averageHeartrateAllTime > fatBurningZoneUpper + 10) {
-        // If consistently training too hard, recommend longer recoveries
-        recoveryLength = 3;
-      } else if (averageHeartrateAllTime < fatBurningZoneLower - 10) {
-        // If consistently training too easy, recommend longer intervals
-        intervalLength = 3;
-      }
-    }
-
-    // Adjust based on reported exertion level if available
-    double exertion = safeParseDouble(levelOfExertion);
-    if (exertion > 0) {
-      if (exertion > 8) {
-        // If reporting very high exertion, reduce interval length
-        intervalLength = math.max(1, intervalLength - 1);
-      } else if (exertion < 4) {
-        // If reporting very low exertion, increase interval length
-        intervalLength += 1;
-      }
-    }
-
-    if (weeklyActivityCount < 3) {
-      // Personalized frequency recommendation based on constraints
-      String frequencyAdvice = daysSinceLastActivity > 5
-          ? "start with just one session this week, then add another session next week"
-          : "gradually build to 3 sessions per week";
-
-      trainingRecommendations.add(
-          "Based on your current activity level (${weeklyActivityCount} sessions/week), $frequencyAdvice, aiming for 12+ monthly sessions for effective weight management. ${mostFrequentDay.isNotEmpty ? "You tend to ride on $mostFrequentDay - try adding sessions on other days too." : ""}");
-    }
-
-    // Personalized calorie recommendations with historical context - adjusted for monthly targets
-    if (bmr > 0 && activityData.length >= 5) {
-      List<double> allCalories = [];
-      for (var activity in activityData) {
-        double cals = safeParseDouble(activity['calories_burned']);
-        if (cals > 0) allCalories.add(cals);
-      }
-
-      if (allCalories.isNotEmpty) {
-        double avgCaloriesPerSession =
-            allCalories.reduce((a, b) => a + b) / allCalories.length;
-        double monthlyCalorieBurn = avgCaloriesPerSession *
-            (weeklyActivityCount * 4); // Estimated monthly burn
-        double dailyDeficitFromExercise =
-            monthlyCalorieBurn / 30.0; // 30 days per month
-
-        // Calculate target weight loss rate (0.5-1 kg per week based on starting weight)
-        double targetWeightLossPerMonth =
-            safeParseDouble(weight) > 100 ? 4.0 : 2.0;
-        double targetDailyDeficit = (targetWeightLossPerMonth * 7700) /
-            30; // Convert kg to calories (7700 cal/kg)
-
-        // Calculate difference between current and target
-        double deficitGap = targetDailyDeficit - dailyDeficitFromExercise;
-
-        if (dailyDeficitFromExercise < 250) {
-          // Calculate session duration increase needed
-          double currentDuration =
-              safeParseDouble(sessionDuration) / 60; // Convert to minutes
-          double targetDuration =
-              currentDuration * (400 / avgCaloriesPerSession);
-
-          trainingRecommendations.add(
-              "Your rides currently burn ${avgCaloriesPerSession.toInt()} kcal per session. For your weight management goals, aim to increase your average ride duration from ${currentDuration.toInt()} min to ${targetDuration.toInt()} min, or add one extra session weekly to create a ${deficitGap.toInt()} kcal larger daily deficit.");
-        } else if (dailyDeficitFromExercise > 1000) {
-          // Calculate estimated weight loss from current deficit
-          double estimatedMonthlyLoss =
-              (dailyDeficitFromExercise * 30) / 7700; // Convert calories to kg
-
-          // Personalized high-calorie burn advice
-          String nutritionAdvice = nutritionData.isNotEmpty
-              ? "increase your carbohydrate intake by ~${(estimatedMonthlyLoss * 50).toInt()}g on training days"
-              : "consume a carb-protein snack (3:1 ratio) within 30 minutes post-workout";
-
-          trainingRecommendations.add(
-              "You're burning an impressive ${avgCaloriesPerSession.toInt()} kcal per workout, creating a ${dailyDeficitFromExercise.toInt()} kcal daily deficit. This could yield approximately ${estimatedMonthlyLoss.toStringAsFixed(1)} kg weight loss per month. To maintain your energy levels and performance, $nutritionAdvice.");
-        }
-      }
-    }
-
-    // Personalized weather recommendations
-    if (weatherData.isNotEmpty) {
-      double currentTemp = safeParseDouble(temperature);
-      double currentHumidity = safeParseDouble(humidity);
-
-      if (currentTemp > 30) {
-        // Personalized hot weather recommendations based on time of day patterns
-        List<DateTime> activityTimes = [];
-        for (var activity in activityData) {
-          if (activity['start_date'] != null) {
-            DateTime date = activity['start_date'].toDate();
-            activityTimes.add(date);
-          }
-        }
-
-        bool mostlyEveningRider =
-            activityTimes.where((time) => time.hour >= 17).length >
-                activityTimes.where((time) => time.hour < 17).length;
-
-        String timeRecommendation = mostlyEveningRider
-            ? "shift your usual evening rides to early morning (5-8 AM)"
-            : "continue your morning rides, but start 1-2 hours earlier";
-
-        String hydrationAdvice = currentHumidity > 70
-            ? "increase your hydration by 150-200ml per 20 minutes in this heat and humidity"
-            : "increase your hydration by 100-150ml per 20 minutes in this heat";
-
-        trainingRecommendations.add(
-            "Current weather (${currentTemp.toStringAsFixed(1)}°C, ${currentHumidity.toStringAsFixed(0)}% humidity): For your high-intensity sessions, $timeRecommendation for better fat burning efficiency. Also, $hydrationAdvice.");
-      }
-
-      // Health condition recommendations
-      if (respiratoryCondition == "Yes") {
-        healthRecommendations.add(
-            "Use shorter intervals (30s-1min) with longer recovery periods.");
-      }
-
-      if (cardiovascularCondition == "Yes") {
-        healthRecommendations.add(
-            "Focus on moderate intensity (60-70% max HR) for longer durations.");
-      }
-
-      // Health recommendations
-      healthRecommendations
-          .add("Include 2 rest days weekly to prevent hormonal imbalances.");
-      healthRecommendations
-          .add("Aim for 7-9 hours sleep to regulate hunger hormones.");
-
-      // Equipment recommendations
-      equipmentRecommendations
-          .add("Ensure proper bike fit to prevent injury during hard efforts.");
-      equipmentRecommendations.add(
-          "Use a heart rate monitor for optimal fat-burning zone training.");
+      setState(() {
+        recommendation = "ℹ️ Building Baseline";
+        feedback = "Track metrics consistently for personalized recommendations. Focus on distance and heart rate.";
+      });
     }
   }
 
-  void _generateCyclingEnduranceRecommendations() {
-    // Basic data
-    double targetDistanceValue = safeParseDouble(targetDistance);
-    double currentDistanceValue = safeParseDouble(distance);
-    double targetDurationValue = safeParseDouble(targetDuration);
-    double currentDurationValue = safeParseDouble(sessionDuration) / 60;
+  // Calorie deficit recommendations
+  if (totalCaloriesBurned > 0) {
+    double dailyDeficitNeeded = (3500 * 2) / 30; // 2kg/month
 
-    // Heart rate zones
-    double maxHeartRate = 220 - age.toDouble();
-    double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
-    double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
-    double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
-    double thresholdZoneUpper = maxHeartRate * 0.90; // 90% of max HR
-
-    double latestHeartRate = safeParseDouble(averageHeartrate);
-
-    if (latestDistance > previousDistance &&
-        latestDistance > 0 &&
-        previousDistance > 0) {
-      setState(() {
-        recommendation = "✅ Distance Improving";
-        feedback =
-            "Great progress! Your distance increased from ${previousDistance.toStringAsFixed(1)} km to ${latestDistance.toStringAsFixed(1)} km.";
-      });
-    } else if (latestAverageSpeed > previousAverageSpeed &&
-        latestAverageSpeed > 0 &&
-        previousAverageSpeed > 0) {
-      setState(() {
-        recommendation = "✅ Speed Improving";
-        feedback =
-            "Your speed increased while maintaining distance. Cycling efficiency is improving!";
-      });
-    } else if (latestAverageHeartrate < previousAverageHeartrate &&
-        latestDistance >= previousDistance &&
-        latestAverageHeartrate > 0 &&
-        previousAverageHeartrate > 0) {
-      setState(() {
-        recommendation = "✅ Efficiency Improving";
-        feedback =
-            "Lower heart rate at same/higher distance shows improved cardiovascular efficiency!";
-      });
-    } else if (latestDistance < previousDistance &&
-        latestDistance > 0 &&
-        previousDistance > 0) {
-      setState(() {
-        recommendation = "⚠️ Distance Decreasing";
-        feedback =
-            "Recent ride was shorter than previous. Focus on recovery before next endurance effort.";
-      });
-    } else if (latestAverageSpeed < previousAverageSpeed &&
-        latestAverageSpeed > 0 &&
-        previousAverageSpeed > 0) {
-      setState(() {
-        recommendation = "⚠️ Speed Decreasing";
-        feedback =
-            "Average speed dropped. Work on consistent pacing during long rides.";
-      });
-    } else if (latestDistance > 0 &&
-        currentDistanceValue < targetDistanceValue) {
-      setState(() {
-        recommendation = "ℹ️ Building Endurance";
-        feedback =
-            "Currently at ${currentDistanceValue.toStringAsFixed(1)} km toward ${targetDistanceValue.toStringAsFixed(1)} km goal.";
-      });
-    } else {
-      setState(() {
-        recommendation = "ℹ️ Establishing Baseline";
-        feedback =
-            "Track rides consistently for personalized endurance recommendations.";
-      });
-    }
-
-    // Historical distance progression analysis
-    if (distanceProgression.length >= 5) {
-      double oldestAvg = 0;
-      double newestAvg = 0;
-
-      int midpoint = distanceProgression.length ~/ 2;
-      if (midpoint > 1) {
-        oldestAvg =
-            distanceProgression.sublist(midpoint).reduce((a, b) => a + b) /
-                (distanceProgression.length - midpoint);
-        newestAvg =
-            distanceProgression.sublist(0, midpoint).reduce((a, b) => a + b) /
-                midpoint;
-
-        double improvementPercent = ((newestAvg - oldestAvg) / oldestAvg) * 100;
-
-        if (improvementPercent > 10) {
-          trainingRecommendations.add(
-              "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to your earlier rides. Excellent progression!");
-        } else if (improvementPercent < -10) {
-          trainingRecommendations.add(
-              "Your recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than your earlier rides. Consider adjusting your training load.");
-        } else {
-          trainingRecommendations.add(
-              "Your distance progression is stable. To continue improving, try gradually increasing your longest ride each week.");
-        }
-      }
-
-      // Find longest ride ever
-      double longestRide = distanceProgression.reduce(math.max);
-      if (longestRide > 0 && targetDistanceValue > 0) {
-        double percentOfTarget = (longestRide / targetDistanceValue) * 100;
-        trainingRecommendations.add(
-            "Your longest ride to date (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target distance.");
-      }
-    }
-
-    // Heart rate zone analysis from historical data
-    if (heartrateProgression.length >= 3) {
-      int enduranceZoneCount = 0;
-      int aboveThresholdCount = 0;
-
-      for (double hr in heartrateProgression) {
-        if (hr >= enduranceZoneLower && hr <= enduranceZoneUpper) {
-          enduranceZoneCount++;
-        } else if (hr > thresholdZoneUpper) {
-          aboveThresholdCount++;
-        }
-      }
-
-      double endurancePercent =
-          (enduranceZoneCount / heartrateProgression.length) * 100;
-      double thresholdPercent =
-          (aboveThresholdCount / heartrateProgression.length) * 100;
-
-      if (endurancePercent < 60 && thresholdPercent > 30) {
-        trainingRecommendations.add(
-            "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm).");
-      }
-    }
-
-    // Current heart rate recommendations
-    if (latestHeartRate > 0) {
-      if (latestHeartRate > thresholdZoneUpper) {
-        trainingRecommendations.add(
-            "Heart rate too high for endurance. Stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range.");
-      } else if (latestHeartRate < enduranceZoneLower) {
-        trainingRecommendations.add(
-            "Increase intensity to ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm for aerobic development.");
-      } else if (latestHeartRate >= enduranceZoneLower &&
-          latestHeartRate <= enduranceZoneUpper) {
-        trainingRecommendations.add(
-            "Perfect endurance zone! Great for building aerobic capacity.");
-      } else {
-        trainingRecommendations.add(
-            "You're in threshold zone - good for tempo sessions but not longer rides.");
-      }
-    }
-
-    // Training structure
-    trainingRecommendations.add(
-        "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides.");
-
-    // Distance progression
-    if (currentDistanceValue > 0 &&
-        targetDistanceValue > 0 &&
-        currentDistanceValue < targetDistanceValue) {
-      double percentComplete =
-          (currentDistanceValue / targetDistanceValue) * 100;
-      double weeklyIncrease = targetDistanceValue * 0.1;
-
+    if (totalCaloriesBurned < dailyDeficitNeeded / 2 && activityData.isNotEmpty) {
       trainingRecommendations.add(
-          "You're ${percentComplete.toStringAsFixed(0)}% to goal. Increase long ride by ~${weeklyIncrease.toStringAsFixed(1)} km/week.");
+          "Increase session duration by 15-20 minutes or add HIIT with short intervals for better results.");
+    } else if (totalCaloriesBurned > dailyDeficitNeeded) {
+      trainingRecommendations.add(
+          "Great calorie burn! Focus on recovery with compression garments and protein intake after sessions.");
+    }
+  }
+
+  // Body fat percentage recommendations (now with null check)
+  if (bodyFatPercentage > 0) {
+    String bodyFatCategory = "";
+    if (bodyFatPercentage < 10) {
+      bodyFatCategory = "essential fat";
+    } else if (bodyFatPercentage < 19) {
+      bodyFatCategory = "athletic";
+    } else if (bodyFatPercentage < 25) {
+      bodyFatCategory = "fitness";
+    } else if (bodyFatPercentage < 32) {
+      bodyFatCategory = "average";
+    } else {
+      bodyFatCategory = "obesity";
     }
 
-    if (weeklyActivityCount < 3) {
-      trainingRecommendations
-          .add("Aim for 3-4 rides/week: one long, 2-3 shorter recovery rides.");
-    }
+    healthRecommendations.add(
+        "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range.");
 
-    // Specific training strategies
+    if (bodyFatCategory == "obesity") {
+      int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
+      healthRecommendations.add(
+          "Aim for ${recommendedSessions} sessions/week. HIIT cycling helps preserve muscle while reducing fat.");
+    } else if (bodyFatCategory == "average") {
+      healthRecommendations.add(
+          "Use 2:1 ratio of high-intensity to steady-state cardio for optimal body composition changes.");
+    } else if (bodyFatCategory == "fitness") {
+      healthRecommendations.add(
+          "Focus on nutrition timing with pre-workout carbs and post-workout protein for better results.");
+    } else if (bodyFatCategory == "athletic") {
+      healthRecommendations.add(
+          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources.");
+    } else if (bodyFatCategory == "essential fat") {
+      healthRecommendations.add(
+          "Maintain current level through consistent performance rather than further reduction.");
+    }
+  } else {
+    // Case for when bodyFat is null
+    healthRecommendations.add(
+        "Measure your body fat percentage to receive more tailored recommendations. Focus on consistency rather than intensity initially.");
+  }
+
+  // BMR-based recommendations
+  if (bmr > 0) {
+    double activityFactor = weeklyActivityCount <= 2 ? 1.375 : weeklyActivityCount <= 4 ? 1.55 : 1.725;
+    double weightLossTarget = bmr * activityFactor - 500;
+
     trainingRecommendations.add(
-        "Include one 'tempo' ride weekly at ${thresholdZoneLower.toInt()}-${thresholdZoneUpper.toInt()} bpm.");
+        "Aim for ${weightLossTarget.toInt()} kcal daily intake for sustainable weight loss while maintaining energy.");
 
-    // Weather and air quality
-    if (weatherData.isNotEmpty) {
-      double currentTemp = safeParseDouble(temperature);
-
-      if (currentTemp > 30) {
-        trainingRecommendations.add(
-            "Hot weather: Lower heart rate target by 5-10% and hydrate more.");
-      }
+    if (bmr > 1800) {
+      trainingRecommendations.add(
+          "Add 1-2 longer steady-state rides (60+ min) weekly to maximize fat utilization.");
+    } else if (bmr < 1400) {
+      trainingRecommendations.add(
+          "Add resistance training 2x weekly to boost your metabolic rate alongside cycling.");
     }
+  }
+
+  // Heart rate recommendations
+  if (latestHeartRate > 0) {
+    if (latestHeartRate < fatBurningZoneLower) {
+      trainingRecommendations.add(
+          "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning.");
+    } else if (latestHeartRate > fatBurningZoneUpper) {
+      trainingRecommendations.add(
+          "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better results.");
+    } else {
+      trainingRecommendations.add(
+          "Perfect fat-burning zone! Maintain this intensity for optimal results.");
+    }
+  }
+
+  // HIIT session analysis
+  int totalHighIntensitySessions = 0;
+  List<int> lastFiveHeartRates = [];
+
+  for (int i = 0; i < math.min(activityData.length, 20); i++) {
+    double hr = safeParseDouble(activityData[i]['average_heartrate']);
+    if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
+    if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
+  }
+
+  if (totalHighIntensitySessions < 12 && activityData.length >= 15) {
+    trainingRecommendations.add(
+        "Aim for at least 12 high-intensity sessions monthly for optimal body composition changes.");
+  }
+
+  // Frequency recommendations
+  if (weeklyActivityCount < 3) {
+    trainingRecommendations.add(
+        "Gradually build to 3 sessions weekly, aiming for 12+ monthly sessions for effective results.");
+  }
+
+  // Weather recommendations
+  if (weatherData.isNotEmpty) {
+    double currentTemp = safeParseDouble(temperature);
+    if (currentTemp > 28) {
+      trainingRecommendations.add(
+          "For hot weather (${currentTemp.toStringAsFixed(1)}°C), ride in early morning and increase hydration by 100-200ml per 20 minutes.");
+    } else if (currentTemp < 10) {
+      trainingRecommendations.add(
+          "For cold weather, ensure proper 10-15 minute warm-up before high-intensity work.");
+    }
+
+    // Recovery recommendations
+    trainingRecommendations.add(
+        "For optimal recovery: 1) active recovery with light cycling, 2) compression garments, 3) cold therapy.");
 
     // Health condition recommendations
     if (respiratoryCondition == "Yes") {
       healthRecommendations.add(
-          "With respiratory condition, build endurance gradually (max 10%/week).");
-      healthRecommendations
-          .add("Only ride outdoors when AQI < 100, preferably < 50.");
+          "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min).");
     }
 
     if (cardiovascularCondition == "Yes") {
       healthRecommendations.add(
-          "Focus on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm) for cardiovascular efficiency.");
-      healthRecommendations
-          .add("Be extra cautious when AQI > 100 with your condition.");
-    }
-    // Health recommendations
-    healthRecommendations
-        .add("Balance training stress with recovery between sessions.");
-    healthRecommendations
-        .add("Post-ride: 3:1 carb:protein ratio within 30 minutes.");
-
-    if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
-      healthRecommendations
-          .add("Add dedicated recovery days to prevent overtraining.");
+          "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm).");
     }
 
-    // Equipment recommendations
-    equipmentRecommendations.add(
-        "Bike fit is crucial for endurance - small discomforts become major on long rides.");
-    equipmentRecommendations
-        .add("Quality padded shorts and chamois cream for rides > 2 hours.");
+    // Training structure
+    if (weeklyActivityCount >= 3) {
+      trainingRecommendations.add(
+          "Structure weekly rides: ${math.min(3, weeklyActivityCount - 1)} HIIT sessions plus ${math.max(1, weeklyActivityCount - 3)} moderate rides for recovery.");
+    }
+  }
+}
+
+ void _generateCyclingEnduranceRecommendations() {
+  // Basic data
+  double targetDistanceValue = safeParseDouble(targetDistance);
+  double currentDistanceValue = safeParseDouble(distance);
+  double targetDurationValue = safeParseDouble(targetDuration);
+  double currentDurationValue = safeParseDouble(sessionDuration) / 60;
+
+  // Heart rate zones
+  double maxHeartRate = 220 - age.toDouble();
+  double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
+  double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
+  double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
+  double thresholdZoneUpper = maxHeartRate * 0.90; // 90% of max HR
+  
+  // Zone 2 training for recovery and base building (60-70% of max HR)
+  double zone2HeartRateLower = maxHeartRate * 0.6;
+  double zone2HeartRateUpper = maxHeartRate * 0.7;
+  double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
+
+  double latestHeartRate = safeParseDouble(averageHeartrate);
+
+  // Tracking progress and providing feedback
+  if (latestDistance > previousDistance &&
+      latestDistance > 0 &&
+      previousDistance > 0) {
+    setState(() {
+      recommendation = "✅ Distance Improving";
+      feedback =
+          "Great progress! Your distance increased from ${previousDistance.toStringAsFixed(1)} km to ${latestDistance.toStringAsFixed(1)} km.";
+    });
+  } else if (latestAverageSpeed > previousAverageSpeed &&
+      latestAverageSpeed > 0 &&
+      previousAverageSpeed > 0) {
+    setState(() {
+      recommendation = "✅ Speed Improving";
+      feedback =
+          "Your speed increased while maintaining distance. Cycling efficiency is improving!";
+    });
+  } else if (latestAverageHeartrate < previousAverageHeartrate &&
+      latestDistance >= previousDistance &&
+      latestAverageHeartrate > 0 &&
+      previousAverageHeartrate > 0) {
+    setState(() {
+      recommendation = "✅ Efficiency Improving";
+      feedback =
+          "Lower heart rate at same/higher distance shows improved cardiovascular efficiency!";
+    });
+  } else if (latestDistance < previousDistance &&
+      latestDistance > 0 &&
+      previousDistance > 0) {
+    setState(() {
+      recommendation = "⚠️ Distance Decreasing";
+      feedback =
+          "Recent ride was shorter than previous. Focus on recovery before next endurance effort.";
+    });
+  } else if (latestAverageSpeed < previousAverageSpeed &&
+      latestAverageSpeed > 0 &&
+      previousAverageSpeed > 0) {
+    setState(() {
+      recommendation = "⚠️ Speed Decreasing";
+      feedback =
+          "Average speed dropped. Work on consistent pacing during long rides.";
+    });
+  } else if (latestDistance > 0 &&
+      currentDistanceValue < targetDistanceValue) {
+    setState(() {
+      recommendation = "ℹ️ Building Endurance";
+      feedback =
+          "Currently at ${currentDistanceValue.toStringAsFixed(1)} km toward ${targetDistanceValue.toStringAsFixed(1)} km goal.";
+    });
+  } else {
+    setState(() {
+      recommendation = "ℹ️ Establishing Baseline";
+      feedback =
+          "Track rides consistently for personalized endurance recommendations.";
+    });
   }
 
+  // Historical distance progression analysis
+  if (distanceProgression.length >= 5) {
+    double oldestAvg = 0;
+    double newestAvg = 0;
+
+    int midpoint = distanceProgression.length ~/ 2;
+    if (midpoint > 1) {
+      oldestAvg =
+          distanceProgression.sublist(midpoint).reduce((a, b) => a + b) /
+              (distanceProgression.length - midpoint);
+      newestAvg =
+          distanceProgression.sublist(0, midpoint).reduce((a, b) => a + b) /
+              midpoint;
+
+      double improvementPercent = ((newestAvg - oldestAvg) / oldestAvg) * 100;
+
+      if (improvementPercent > 10) {
+        trainingRecommendations.add(
+            "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to earlier rides. Excellent progression!");
+      } else if (improvementPercent < -10) {
+        trainingRecommendations.add(
+            "Recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than earlier rides. Adjust training and ensure proper recovery.");
+      } else {
+        trainingRecommendations.add(
+            "Your distance progression is stable. Continue improving by gradually increasing your longest ride each week (no more than 10% increase).");
+      }
+    }
+
+    // Find longest ride ever
+    double longestRide = distanceProgression.reduce(math.max);
+    if (longestRide > 0 && targetDistanceValue > 0) {
+      double percentOfTarget = (longestRide / targetDistanceValue) * 100;
+      trainingRecommendations.add(
+          "Your longest ride (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target. For recreational cycling, aim for at least 30 minutes per day.");
+    }
+  }
+
+  // Heart rate zone analysis from historical data
+  if (heartrateProgression.length >= 3) {
+    int enduranceZoneCount = 0;
+    int aboveThresholdCount = 0;
+
+    for (double hr in heartrateProgression) {
+      if (hr >= enduranceZoneLower && hr <= enduranceZoneUpper) {
+        enduranceZoneCount++;
+      } else if (hr > thresholdZoneUpper) {
+        aboveThresholdCount++;
+      }
+    }
+
+    double endurancePercent =
+        (enduranceZoneCount / heartrateProgression.length) * 100;
+    double thresholdPercent =
+        (aboveThresholdCount / heartrateProgression.length) * 100;
+
+    if (endurancePercent < 60 && thresholdPercent > 30) {
+      trainingRecommendations.add(
+          "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm). Heart rate monitoring is valuable for measuring exercise intensity.");
+    }
+  }
+
+  // Recovery and overtraining prevention based on heart rate
+  if (heartrateProgression.length >= 10) {
+    List<double> recentHRs = heartrateProgression.sublist(0, 5);
+    List<double> earlierHRs = heartrateProgression.sublist(5, math.min(10, heartrateProgression.length));
+    
+    double recentAvg = recentHRs.reduce((a, b) => a + b) / recentHRs.length;
+    double earlierAvg = earlierHRs.reduce((a, b) => a + b) / earlierHRs.length;
+    
+    double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+    
+    if (hrChangePercent > 5 && weeklyActivityCount > 3) {
+      trainingRecommendations.add(
+          "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% recently. This may indicate fatigue. Add an additional recovery day and consider active recovery (light cycling at ${zone2HeartRate.toInt()} bpm).");
+    } else if (hrChangePercent < -5) {
+      trainingRecommendations.add(
+          "Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% recently, suggesting improved cardiovascular efficiency. Great progress!");
+    }
+  }
+
+  // Current heart rate recommendations
+  if (latestHeartRate > 0) {
+    if (latestHeartRate > thresholdZoneUpper) {
+      trainingRecommendations.add(
+          "Heart rate too high for endurance. For longer rides, stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range.");
+    } else if (latestHeartRate < enduranceZoneLower) {
+      trainingRecommendations.add(
+          "Increase intensity to ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm for better aerobic development.");
+    } else if (latestHeartRate >= enduranceZoneLower &&
+        latestHeartRate <= enduranceZoneUpper) {
+      trainingRecommendations.add(
+          "Perfect endurance zone! This heart rate range is optimal for building aerobic capacity.");
+    } else {
+      trainingRecommendations.add(
+          "You're in threshold zone - good for tempo sessions but not longer endurance rides.");
+    }
+  }
+
+  // Training structure based on research
+  trainingRecommendations.add(
+      "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides. HRMs effectively measure exercise intensity and can help prevent overtraining.");
+
+  // Distance progression
+  if (currentDistanceValue > 0 &&
+      targetDistanceValue > 0 &&
+      currentDistanceValue < targetDistanceValue) {
+    double percentComplete =
+        (currentDistanceValue / targetDistanceValue) * 100;
+    // Limit to 10% increase per week based on research
+    double weeklyIncrease = math.min(targetDistanceValue * 0.1, currentDistanceValue * 0.1);
+
+    trainingRecommendations.add(
+        "You're ${percentComplete.toStringAsFixed(0)}% to goal. For safe progression, increase your long ride by no more than ${weeklyIncrease.toStringAsFixed(1)} km/week.");
+  }
+
+  // Frequency recommendations
+  if (weeklyActivityCount < 3) {
+    trainingRecommendations
+        .add("For optimal endurance benefits, aim for 3-4 rides/week: one long ride, 2-3 shorter recovery rides.");
+  }
+
+  // Recovery strategies based on research
+  trainingRecommendations.add(
+      "For optimal recovery: (1) active recovery with low-intensity cycling, (2) compression garments to reduce fatigue, and (3) proper nutrition timing.");
+
+  // Weather and temperature considerations
+  if (weatherData.isNotEmpty) {
+    double currentTemp = safeParseDouble(temperature);
+    double currentHumidity = safeParseDouble(humidity);
+
+    if (currentTemp > 28) {
+      trainingRecommendations.add(
+          "At ${currentTemp.toStringAsFixed(1)}°C: Lower heart rate target by 5-10%, hydrate more frequently, and consider riding earlier in the morning to avoid heat stress.");
+      
+      if (currentHumidity > 70) {
+        trainingRecommendations.add(
+            "High humidity (${currentHumidity.toStringAsFixed(0)}%) restricts evaporative cooling. Reduce intensity and increase hydration further in these conditions.");
+      }
+    } else if (currentTemp < 10) {
+      trainingRecommendations.add(
+          "Cold weather (${currentTemp.toStringAsFixed(1)}°C): Extend your warm-up to 15-20 minutes and use layered clothing for optimal temperature regulation.");
+    }
+
+  // Health condition recommendations
+  if (respiratoryCondition == "Yes") {
+    healthRecommendations.add(
+        "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise.");
+    healthRecommendations
+        .add("Only ride outdoors when AQI < 100, as pollution can exacerbate respiratory issues and decrease performance.");
+  }
+
+  if (cardiovascularCondition == "Yes") {
+    healthRecommendations.add(
+        "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly.");
+    healthRecommendations
+        .add("Monitor heart rate carefully and increase intensity very gradually to avoid strain.");
+  }
+  
+  // Nutrition recommendations
+  healthRecommendations
+      .add("Post-ride nutrition: 3:1 carb:protein ratio within 30 minutes to optimize recovery and glycogen replenishment.");
+      
+  if (currentDistanceValue > 30) {
+    healthRecommendations.add(
+        "For rides longer than 2 hours, consume 60-90g of carbohydrate per hour from multiple sources to maintain energy levels.");
+  }
+
+  // Recovery recommendations
+  if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
+    healthRecommendations
+        .add("Add dedicated recovery days to prevent overtraining syndrome and reduce injury risk.");
+  }
+
+  // Equipment recommendations
+  equipmentRecommendations.add(
+      "Proper bike fit is crucial for endurance - small discomforts become major issues on long rides.");
+  equipmentRecommendations
+      .add("For longer rides, invest in quality padded shorts and use heart rate monitoring to maintain proper intensity.");
+}
+}
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
@@ -4671,7 +4300,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     SizedBox(height: 16),
                     _buildHeaderSection(),
 
-                    // Primary recommendation card with animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4690,7 +4318,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 16),
 
-                    // Show subgoal selection card if needed
                     if (goalType == "High Intensity Cycling")
                       TweenAnimationBuilder(
                         tween: Tween<double>(begin: 0, end: 1),
@@ -4710,7 +4337,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 16),
 
-                    // Section title with animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4730,7 +4356,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 12),
 
-                    // Recommendation carousel with animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 900),
@@ -4749,7 +4374,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 24),
 
-                    // Analytics section title
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4771,7 +4395,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     _buildWeeklySummary(),
 
-                    // Goal based graphs with animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1000),
@@ -4790,7 +4413,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 50),
 
-                    // Activity section title
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4809,7 +4431,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
                     SizedBox(height: 12),
 
-                    // Activity logs with animation
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1100),
@@ -4915,7 +4536,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  // Header section with welcome message
   Widget _buildHeaderSection() {
     return Container(
       margin: EdgeInsets.only(bottom: 20),
@@ -4947,7 +4567,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  // Section title widget
   Widget _buildSectionTitle(String title, IconData icon) {
     return Row(
       children: [
@@ -5127,7 +4746,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  // Activity logs list
   Widget _buildActivityLogs() {
     if (activityData.isEmpty) {
       return Container(
@@ -5163,14 +4781,12 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       itemBuilder: (context, index) {
         var data = activityData[index];
 
-        // Format the start date
         String formattedDate = "N/A";
         if (data['start_date'] != null) {
           DateTime startDate = data['start_date'].toDate();
           formattedDate = DateFormat('MMM d, y • h:mm a').format(startDate);
         }
 
-        // Convert elapsed time to hours:minutes format
         String duration = "N/A";
         int elapsedSeconds = 0;
         if (data['elapsed_time'] != null) {
@@ -5211,7 +4827,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Activity name and date
                     Row(
                       children: [
                         Container(
@@ -5337,7 +4952,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  // Calculate how many days the activity data spans
   String _calculateActivitySpan() {
     if (activityData.length < 2) return "0";
 
@@ -5400,7 +5014,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       });
     }
 
-    // Add Progress Insights category if available
     if (progressRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Progress Insights",
@@ -5411,7 +5024,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       });
     }
 
-    // If no recommendations are available
     if (recommendationCategories.isEmpty) {
       return Container(
         padding: EdgeInsets.all(20),
@@ -5495,7 +5107,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  // Build improved recommendation card with scrollable content
   Widget _buildRecommendationCard(String title, IconData icon, Color color,
       List<Color> gradientColors, List<String> recommendations) {
     return Container(
@@ -5776,15 +5387,10 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             chartData.map((e) => e.calories).reduce((a, b) => a + b) /
                 chartData.length;
 
-        double minCalories = chartData.map((e) => e.calories).reduce(math.min);
-        double maxCalories = chartData.map((e) => e.calories).reduce(math.max);
-
         PaceCaloriesData fastestSession =
             chartData.reduce((a, b) => a.pace < b.pace ? a : b);
         PaceCaloriesData highestCalorieSession =
             chartData.reduce((a, b) => a.calories > b.calories ? a : b);
-        int fastestIdx = chartData.indexOf(fastestSession);
-        int highestCalorieIdx = chartData.indexOf(highestCalorieSession);
 
         return _buildGraphContainer(
           title: "Pace & Calories\nAnalysis",
@@ -5877,7 +5483,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                               ? Colors.orange[700]
                               : null,
                     ),
-                    // Pace as line chart
                     SplineSeries<PaceCaloriesData, String>(
                       name: 'Pace',
                       dataSource: chartData,
@@ -5925,7 +5530,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 child: Column(
                   children: [
                     Divider(height: 1, thickness: 5, color: Colors.grey[200]),
-                    // Insight message
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
@@ -6102,7 +5706,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     intervalType: DateTimeIntervalType.days,
                     labelRotation: 0,
                   ),
-                  // Primary Y axis for weight
                   primaryYAxis: NumericAxis(
                     name: 'Weight',
                     majorGridLines: MajorGridLines(
@@ -6452,7 +6055,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     }
     List<Widget> goalGraphs = [];
 
-    // If no activity data is available
     if (activityData.isEmpty) {
       return Container(
         padding: EdgeInsets.all(16),
@@ -6878,7 +6480,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
     List<BaselineComparisonData> chartData = [];
 
-    // Add distance comparison if available
     if (baselineComparison.containsKey('activity') &&
         baselineComparison['activity'].containsKey('baselineAvgDistance') &&
         baselineComparison['activity'].containsKey('currentAvgDistance')) {
@@ -6889,7 +6490,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .add(BaselineComparisonData("Distance", baseline, current, change));
     }
 
-    // Add speed comparison if available
     if (baselineComparison.containsKey('activity') &&
         baselineComparison['activity'].containsKey('baselineAvgSpeed') &&
         baselineComparison['activity'].containsKey('currentAvgSpeed')) {
@@ -6899,7 +6499,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       chartData.add(BaselineComparisonData("Speed", baseline, current, change));
     }
 
-    // Add heart rate comparison if available
     if (baselineComparison.containsKey('activity') &&
         baselineComparison['activity'].containsKey('baselineAvgHeartRate') &&
         baselineComparison['activity'].containsKey('currentAvgHeartRate')) {
@@ -6910,7 +6509,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .add(BaselineComparisonData("Heart Rate", baseline, current, change));
     }
 
-    // For High Intensity goal, add body composition metrics
     if (goalType == "High Intensity Cycling" &&
         baselineComparison.containsKey('body')) {
       if (baselineComparison['body'].containsKey('baselineWeight') &&
@@ -6971,7 +6569,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           overflowMode: LegendItemOverflowMode.wrap,
         ),
         series: <ChartSeries>[
-          // Baseline values
           ColumnSeries<BaselineComparisonData, String>(
             name: 'Baseline',
             dataSource: chartData,
@@ -6982,7 +6579,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             width: 0.4,
             spacing: 0.2,
           ),
-          // Current values
           ColumnSeries<BaselineComparisonData, String>(
             name: 'Current',
             dataSource: chartData,
@@ -6994,7 +6590,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           ),
         ],
         annotations: [
-          // Add improvement percentage annotations above each metric
           ...chartData.asMap().entries.map((entry) {
             int index = entry.key;
             BaselineComparisonData data = entry.value;
@@ -7046,7 +6641,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Weekly Summary Section Title
         Padding(
           padding: const EdgeInsets.only(left: 5, bottom: 15),
           child: Row(
@@ -7093,11 +6687,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             ],
           ),
         ),
-
-        // Cards Row 1 - Cycling Sessions and Calories
         Row(
           children: [
-            // Cycling Sessions Card
             Expanded(
               child: Container(
                 height: media.width * 0.45,
@@ -7196,8 +6787,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 ),
               ),
             ),
-
-            // Calories Burned Card
             Expanded(
               child: Container(
                 height: media.width * 0.45,
@@ -7297,11 +6886,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         ),
 
         SizedBox(height: 15),
-
-        // Cards Row 2 - Heart Rate and Weight
         Row(
           children: [
-            // Heart Rate Card
             Expanded(
               child: Container(
                 height: media.width * 0.45,
@@ -7752,8 +7338,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 ),
 
                 SizedBox(height: 15),
-
-                // Net caloric balance
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -7849,7 +7433,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                     ],
                   ),
                   SizedBox(height: 15),
-                  // Enhanced meal cards in a column layout
                   Column(
                     children: [
                       if (nutritionData[0]['breakfast'] != "-")
@@ -7905,8 +7488,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         return Transform(
           alignment: Alignment.center,
           transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001) // perspective
-            ..translate(0.0, -4.0 * value), // floating effect
+            ..setEntry(3, 2, 0.001) 
+            ..translate(0.0, -4.0 * value),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
@@ -8020,8 +7603,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
   Widget _buildHRZone(String zone, bool isActive, Color color) {
     return Container(
-      width: 24, // Reduced size slightly
-      height: 24, // Reduced size slightly
+      width: 24, 
+      height: 24, 
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isActive ? color : Colors.grey[200],
@@ -8041,78 +7624,11 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           zone,
           style: TextStyle(
             fontFamily: 'Inter',
-            fontSize: 10, // Reduced font size
+            fontSize: 10, 
             color: isActive ? Colors.white : Colors.grey[600],
             fontWeight: FontWeight.bold,
           ),
         ),
-      ),
-    );
-  }
-
-// Helper widget for meal cards
-  Widget _buildMealCard(
-      String letter, String meal, String calories, Color color) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 3),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                ),
-                child: Center(
-                  child: Text(
-                    letter,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  meal,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 3),
-          Padding(
-            padding: const EdgeInsets.only(left: 27),
-            child: Text(
-              calories,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -8130,10 +7646,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         );
         break;
       case 1:
-        // When navigating back to the recommendation page, simply reload the page
-        // instead of creating a new instance
-        // This will fix the immediate issue but may cause other state issues
-        // A better solution would be to use a state management solution like Provider
         if (_selectedIndex != 1) {
           Navigator.pushReplacement(
             context,

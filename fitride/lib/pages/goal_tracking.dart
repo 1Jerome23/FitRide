@@ -21,14 +21,11 @@ int _currentWeekNumber = 1;
 Map<int, Map<String, dynamic>> _weeklyGoalData = {};
 Map<int, List<Map<String, dynamic>>> _weeklySubgoalData = {};
 
-// Weekly progress structure for different goal types
 class WeeklyProgress {
-  // Common fields
   final int weekNumber;
   final DateTime weekStartDate;
   final DateTime weekEndDate;
 
-  // Leisure goal tracking
   int sessionsCompleted = 0;
   double totalDuration = 0.0;
 
@@ -53,7 +50,6 @@ class WeeklyProgress {
       required this.weekStartDate,
       required this.weekEndDate});
 
-  // Convert to map for Firestore storage
   Map<String, dynamic> toMap() {
     return {
       'weekNumber': weekNumber,
@@ -74,7 +70,6 @@ class WeeklyProgress {
     };
   }
 
-  // Create from Firestore data
   factory WeeklyProgress.fromMap(Map<String, dynamic> map) {
     WeeklyProgress progress = WeeklyProgress(
       weekNumber: map['weekNumber'] ?? 0,
@@ -134,7 +129,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   DateTime? _latestActivityDate;
   double _latestDistance = 0;
   bool hasActiveSubgoal = false;
-  String subgoalType = ""; // "distance", "pace", "duration", or "maintain"
+  String subgoalType = ""; 
   double subgoalTargetValue = 0.0;
   DateTime subgoalStartDate = DateTime.now();
   DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
@@ -148,8 +143,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
-  TextEditingController _updateMetabolicRateController =
-      TextEditingController();
+  TextEditingController _updateMetabolicRateController =TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -166,18 +160,15 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     });
 
     try {
-      // Get the current week number
       _currentWeekNumber = getCurrentWeekNumber();
       print("Current week number: $_currentWeekNumber");
 
-      // Get the goal ID
       String goalId = userGoal!['id'] ?? "";
       if (goalId.isEmpty) {
         print("Goal ID is empty");
         return;
       }
 
-      // Fetch all weekly data for this goal
       QuerySnapshot weeklySnapshot = await FirebaseFirestore.instance
           .collection('weekly_progress')
           .where('uid', isEqualTo: uid)
@@ -185,16 +176,13 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           .orderBy('weekNumber', descending: true)
           .get();
 
-      // Clear existing data
       _weeklyGoalData.clear();
 
-      // Process results
       for (var doc in weeklySnapshot.docs) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         int weekNum = data['weekNumber'] ?? 0;
 
         if (weekNum > 0) {
-          // Store the document ID for future updates
           data['docId'] = doc.id;
           _weeklyGoalData[weekNum] = data;
 
@@ -202,12 +190,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         }
       }
 
-      // Fetch subgoal data (if needed)
       if (hasActiveSubgoal) {
         await _fetchWeeklySubgoalData(uid, goalId);
       }
 
-      // Initialize data for the current week if it doesn't exist
       if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
         _initializeCurrentWeekData(uid, goalId);
       }
@@ -225,13 +211,12 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     DateTime weekStart = _getWeekStartDate();
     DateTime weekEnd = _getWeekEndDate();
 
-    // Base data structure
     Map<String, dynamic> weekData = {
       'uid': uid,
       'goalId': goalId,
       'weekNumber': _currentWeekNumber,
-      'weekStartDate': Timestamp.fromDate(weekStart), // Convert to Timestamp
-      'weekEndDate': Timestamp.fromDate(weekEnd), // Convert to Timestamp
+      'weekStartDate': Timestamp.fromDate(weekStart), 
+      'weekEndDate': Timestamp.fromDate(weekEnd), 
       'timestamp': FieldValue.serverTimestamp(),
       'sessionsCompleted': 0,
       'totalDuration': 0.0,
@@ -239,7 +224,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       'uniqueDays': [],
     };
 
-    // Add goal-specific fields
     if (userGoal?['goalType'] == 'High Intensity Cycling') {
       weekData['weekStartWeight'] = _currentUserWeight;
       weekData['weekEndWeight'] = _currentUserWeight;
@@ -256,7 +240,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       weekData['targetDuration'] = userGoal?['sessionDuration'] ?? 30.0;
     }
 
-    // Add subgoal tracking if there's an active subgoal
     if (hasActiveSubgoal) {
       weekData['subgoalType'] = subgoalType;
       weekData['subgoalTargetValue'] = subgoalTargetValue;
@@ -264,13 +247,11 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       weekData['subgoalBaseline'] = _getSubgoalBaselineValue();
     }
 
-    // Store in the data structure
     _weeklyGoalData[_currentWeekNumber] = weekData;
 
     print("Initialized data for week $_currentWeekNumber");
   }
 
-// Helper method to get the appropriate baseline value for the active subgoal
   double _getSubgoalBaselineValue() {
     switch (subgoalType) {
       case "distance":
@@ -287,17 +268,14 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
 // Fetch subgoal data by week
   Future<void> _fetchWeeklySubgoalData(String uid, String goalId) async {
     try {
-      // Clear existing data
       _weeklySubgoalData.clear();
 
-      // Get all subgoals for this user and goal
       QuerySnapshot subgoalSnapshot = await FirebaseFirestore.instance
           .collection('cycling_subgoals')
           .where('userId', isEqualTo: uid)
           .orderBy('createdAt', descending: true)
           .get();
 
-      // Process results
       for (var doc in subgoalSnapshot.docs) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
@@ -309,8 +287,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         if (!_weeklySubgoalData.containsKey(weekNum)) {
           _weeklySubgoalData[weekNum] = [];
         }
-
-        // Add the document ID for future updates
         data['docId'] = doc.id;
         _weeklySubgoalData[weekNum]!.add(data);
 
@@ -1170,170 +1146,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         _isLoading = false;
       });
     }
-  }
-
-  Widget _buildWeekComparisonCard() {
-    Map<String, dynamic> comparison = getWeekOverWeekProgress();
-
-    if (!comparison['hasComparison']) {
-      return Container(
-        margin: EdgeInsets.only(bottom: 20),
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Week $_currentWeekNumber Progress",
-              style: TextStyle(
-                fontFamily: 'Fredoka-SemiBold',
-                fontSize: 18,
-                color: primaryBlack,
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              "This is your first week with this goal. Weekly comparisons will be available after you complete this week.",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: primaryGray,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Get the comparison values
-    int sessionsChange = comparison['sessionsChange'] ?? 0;
-    double durationChange = comparison['durationChange'] ?? 0.0;
-    double distanceChange = comparison['distanceChange'] ?? 0.0;
-
-    return Container(
-      margin: EdgeInsets.only(bottom: 20),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Week-over-Week Progress",
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 18,
-                  color: primaryBlack,
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[300]!, width: 1),
-                ),
-                child: Text(
-                  "Week $_currentWeekNumber",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
-
-          // Comparison metrics
-          _buildComparisonRow(
-              "Sessions",
-              comparison['currentSessionsCount'] ?? 0,
-              comparison['previousSessionsCount'] ?? 0,
-              "",
-              Icons.event_available),
-
-          _buildComparisonRow(
-              "Duration",
-              comparison['currentTotalDuration'] ?? 0.0,
-              comparison['previousTotalDuration'] ?? 0.0,
-              "mins",
-              Icons.timer),
-
-          _buildComparisonRow(
-              "Distance",
-              comparison['currentTotalDistance'] ?? 0.0,
-              comparison['previousTotalDistance'] ?? 0.0,
-              "km",
-              Icons.straighten),
-
-          // Goal-specific metrics
-          if (userGoal?['goalType'] == 'High Intensity Cycling') ...[
-            Divider(height: 24),
-            _buildComparisonRow(
-              "Weight",
-              comparison['currentWeight'] ?? 0.0,
-              comparison['previousWeight'] ?? 0.0,
-              "kg",
-              Icons.monitor_weight,
-              // For weight, negative change is good
-              invertComparison: true,
-            ),
-            _buildComparisonRow(
-                "Calories Burned",
-                comparison['currentCaloriesBurned'] ?? 0.0,
-                comparison['previousCaloriesBurned'] ?? 0.0,
-                "kcal",
-                Icons.local_fire_department),
-          ] else if (userGoal?['goalType'] == 'Endurance') ...[
-            Divider(height: 24),
-            _buildComparisonRow(
-                "Best Distance",
-                comparison['currentBestDistance'] ?? 0.0,
-                comparison['previousBestDistance'] ?? 0.0,
-                "km",
-                Icons.emoji_events),
-            if (comparison['currentBestPace'] != null &&
-                comparison['previousBestPace'] != null)
-              _buildComparisonRow(
-                "Best Pace",
-                comparison['currentBestPace'],
-                comparison['previousBestPace'],
-                "min/km",
-                Icons.speed,
-                // For pace, negative change is good (lower pace = faster)
-                invertComparison: true,
-              ),
-          ],
-        ],
-      ),
-    );
   }
 
 // Helper widget to build a comparison row

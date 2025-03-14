@@ -117,7 +117,7 @@ void initState() {
       )
       ..loadRequest(Uri.parse(widget.initialUrl));
 
-    setState(() {}); // Trigger rebuild after initializing `_controller`
+    setState(() {}); 
   });
 }
 
@@ -150,7 +150,6 @@ Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
 
       print("Strava User ID: $stravaUserId");
 
-      // Fetch the Firebase UID of the authenticated user
       final String? firebaseUid = FirebaseAuth.instance.currentUser?.uid;
 
       if (firebaseUid == null) {
@@ -161,17 +160,16 @@ Future<bool> _exchangeAuthorizationCodeForTokens(String code) async {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('stravaUserId', stravaUserId);
 
-      // Store the Strava tokens along with Firebase UID in Firestore
       await FirebaseFirestore.instance
           .collection('user_tokens')
-          .doc(stravaUserId) // Use stravaUserId as the document ID
+          .doc(stravaUserId)
           .set({
-        'firebaseUid': firebaseUid, // Store Firebase UID
+        'firebaseUid': firebaseUid,
         'stravaUserId': stravaUserId,
         'expires_at': expiresAt,
         'access_token': accessToken,
         'refresh_token': refreshToken,
-      }, SetOptions(merge: true)); // Merge to avoid overwriting existing data
+      }, SetOptions(merge: true));
 
       print('Tokens saved in Firestore with Firebase UID: $firebaseUid');
 
