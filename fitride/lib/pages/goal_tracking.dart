@@ -1150,113 +1150,6 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     }
   }
 
-// Helper widget to build a comparison row
-  Widget _buildComparisonRow(
-      String label, num current, num previous, String unit, IconData icon,
-      {bool invertComparison = false}) {
-    num change = current - previous;
-    bool isPositiveChange = invertComparison ? change < 0 : change > 0;
-    bool isNegativeChange = invertComparison ? change > 0 : change < 0;
-    bool isUnchanged = change == 0;
-
-    Color changeColor = isPositiveChange
-        ? Colors.green
-        : isNegativeChange
-            ? Colors.red
-            : Colors.grey;
-
-    IconData changeIcon = isPositiveChange
-        ? Icons.arrow_upward
-        : isNegativeChange
-            ? Icons.arrow_downward
-            : Icons.remove;
-
-    String changeText = (change == 0)
-        ? "No change"
-        : "${change > 0 ? '+' : ''}${change.toStringAsFixed(1)} $unit";
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: Colors.grey[700]),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: primaryBlack,
-                  ),
-                ),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: "${current.toStringAsFixed(1)} $unit",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: primaryBlack,
-                        ),
-                      ),
-                      TextSpan(
-                        text:
-                            " (previous: ${previous.toStringAsFixed(1)} $unit)",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: changeColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: changeColor.withOpacity(0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(changeIcon, size: 12, color: changeColor),
-                SizedBox(width: 4),
-                Text(
-                  changeText,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: changeColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 // Method to display weekly progress history
   void _showWeeklyProgressHistory() {
     showDialog(
@@ -4111,54 +4004,88 @@ Widget _buildInputField({
   );
 }
   Future<void> _updateUserMetrics() async {
-    try {
-      String? uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return;
+  try {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-      double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
-      double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
-      double newMetabolicRate =
-          double.tryParse(_updateMetabolicRateController.text) ?? 0;
+    // Parse the new metric values
+    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
+    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+    double newMetabolicRate =
+        double.tryParse(_updateMetabolicRateController.text) ?? 0;
 
-      final userDataQuery = await FirebaseFirestore.instance
-          .collection('userData')
-          .where('uid', isEqualTo: uid)
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
+    // Query the latest userData document for the user
+    final userDataQuery = await FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: uid)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
 
-      Map<String, dynamic> newData = {
-        'uid': uid,
-        'timestamp': FieldValue.serverTimestamp(),
-        'weight': newWeight,
-        'bodyFat': newBodyFat,
-        'basalMetabolicRate': newMetabolicRate,
-      };
+    // Prepare the new data to be saved
+    Map<String, dynamic> newData = {
+      'uid': uid,
+      'timestamp': FieldValue.serverTimestamp(),
+      'weight': newWeight,
+      'bodyFat': newBodyFat,
+      'basalMetabolicRate': newMetabolicRate,
+    };
 
-      if (userDataQuery.docs.isNotEmpty) {
-        Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-        existingData.forEach((key, value) {
-          if (key != 'uid' &&
-              key != 'timestamp' &&
-              key != 'weight' &&
-              key != 'bodyFat') {
-            newData[key] = value;
-          }
-        });
-      }
-
-      await FirebaseFirestore.instance.collection('userData').add(newData);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Progress updated successfully!')));
-
-      await _loadUserGoalAndActivities();
-    } catch (e) {
-      print('Error updating metrics: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update progress: $e')));
+    // Copy over existing fields from the latest userData document
+    if (userDataQuery.docs.isNotEmpty) {
+      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
+      existingData.forEach((key, value) {
+        if (key != 'uid' &&
+            key != 'timestamp' &&
+            key != 'weight' &&
+            key != 'bodyFat') {
+          newData[key] = value;
+        }
+      });
     }
+
+    // Save the new userData document
+    await FirebaseFirestore.instance.collection('userData').add(newData);
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Progress updated successfully!')));
+
+    // Check and update baseline_complete in the goals collection
+    final goalsSnapshot = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: uid)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+
+    if (goalsSnapshot.docs.isNotEmpty) {
+      final goalDoc = goalsSnapshot.docs.first;
+      final goalData = goalDoc.data();
+
+      // Check if baseline_complete exists and is false
+      if (goalData['baseline_complete'] == null || goalData['baseline_complete'] == false) {
+        // Update baseline_complete to true
+        await FirebaseFirestore.instance
+            .collection('goals')
+            .doc(goalDoc.id)
+            .update({'baseline_complete': true});
+        print('Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
+      } else {
+        print('baseline_complete is already true. No update needed.');
+      }
+    } else {
+      print('No goal documents found for user with UID: $uid');
+    }
+
+    // Reload user goal and activities
+    await _loadUserGoalAndActivities();
+  } catch (e) {
+    print('Error updating metrics: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update progress: $e')));
   }
+}
 
   Widget _buildProgressCard(String title, double progress, double target,
       String unit, Color color, IconData icon,

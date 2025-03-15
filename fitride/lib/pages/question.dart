@@ -190,90 +190,105 @@ class _QuestionPageState extends State<QuestionPage>
     }
   }
 
-  Future<void> submitAllUserData() async {
-    if (ageController.text.isEmpty ||
-        heightController.text.isEmpty ||
-        _healthCondition == null ||
-        _selectedGoal == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields')),
-      );
-      return;
-    }
-
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to submit your data')),
-      );
-      return;
-    }
-
-    try {
-      Map<String, dynamic> userData = {
-        'uid': user.uid,
-        'timestamp': FieldValue.serverTimestamp(),
-        'age': ageController.text,
-        'height': heightController.text,
-        'healthCondition': _healthCondition,
-      };
-
-      if (_healthCondition != 'None') {
-        userData['weatherCondition'] = _weatherCondition;
-        userData['heartRateLimit'] = _heartRateLimit;
-        userData['maxDuration'] = _maxDuration;
-      }
-
-      Map<String, dynamic> goalData = {
-        'uid': user.uid,
-        'timestamp': FieldValue.serverTimestamp(),
-        'goalType': _selectedGoal,
-      };
-
-      if (_selectedGoal == 'Leisure') {
-        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
-        goalData['sessionDuration'] =
-            int.tryParse(sessionDurationController.text) ?? 0;
-      } else if (_selectedGoal == 'High Intensity Cycling') {
-        double initialWeight = double.tryParse(weightController.text) ?? 0.0;
-
-        userData['weight'] = weightController.text;
-        userData['basalMetabolicRate'] = basalMetabolicRateController.text;
-        userData['bodyFat'] = bodyFatController.text;
-
-        goalData['targetWeight'] = targetWeightController.text;
-        goalData['initialWeight'] = initialWeight;
-        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
-        goalData['sessionDuration'] =
-            int.tryParse(sessionDurationController.text) ?? 0;
-      } else if (_selectedGoal == 'Endurance') {
-        goalData['targetDistance'] = targetDistanceController.text;
-        goalData['targetDuration'] = targetDurationController.text;
-        goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
-      }
-
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-
-      DocumentReference userDataRef =
-          FirebaseFirestore.instance.collection('userData').doc();
-      batch.set(userDataRef, userData);
-
-      DocumentReference goalsRef =
-          FirebaseFirestore.instance.collection('goals').doc();
-      batch.set(goalsRef, goalData);
-
-      await batch.commit();
-
-      _controller.animateToPage(
-        page: _currentPage + 1,
-        duration: 600,
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit data: $e')),
-      );
-    }
+ Future<void> submitAllUserData() async {
+  // Validate required fields
+  if (ageController.text.isEmpty ||
+      heightController.text.isEmpty ||
+      _healthCondition == null ||
+      _selectedGoal == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please fill in all required fields')),
+    );
+    return;
   }
+
+  // Check if the user is logged in
+  User? user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please log in to submit your data')),
+    );
+    return;
+  }
+
+  try {
+    // Prepare userData map
+    Map<String, dynamic> userData = {
+      'uid': user.uid,
+      'timestamp': FieldValue.serverTimestamp(),
+      'age': ageController.text,
+      'height': heightController.text,
+      'healthCondition': _healthCondition,
+    };
+
+    // Add additional fields based on health condition
+    if (_healthCondition != 'None') {
+      userData['weatherCondition'] = _weatherCondition;
+      userData['heartRateLimit'] = _heartRateLimit;
+      userData['maxDuration'] = _maxDuration;
+    }
+    DateTime baseLineStartDate = DateTime.now();
+    DateTime baseLineEndDate = baseLineStartDate.add(const Duration(days: 28));
+    
+    Map<String, dynamic> goalData = {
+      'uid': user.uid,
+      'timestamp': FieldValue.serverTimestamp(),
+      'goalType': _selectedGoal,
+      'base_lineStartDate': baseLineStartDate, 
+      'base_lineEndDate': baseLineEndDate, 
+      'baseline_complete': false, 
+    };
+
+    // Add goal-specific fields based on the selected goal
+    if (_selectedGoal == 'Leisure') {
+      goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
+      goalData['sessionDuration'] =
+          int.tryParse(sessionDurationController.text) ?? 0;
+    } else if (_selectedGoal == 'High Intensity Cycling') {
+      double initialWeight = double.tryParse(weightController.text) ?? 0.0;
+
+      userData['weight'] = weightController.text;
+      userData['basalMetabolicRate'] = basalMetabolicRateController.text;
+      userData['bodyFat'] = bodyFatController.text;
+
+      goalData['targetWeight'] = targetWeightController.text;
+      goalData['initialWeight'] = initialWeight;
+      goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
+      goalData['sessionDuration'] =
+          int.tryParse(sessionDurationController.text) ?? 0;
+      goalData[''];
+    } else if (_selectedGoal == 'Endurance') {
+      goalData['targetDistance'] = targetDistanceController.text;
+      goalData['targetDuration'] = targetDurationController.text;
+      goalData['daysPerWeek'] = int.tryParse(daysPerWeekController.text) ?? 0;
+    }
+
+    // Create a batch write for Firestore
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    DocumentReference userDataRef =
+        FirebaseFirestore.instance.collection('userData').doc();
+    batch.set(userDataRef, userData);
+
+    DocumentReference goalsRef =
+        FirebaseFirestore.instance.collection('goals').doc();
+    batch.set(goalsRef, goalData);
+
+    // Commit the batch write
+    await batch.commit();
+
+    // Navigate to the next page
+    _controller.animateToPage(
+      page: _currentPage + 1,
+      duration: 600,
+    );
+  } catch (e) {
+    // Show an error message if something goes wrong
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to submit data: $e')),
+    );
+  }
+}
 
   void _authorizeStrava() {
     final String clientId = "146485";

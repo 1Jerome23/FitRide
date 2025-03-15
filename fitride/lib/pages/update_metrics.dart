@@ -296,63 +296,90 @@ class _UpdateMetricsPageState extends State<UpdateMetricsPage> with SingleTicker
   }
   
   Future<void> _saveMetrics() async {
-    if (_formKey.currentState!.validate()) {
-      log('Form validated. Values - Weight: ${_weightController.text}, Body Fat: ${_bodyFatController.text}, BMR: ${_metabolicRateController.text}');
-      
-      setState(() {
-        _isLoading = true;
-      });
-      
-      try {
-        double weight = double.parse(_weightController.text);
-        double bodyFat = double.parse(_bodyFatController.text);
-        double metabolicRate = double.parse(_metabolicRateController.text);
-        
-        log('Parsed values - Weight: $weight, Body Fat: $bodyFat, BMR: $metabolicRate');
-        
-        // Add direct field check and update
-        bool success = await saveUserMetrics(
-          weight: weight,
-          bodyFat: bodyFat,
-          metabolicRate: metabolicRate,
-        );
-        
-        if (!success) {
-          throw Exception("Failed to save metrics - no data was updated");
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Your metrics have been updated!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
-          // Instead of just popping, we'll pop and pass back a result to trigger a refresh
-          Navigator.pop(context, true);  // Pass true to indicate data was updated
-        }
-      } catch (e) {
-        log('Error saving metrics: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving your metrics: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+  if (_formKey.currentState!.validate()) {
+    log('Form validated. Values - Weight: ${_weightController.text}, Body Fat: ${_bodyFatController.text}, BMR: ${_metabolicRateController.text}');
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      double weight = double.parse(_weightController.text);
+      double bodyFat = double.parse(_bodyFatController.text);
+      double metabolicRate = double.parse(_metabolicRateController.text);
+      log('Parsed values - Weight: $weight, Body Fat: $bodyFat, BMR: $metabolicRate');
+
+      // Save user metrics
+      bool success = await saveUserMetrics(
+        weight: weight,
+        bodyFat: bodyFat,
+        metabolicRate: metabolicRate,
+      );
+      if (!success) {
+        throw Exception("Failed to save metrics - no data was updated");
+      }
+
+      // Check and update baseline_complete in the goals collection
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final String uid = currentUser.uid;
+
+        // Query the goals collection to find the latest goal document for the user
+        final goalsSnapshot = await FirebaseFirestore.instance
+            .collection('goals')
+            .where('uid', isEqualTo: uid)
+            .orderBy('timestamp', descending: true)
+            .limit(1)
+            .get();
+
+        if (goalsSnapshot.docs.isNotEmpty) {
+          final goalDoc = goalsSnapshot.docs.first;
+          final goalData = goalDoc.data();
+
+          // Check if baseline_complete exists and is false
+          if (goalData['baseline_complete'] == null || goalData['baseline_complete'] == false) {
+            // Update baseline_complete to true
+            await FirebaseFirestore.instance
+                .collection('goals')
+                .doc(goalDoc.id)
+                .update({'baseline_complete': true});
+            log('Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
+          } else {
+            log('baseline_complete is already true. No update needed.');
+          }
+        } else {
+          log('No goal documents found for user with UID: $uid');
         }
       }
-    } else {
-      log('Form validation failed');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Your metrics have been updated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true); 
+      }
+    } catch (e) {
+      log('Error saving metrics: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving your metrics: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  } else {
+    log('Form validation failed');
   }
+}
   
   @override
   Widget build(BuildContext context) {
