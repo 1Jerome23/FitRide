@@ -1578,9 +1578,22 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             "breakfast_calories": data['breakfast_calories'] ?? 0,
             "lunch_calories": data['lunch_calories'] ?? 0,
             "dinner_calories": data['dinner_calories'] ?? 0,
+            "breakfast_carbs": data['breakfast_carbs'] ?? 0,
+            "lunch_carbs": data['lunch_carbs'] ?? 0,
+            "dinner_carbs": data['dinner_carbs'] ?? 0,
+            "total_carbs": data['total_carbs'] ?? 0,
+            "breakfast_fat": data['breakfast_fat'] ?? 0,
+            "lunch_fat": data['lunch_fat'] ?? 0,
+            "dinner_fat": data['dinner_fat'] ?? 0,
+            "total_fat": data['total_fat'] ?? 0,
+            "breakfast_protein": data['breakfast_protein'] ?? 0,
+            "lunch_protein": data['lunch_protein'] ?? 0,
+            "dinner_protein": data['dinner_protein'] ?? 0,
+            "total_protein": data['total_protein'] ?? 0,
             "total_calories": data['total_calories'] ?? 0,
             "date": data['date'],
             "timestamp": data['timestamp'],
+
           });
         }
 
@@ -1617,6 +1630,19 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         safeParseDouble(latestFoodEntry['lunch_calories'].toString());
     double dinnerCalories =
         safeParseDouble(latestFoodEntry['dinner_calories'].toString());
+    double totalCarbs = safeParseDouble(latestFoodEntry['total_carbs'].toString());
+    double totalFat = safeParseDouble(latestFoodEntry['total_fat'].toString());
+    double totalProtein = safeParseDouble(latestFoodEntry['total_protein'].toString());
+    double breakfastCarbs = safeParseDouble(latestFoodEntry['breakfast_carbs'].toString());
+    double lunchCarbs = safeParseDouble(latestFoodEntry['lunch_carbs'].toString());
+    double dinnerCarbs = safeParseDouble(latestFoodEntry['dinner_carbs'].toString());
+    double breakfastFat = safeParseDouble(latestFoodEntry['breakfast_fat'].toString());
+    double lunchFat = safeParseDouble(latestFoodEntry['lunch_fat'].toString());
+    double dinnerFat = safeParseDouble(latestFoodEntry['dinner_fat'].toString());
+    double breakfastProtein = safeParseDouble(latestFoodEntry['breakfast_protein'].toString());
+    double lunchProtein = safeParseDouble(latestFoodEntry['lunch_protein'].toString());
+    double dinnerProtein = safeParseDouble(latestFoodEntry['dinner_protein'].toString());
+  
 
     double bmr = safeParseDouble(basalMetabolicRate);
     double activityFactor = 1.2;
