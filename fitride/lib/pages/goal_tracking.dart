@@ -3177,211 +3177,327 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     return goalHistory;
   }
 
-  void _showGoalHistoryDialog() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return FutureBuilder<List<Map<String, dynamic>>>(
+ void _showGoalHistoryDialog() async {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return Dialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
           future: _fetchGoalHistory(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                title: const Text(
-                  "Goal History",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: primaryBlack,
-                  ),
-                ),
-                content: SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
+              // Loading state
+              return Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Goal History",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 22,
+                        color: primaryBlack,
+                      ),
                     ),
-                  ),
+                    SizedBox(height: 24),
+                    Container(
+                      height: 100,
+                      alignment: Alignment.center,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
+                      ),
+                    ),
+                  ],
                 ),
               );
             } else if (snapshot.hasError) {
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+              // Error state
+              return Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Goal History",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 22,
+                        color: primaryBlack,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "Error loading goals: ${snapshot.error}",
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    SizedBox(height: 24),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        "Close",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: primaryGray,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                title: const Text(
-                  "Goal History",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: primaryBlack,
-                  ),
-                ),
-                content: Text(
-                  "Error loading goals: ${snapshot.error}",
-                  style: TextStyle(color: Colors.red),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Close"),
-                  ),
-                ],
               );
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                title: const Text(
-                  "Goal History",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: primaryBlack,
-                  ),
-                ),
-                content: const Text("No goal history found."),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Close"),
-                  ),
-                ],
-              );
-            } else {
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                title: const Text(
-                  "Goal History",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 22,
-                    color: primaryBlack,
-                  ),
-                ),
-                content: Container(
-                  width: double.maxFinite,
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: snapshot.data!.length,
-                    itemBuilder: (context, index) {
-                      final goal = snapshot.data![index];
-                      final goalType = goal['goalType'] ?? 'Unknown';
-                      final createdAt = goal['timestamp'] != null
-                          ? (goal['timestamp'] as Timestamp).toDate()
-                          : DateTime.now();
-
-                      String details = '';
-
-                      if (goalType == 'Leisure') {
-                        final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
-                        final sessionDuration =
-                            goal['sessionDuration'] ?? 'N/A';
-                        details =
-                            "$daysPerWeek days/week, $sessionDuration min/session";
-                      } else if (goalType == 'High Intensity Cycling') {
-                        final targetWeight = goal['targetWeight'] ?? 'N/A';
-                        details = "Target weight: $targetWeight kg";
-                      } else if (goalType == 'Endurance') {
-                        final targetDistance = goal['targetDistance'] ?? 'N/A';
-                        details = "Target distance: $targetDistance km";
-                      }
-
-                      return Container(
-                        margin: EdgeInsets.only(bottom: 12),
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: index == 0
-                              ? primaryOrange.withOpacity(0.1)
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: index == 0
-                                ? primaryOrange.withOpacity(0.3)
-                                : Colors.grey.shade300,
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  goalType,
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 16,
-                                    color: primaryBlack,
-                                  ),
-                                ),
-                                if (index == 0)
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: primaryOrange,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      "Current",
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              "Created: ${DateFormat('MMM d, yyyy').format(createdAt)}",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                color: primaryGray,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              details,
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                color: primaryBlack,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      "Close",
+              // Empty state
+              return Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "Goal History",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 22,
+                        color: primaryBlack,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "No goal history found.",
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 16,
                         color: primaryGray,
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        "Close",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: primaryGray,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              // Data loaded successfully
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header with gradient
+                  Container(
+                    padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          "Goal History",
+                          style: TextStyle(
+                            fontFamily: 'Fredoka-SemiBold',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Content area with list
+                  Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5,
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        final goal = snapshot.data![index];
+                        final goalType = goal['goalType'] ?? 'Unknown';
+                        final createdAt = goal['timestamp'] != null
+                            ? (goal['timestamp'] as Timestamp).toDate()
+                            : DateTime.now();
+
+                        String details = '';
+                        IconData goalIcon = Icons.flag_outlined;
+
+                        if (goalType == 'Leisure') {
+                          goalIcon = Icons.pedal_bike_outlined;
+                          final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
+                          final sessionDuration = goal['sessionDuration'] ?? 'N/A';
+                          details = "$daysPerWeek days/week, $sessionDuration min/session";
+                        } else if (goalType == 'High Intensity Cycling') {
+                          goalIcon = Icons.speed_outlined;
+                          final targetWeight = goal['targetWeight'] ?? 'N/A';
+                          details = "Target weight: $targetWeight kg";
+                        } else if (goalType == 'Endurance') {
+                          goalIcon = Icons.timer_outlined;
+                          final targetDistance = goal['targetDistance'] ?? 'N/A';
+                          details = "Target distance: $targetDistance km";
+                        }
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: index == 0
+                                ? Color(0xffFFA500).withOpacity(0.1)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: index == 0
+                                  ? Color(0xffFFA500).withOpacity(0.3)
+                                  : Colors.grey.shade300,
+                              width: 1,
+                            ),
+                            boxShadow: index == 0 ? [
+                              BoxShadow(
+                                color: Color(0xffFFA500).withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              )
+                            ] : null,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: index == 0 
+                                    ? Color(0xffFFA500).withOpacity(0.2)
+                                    : Colors.grey.shade200,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  goalIcon,
+                                  size: 20,
+                                  color: index == 0 
+                                    ? Color(0xffFFA500)
+                                    : Colors.grey[700],
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            goalType,
+                                            style: TextStyle(
+                                              fontFamily: 'Fredoka-SemiBold',
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: primaryBlack,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (index == 0)
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Color(0xffFFA500),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              "Current",
+                                              style: TextStyle(
+                                                fontFamily: 'Inter',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      "Created: ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      details,
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  // Close button
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        "Close",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[700],
+                        ),
                       ),
                     ),
                   ),
@@ -3389,10 +3505,11 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
               );
             }
           },
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   String _getIconForGoalType(String goalType) {
     switch (goalType) {
@@ -3620,117 +3737,271 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     }
   }
 
-  void _showUpdateWeightDialog() {
-    _updateWeightController.text = "";
-    _updateBodyFatController.text = "";
-    _updateMetabolicRateController.text = "";
+void _showUpdateWeightDialog() {
+  _updateWeightController.text = "";
+  _updateBodyFatController.text = "";
+  _updateMetabolicRateController.text = "";
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            "Update Your Progress",
-            style: TextStyle(
-              fontFamily: 'Fredoka-SemiBold',
-              fontSize: 22,
-              color: primaryBlack,
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (BuildContext context) {
+      return Dialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: SingleChildScrollView(
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _updateWeightController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.black),
-                decoration: InputDecoration(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header with icon
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.monitor_weight_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Update Your Progress",
+                          style: TextStyle(
+                            fontFamily: 'Fredoka-SemiBold',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(height: 24),
+                
+                // Weight field with icon
+                _buildInputField(
+                  controller: _updateWeightController,
                   labelText: "Current Weight (kg)",
-                  labelStyle: const TextStyle(color: Colors.black),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintText: "Enter your current weight",
+                  icon: Icons.scale_outlined,
+                  iconColor: Color(0xffFFA500),
                 ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _updateBodyFatController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.black),
-                decoration: InputDecoration(
+                
+                SizedBox(height: 16),
+                
+                // Body fat field with icon
+                _buildInputField(
+                  controller: _updateBodyFatController,
                   labelText: "Body Fat Percentage (%)",
-                  labelStyle: const TextStyle(color: Colors.black),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintText: "Enter your body fat %",
+                  icon: Icons.percent_rounded,
+                  iconColor: Color(0xffFF7E00),
                 ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _updateMetabolicRateController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.black),
-                decoration: InputDecoration(
-                  labelText: "Metabolic Rate",
-                  labelStyle: const TextStyle(color: Colors.black),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                
+                SizedBox(height: 16),
+                
+                // Metabolic rate field with icon
+                _buildInputField(
+                  controller: _updateMetabolicRateController,
+                  labelText: "Basal Metabolic Rate (kcal)",
+                  hintText: "Enter your BMR",
+                  icon: Icons.local_fire_department_outlined,
+                  iconColor: Color(0xffFF5900),
                 ),
-              ),
-            ],
+                
+                SizedBox(height: 24),
+                
+                // Motivation text
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: Colors.blue[700],
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Regular tracking helps you stay on top of your goals and measure your progress accurately.",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(height: 24),
+                
+                // Action buttons with better styling
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.grey[200],
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          "Cancel",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _updateUserMetrics();
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xffFFA500),
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          "Save",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                "Cancel",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  color: primaryGray,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _updateUserMetrics();
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryOrange,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              ),
-              child: const Text(
-                "Save",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
+// Helper method to build consistent input fields with fully rounded icon backgrounds
+Widget _buildInputField({
+  required TextEditingController controller,
+  required String labelText,
+  required String hintText,
+  required IconData icon,
+  required Color iconColor,
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.grey[50],
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey[300]!, width: 1),
+    ),
+    child: Row(
+      children: [
+        // Fully rounded icon container
+        Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 20,
+            ),
+          ),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 15,
+              color: Colors.black87,
+            ),
+            decoration: InputDecoration(
+              labelText: labelText,
+              hintText: hintText,
+              hintStyle: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.grey[400],
+              ),
+              labelStyle: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.grey[700],
+              ),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+        SizedBox(width: 12),
+      ],
+    ),
+  );
+}
   Future<void> _updateUserMetrics() async {
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;

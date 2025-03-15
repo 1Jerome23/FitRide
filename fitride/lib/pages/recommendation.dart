@@ -4307,7 +4307,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -6681,230 +6681,245 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
-  Widget _buildWeeklySummary() {
-    var media = MediaQuery.of(context).size;
+ Widget _buildWeeklySummary() {
+  var media = MediaQuery.of(context).size;
 
-    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
-    double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+  double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+  double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 5, bottom: 15),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Row(
-                  children: [
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        "Weekly Summary",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  "This Week",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Row(
+  // Make sure flex values are at least 1 to avoid divide by zero errors
+  int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
+  int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
+  
+  // Scale down if values are too large to prevent UI overflow
+  if (burnedFlex > 10000 || consumedFlex > 10000) {
+    int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
+    burnedFlex = burnedFlex ~/ divisor;
+    consumedFlex = consumedFlex ~/ divisor;
+  }
+
+  // Calculate a fixed card height that will be safe for all cards
+  double cardHeight = math.min(media.width * 0.45, 180);
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 5, bottom: 15),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Container(
-                height: media.width * 0.45,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Cycling\nSessions",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFFA500).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.directions_bike_rounded,
-                              color: Color(0xffFFA500),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) {
-                        return LinearGradient(
-                                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight)
-                            .createShader(Rect.fromLTRB(
-                                0, 0, bounds.width, bounds.height));
-                      },
-                      child: Text(
-                        "$weeklyActivityCount",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      "of ${daysPerWeek} goal",
+            Flexible(
+              child: Row(
+                children: [
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      "Weekly Summary",
                       style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: Colors.grey[600],
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: weeklyActivityCount /
-                              (int.tryParse(daysPerWeek) ?? 7),
-                          minHeight: 8,
-                          backgroundColor: Colors.grey[200],
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                "This Week",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            Expanded(
-              child: Container(
-                height: media.width * 0.45,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
+          ],
+        ),
+      ),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Calories\nBurned",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Cycling\nSessions",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF7E00).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.local_fire_department_rounded,
-                              color: Color(0xffFF7E00),
-                              size: 18,
-                            ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFFA500).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Icon(
+                            Icons.directions_bike_rounded,
+                            color: Color(0xffFFA500),
+                            size: 18,
+                          ),
+                        ),
+                      ],
                     ),
+                    
+                    // Value display
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 30),
+                      child: Center(
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (bounds) {
                                 return LinearGradient(
-                                        colors: [
-                                      Color(0xffFF7E00),
-                                      Color(0xffFF5900)
-                                    ],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight)
-                                    .createShader(Rect.fromLTRB(
-                                        0, 0, bounds.width, bounds.height));
+                                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight
+                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                              },
+                              child: Text(
+                                "$weeklyActivityCount",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              "of ${daysPerWeek} goal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: weeklyActivityCount / math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Calories\nBurned",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF7E00).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.local_fire_department_rounded,
+                            color: Color(0xffFF7E00),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Value display
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (bounds) {
+                                return LinearGradient(
+                                  colors: [Color(0xffFF7E00), Color(0xffFF5900)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight
+                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
                               },
                               child: Text(
                                 "${weeklyCaloriesBurned.toInt()}",
@@ -6931,206 +6946,218 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
 
-        SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: media.width * 0.45,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Heart Rate",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF5900).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.favorite_rounded,
-                              color: Color(0xffFF5900),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) {
-                        return LinearGradient(
-                                colors: [Color(0xffFF5900), Color(0xffFF3800)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight)
-                            .createShader(Rect.fromLTRB(
-                                0, 0, bounds.width, bounds.height));
-                      },
-                      child: Text(
-                        "${latestAverageHeartrate.toInt()}",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      "bpm avg",
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildHRZone(
-                            "Z1",
-                            latestAverageHeartrate <= zone1HeartRate,
-                            Colors.green,
-                          ),
-                          SizedBox(width: 3),
-                          _buildHRZone(
-                            "Z2",
-                            latestAverageHeartrate > zone1HeartRate &&
-                                latestAverageHeartrate <= zone2HeartRate,
-                            Color(0xffFFA500),
-                          ),
-                          SizedBox(width: 3),
-                          _buildHRZone(
-                            "Z3",
-                            latestAverageHeartrate > zone2HeartRate &&
-                                latestAverageHeartrate <= zone3HeartRate,
-                            Color(0xffFF7E00),
-                          ),
-                          SizedBox(width: 3),
-                          _buildHRZone(
-                            "Z4",
-                            latestAverageHeartrate > zone3HeartRate &&
-                                latestAverageHeartrate <= zone4HeartRate,
-                            Color(0xffFF5900),
-                          ),
-                          SizedBox(width: 3),
-                          _buildHRZone(
-                            "Z5",
-                            latestAverageHeartrate > zone4HeartRate,
-                            Color(0xffFF3800),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                  ],
-                ),
+      SizedBox(height: 15),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-            ),
-
-            // Weight Card
-            Expanded(
-              child: Container(
-                height: media.width * 0.45,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Weight",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Heart Rate",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF3800).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.monitor_weight_rounded,
-                              color: Color(0xffFF3800),
-                              size: 18,
-                            ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF5900).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            color: Color(0xffFF5900),
+                            size: 18,
+                          ),
+                        ),
+                      ],
                     ),
+                    
+                    // Value display
                     Expanded(
                       child: Center(
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (bounds) {
                                 return LinearGradient(
-                                        colors: [
-                                      Color(0xffFF3800),
-                                      Color(0xffE62200)
-                                    ],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight)
-                                    .createShader(Rect.fromLTRB(
-                                        0, 0, bounds.width, bounds.height));
+                                  colors: [Color(0xffFF5900), Color(0xffFF3800)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight
+                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
+                              },
+                              child: Text(
+                                "${latestAverageHeartrate.toInt()}",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              "bpm avg",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Zone indicators
+                    Container(
+                      height: 30,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildHRZone(
+                              "Z1",
+                              latestAverageHeartrate <= zone1HeartRate,
+                              Colors.green,
+                            ),
+                            SizedBox(width: 3),
+                            _buildHRZone(
+                              "Z2",
+                              latestAverageHeartrate > zone1HeartRate &&
+                                  latestAverageHeartrate <= zone2HeartRate,
+                              Color(0xffFFA500),
+                            ),
+                            SizedBox(width: 3),
+                            _buildHRZone(
+                              "Z3",
+                              latestAverageHeartrate > zone2HeartRate &&
+                                  latestAverageHeartrate <= zone3HeartRate,
+                              Color(0xffFF7E00),
+                            ),
+                            SizedBox(width: 3),
+                            _buildHRZone(
+                              "Z4",
+                              latestAverageHeartrate > zone3HeartRate &&
+                                  latestAverageHeartrate <= zone4HeartRate,
+                              Color(0xffFF5900),
+                            ),
+                            SizedBox(width: 3),
+                            _buildHRZone(
+                              "Z5",
+                              latestAverageHeartrate > zone4HeartRate,
+                              Color(0xffFF3800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Weight Card
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Weight",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF3800).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.monitor_weight_rounded,
+                            color: Color(0xffFF3800),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Value display
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (bounds) {
+                                return LinearGradient(
+                                  colors: [Color(0xffFF3800), Color(0xffE62200)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight
+                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
                               },
                               child: Text(
                                 "${weight}",
@@ -7153,380 +7180,361 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                         ),
                       ),
                     ),
-                    SizedBox(
-                      height: 40,
-                      child: Center(
-                        child: (previousWeight > 0 && latestWeight > 0)
-                            ? Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: latestWeight < previousWeight
-                                      ? Colors.green.withOpacity(0.1)
-                                      : Colors.red.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      latestWeight < previousWeight
-                                          ? Icons.arrow_downward_rounded
-                                          : Icons.arrow_upward_rounded,
-                                      size: 14,
-                                      color: latestWeight < previousWeight
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 12,
-                                        color: latestWeight < previousWeight
-                                            ? Colors.green
-                                            : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : SizedBox(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        SizedBox(height: 15),
-
-        // Bottom Card - Caloric Balance
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 5),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 2,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        "Caloric Balance",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Color(0xffFFA500).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.equalizer_rounded,
-                        color: Color(0xffFFA500),
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 15),
-
-                // Single bar balance visualization
-                Container(
-                  width: double.infinity,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xffFFA500),
-                                      Color(0xffFF8C00)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xff4CAF50),
-                                      Color(0xff388E3C)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      // Balance bar
+                    
+                    // Change indicator
+                    if (previousWeight > 0 && latestWeight > 0)
                       Container(
-                        height: 10,
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Row(
-                          children: [
-                            Flexible(
-                              flex: weeklyCaloriesBurned.toInt(),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xffFFA500),
-                                      Color(0xffFF8C00)
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(5),
-                                    bottomLeft: Radius.circular(5),
-                                    topRight: weeklyCaloriesConsumed == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                    bottomRight: weeklyCaloriesConsumed == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Flexible(
-                              flex: weeklyCaloriesConsumed.toInt(),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xff4CAF50),
-                                      Color(0xff388E3C)
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.only(
-                                    topRight: Radius.circular(5),
-                                    bottomRight: Radius.circular(5),
-                                    topLeft: weeklyCaloriesBurned == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                    bottomLeft: weeklyCaloriesBurned == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors:
-                                weeklyCaloriesBurned > weeklyCaloriesConsumed
-                                    ? [Color(0xffFFA500), Color(0xffFF8C00)]
-                                    : [Color(0xff4CAF50), Color(0xff388E3C)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  weeklyCaloriesBurned > weeklyCaloriesConsumed
-                                      ? Color(0xffFFA500).withOpacity(0.3)
-                                      : Color(0xff4CAF50).withOpacity(0.3),
-                              spreadRadius: 1,
-                              blurRadius: 6,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                          color: latestWeight < previousWeight
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              weeklyCaloriesBurned > weeklyCaloriesConsumed
-                                  ? Icons.trending_down_rounded
-                                  : Icons.trending_up_rounded,
-                              color: Colors.white,
-                              size: 18,
+                              latestWeight < previousWeight
+                                  ? Icons.arrow_downward_rounded
+                                  : Icons.arrow_upward_rounded,
+                              size: 14,
+                              color: latestWeight < previousWeight
+                                  ? Colors.green
+                                  : Colors.red,
                             ),
-                            SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            SizedBox(width: 5),
+                            Text(
+                              "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: latestWeight < previousWeight
+                                    ? Colors.green
+                                    : Colors.red,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                       ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      SizedBox(height: 15),
+
+      // Bottom Card - Caloric Balance
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      "Caloric Balance",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xffFFA500).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.equalizer_rounded,
+                      color: Color(0xffFFA500),
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 15),
+
+              // Single bar balance visualization
+              Container(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xffFFA500),
+                                    Color(0xffFF8C00)
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xff4CAF50),
+                                    Color(0xff388E3C)
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    // Balance bar with safe flex values
+                    Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            flex: burnedFlex,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xffFFA500),
+                                    Color(0xffFF8C00)
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(5),
+                                  bottomLeft: Radius.circular(5),
+                                  topRight: weeklyCaloriesConsumed == 0
+                                      ? Radius.circular(5)
+                                      : Radius.zero,
+                                  bottomRight: weeklyCaloriesConsumed == 0
+                                      ? Radius.circular(5)
+                                      : Radius.zero,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            flex: consumedFlex,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xff4CAF50),
+                                    Color(0xff388E3C)
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(5),
+                                  bottomRight: Radius.circular(5),
+                                  topLeft: weeklyCaloriesBurned == 0
+                                      ? Radius.circular(5)
+                                      : Radius.zero,
+                                  bottomLeft: weeklyCaloriesBurned == 0
+                                      ? Radius.circular(5)
+                                      : Radius.zero,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
+              ),
 
-                if (nutritionData.isNotEmpty) ...[
-                  SizedBox(height: 20),
-                  Divider(),
-                  SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              SizedBox(height: 15),
+              Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                          ? [Color(0xffFFA500), Color(0xffFF8C00)]
+                          : [Color(0xff4CAF50), Color(0xff388E3C)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                            ? Color(0xffFFA500).withOpacity(0.3)
+                            : Color(0xff4CAF50).withOpacity(0.3),
+                        spreadRadius: 1,
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(
+                        weeklyCaloriesBurned > weeklyCaloriesConsumed
+                            ? Icons.trending_down_rounded
+                            : Icons.trending_up_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
                       Text(
-                        "Latest Meals",
+                        "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
                         style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Text(
-                          "Today",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 15),
-                  Column(
-                    children: [
-                      if (nutritionData[0]['breakfast'] != "-")
-                        _buildEnhancedMealCard(
-                          "B",
-                          "Breakfast",
-                          nutritionData[0]['breakfast'],
-                          "${nutritionData[0]['breakfast_calories']} kcal",
-                          Color(0xffFFA500),
-                          Icons.wb_sunny_outlined,
+                ),
+              ),
+
+              if (nutritionData.isNotEmpty) ...[
+                SizedBox(height: 20),
+                Divider(),
+                SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Latest Meals",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xffFFA500), Color(0xffFF8C00)],
                         ),
-                      SizedBox(
-                          height:
-                              nutritionData[0]['breakfast'] != "-" ? 10 : 0),
-                      if (nutritionData[0]['lunch'] != "-")
-                        _buildEnhancedMealCard(
-                          "L",
-                          "Lunch",
-                          nutritionData[0]['lunch'],
-                          "${nutritionData[0]['lunch_calories']} kcal",
-                          Color(0xffFF7E00),
-                          Icons.restaurant_outlined,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Text(
+                        "Today",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
-                      SizedBox(
-                          height: nutritionData[0]['lunch'] != "-" ? 10 : 0),
-                      if (nutritionData[0]['dinner'] != "-")
-                        _buildEnhancedMealCard(
-                          "D",
-                          "Dinner",
-                          nutritionData[0]['dinner'],
-                          "${nutritionData[0]['dinner_calories']} kcal",
-                          Color(0xffFF5900),
-                          Icons.nightlight_outlined,
-                        ),
-                    ],
-                  ),
-                ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 15),
+                Column(
+                  children: [
+                    if (nutritionData[0]['breakfast'] != "-")
+                      _buildEnhancedMealCard(
+                        "B",
+                        "Breakfast",
+                        nutritionData[0]['breakfast'],
+                        "${double.parse(nutritionData[0]['breakfast_calories'].toString()).toStringAsFixed(2)} kcal",
+                        Color(0xffFFA500),
+                        Icons.wb_sunny_outlined,
+                      ),
+                    SizedBox(
+                        height: nutritionData[0]['breakfast'] != "-" ? 10 : 0),
+                    if (nutritionData[0]['lunch'] != "-")
+                      _buildEnhancedMealCard(
+                        "L",
+                        "Lunch",
+                        nutritionData[0]['lunch'],
+                        "${double.parse(nutritionData[0]['lunch_calories'].toString()).toStringAsFixed(2)} kcal",
+                        Color(0xffFF7E00),
+                        Icons.restaurant_outlined,
+                      ),
+                    SizedBox(height: nutritionData[0]['lunch'] != "-" ? 10 : 0),
+                    if (nutritionData[0]['dinner'] != "-")
+                      _buildEnhancedMealCard(
+                        "D",
+                        "Dinner",
+                        nutritionData[0]['dinner'],
+                        "${double.parse(nutritionData[0]['dinner_calories'].toString()).toStringAsFixed(2)} kcal",
+                        Color(0xffFF5900),
+                        Icons.nightlight_outlined,
+                      ),
+                  ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
-      ],
-    );
-  }
-
+      ),
+    ],
+  );
+}
   Widget _buildEnhancedMealCard(String letter, String mealType, String mealDesc,
       String calories, Color color, IconData icon) {
     return TweenAnimationBuilder(
