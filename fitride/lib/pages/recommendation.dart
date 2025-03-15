@@ -3774,9 +3774,11 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   double bodyFatPercentage = safeParseDouble(bodyFat);
   double totalCaloriesBurned = safeParseDouble(caloriesBurned);
 
+  // Updated heart rate zones based on research (Fletcher, 2023)
   double maxHeartRate = 220 - age.toDouble();
-  double fatBurningZoneLower = maxHeartRate * 0.7;
-  double fatBurningZoneUpper = maxHeartRate * 0.85;
+  // Updated fat burning zone based on research (60-80% of max HR)
+  double fatBurningZoneLower = maxHeartRate * 0.6;
+  double fatBurningZoneUpper = maxHeartRate * 0.8;
   double zone2HeartRate = maxHeartRate * 0.65;
 
   double latestHeartRate = safeParseDouble(averageHeartrate);
@@ -3800,7 +3802,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       previousBodyFat > 0) {
     setState(() {
       recommendation = "⚠️ Mixed Results";
-      feedback = "Losing weight but not body fat. Add more HIIT with short work intervals (<60s) and active recovery periods (<90s).";
+      // Updated based on Weegu et al. (2023) findings
+      feedback = "Losing weight but not body fat. Add more HIIT with short work intervals (<60s) and active recovery periods (<90s) for better body composition.";
     });
   } else if (latestWeight > previousWeight &&
       latestBodyFat < previousBodyFat &&
@@ -3810,7 +3813,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       previousBodyFat > 0) {
     setState(() {
       recommendation = "✅ Gaining Muscle";
-      feedback = "Gaining weight while reducing body fat suggests muscle building. Great work!";
+      // Updated based on cycling HIIT research (Weegu et al., 2023)
+      feedback = "Gaining weight while reducing body fat suggests muscle building. Cycling HIIT is effective for recruiting lower body muscles.";
     });
   } else if (latestWeight == previousWeight &&
       latestBodyFat < previousBodyFat &&
@@ -3830,7 +3834,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       previousBodyFat > 0) {
     setState(() {
       recommendation = "⚠️ Needs Adjustment";
-      feedback = "Adjust your training and nutrition. HIIT sessions 3x weekly for 8+ weeks are most effective for body composition.";
+      // Updated based on HIIT research (Weegu et al., 2023)
+      feedback = "Adjust your training and nutrition. HIIT sessions 3x weekly for 8+ weeks are most effective for body composition changes.";
     });
   } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
     setState(() {
@@ -3841,17 +3846,20 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     if (latestWeight > 0 && latestBodyFat > 0) {
       setState(() {
         recommendation = "ℹ️ Monitoring Progress";
-        feedback = "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. For results, aim for 30 minutes daily.";
+        // Updated based on Myles C's recommendations
+        feedback = "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. For results, aim for 30 minutes daily (180 minutes/week).";
       });
     } else if (safeParseDouble(weight) > 0) {
       setState(() {
         recommendation = "ℹ️ Starting Point Established";
-        feedback = "Your weight: ${weight} kg. Record post-workout data to track progress. Aim for 3x weekly cycling for 8+ weeks.";
+        // Updated based on Adam K's recommendations
+        feedback = "Your weight: ${weight} kg. Record post-workout data to track progress. Aim for 3x weekly cycling for at least 20 minutes each session.";
       });
     } else {
       setState(() {
         recommendation = "ℹ️ Building Baseline";
-        feedback = "Track metrics consistently for personalized recommendations. Focus on distance and heart rate.";
+        // Based on Adam K's input about monitoring distance
+        feedback = "Track metrics consistently for personalized recommendations. Focus on distance and heart rate for progress monitoring.";
       });
     }
   }
@@ -3862,14 +3870,15 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
     if (totalCaloriesBurned < dailyDeficitNeeded / 2 && activityData.isNotEmpty) {
       trainingRecommendations.add(
-          "Increase session duration by 15-20 minutes or add HIIT with short intervals for better results.");
+          "Increase session duration by 15-20 minutes or add HIIT with short intervals (<60s) and active recovery (<90s) for better results.");
     } else if (totalCaloriesBurned > dailyDeficitNeeded) {
+      // Updated based on recovery science (Dupuy et al.)
       trainingRecommendations.add(
-          "Great calorie burn! Focus on recovery with compression garments and protein intake after sessions.");
+          "Great calorie burn! Focus on recovery with compression garments, cold therapy, and protein intake after sessions to reduce muscle damage and inflammation.");
     }
   }
 
-  // Body fat percentage recommendations (now with null check)
+  // Body fat percentage recommendations
   if (bodyFatPercentage > 0) {
     String bodyFatCategory = "";
     if (bodyFatPercentage < 10) {
@@ -3889,25 +3898,29 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
     if (bodyFatCategory == "obesity") {
       int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
+      // Updated based on Weegu et al. (2023) research
       healthRecommendations.add(
-          "Aim for ${recommendedSessions} sessions/week. HIIT cycling helps preserve muscle while reducing fat.");
+          "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
     } else if (bodyFatCategory == "average") {
+      // Updated based on HIIT research
       healthRecommendations.add(
-          "Use 2:1 ratio of high-intensity to steady-state cardio for optimal body composition changes.");
+          "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
     } else if (bodyFatCategory == "fitness") {
+      // Updated based on nutrition timing research
       healthRecommendations.add(
-          "Focus on nutrition timing with pre-workout carbs and post-workout protein for better results.");
+          "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
     } else if (bodyFatCategory == "athletic") {
+      // Updated based on carbohydrate research
       healthRecommendations.add(
-          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources.");
+          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
     } else if (bodyFatCategory == "essential fat") {
       healthRecommendations.add(
           "Maintain current level through consistent performance rather than further reduction.");
     }
   } else {
-    // Case for when bodyFat is null
+    // Updated based on Myles C's advice on BMI vs body fat
     healthRecommendations.add(
-        "Measure your body fat percentage to receive more tailored recommendations. Focus on consistency rather than intensity initially.");
+        "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
   }
 
   // BMR-based recommendations
@@ -3915,8 +3928,9 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     double activityFactor = weeklyActivityCount <= 2 ? 1.375 : weeklyActivityCount <= 4 ? 1.55 : 1.725;
     double weightLossTarget = bmr * activityFactor - 500;
 
+    // Updated based on nutrition research
     trainingRecommendations.add(
-        "Aim for ${weightLossTarget.toInt()} kcal daily intake for sustainable weight loss while maintaining energy.");
+        "Aim for ${weightLossTarget.toInt()} kcal daily intake for sustainable weight loss. Never start your workout on an empty stomach - eat something light 30-60 minutes before.");
 
     if (bmr > 1800) {
       trainingRecommendations.add(
@@ -3927,21 +3941,21 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     }
   }
 
-  // Heart rate recommendations
+  // Heart rate recommendations - updated based on fat burning zone research
   if (latestHeartRate > 0) {
     if (latestHeartRate < fatBurningZoneLower) {
       trainingRecommendations.add(
-          "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning.");
+          "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning. This zone varies by individual fitness level.");
     } else if (latestHeartRate > fatBurningZoneUpper) {
       trainingRecommendations.add(
-          "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better results.");
+          "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better lactate clearance and fat oxidation.");
     } else {
       trainingRecommendations.add(
-          "Perfect fat-burning zone! Maintain this intensity for optimal results.");
+          "Perfect fat-burning zone! Maintain this intensity for optimal results, but remember fat can be burned at various heart rates.");
     }
   }
 
-  // HIIT session analysis
+  // HIIT session analysis - updated based on Weegu et al. (2023)
   int totalHighIntensitySessions = 0;
   List<int> lastFiveHeartRates = [];
 
@@ -3953,48 +3967,51 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
   if (totalHighIntensitySessions < 12 && activityData.length >= 15) {
     trainingRecommendations.add(
-        "Aim for at least 12 high-intensity sessions monthly for optimal body composition changes.");
+        "Aim for at least 12 high-intensity sessions monthly (3x weekly) for optimal body composition changes.");
   }
 
-  // Frequency recommendations
+  // Frequency recommendations - updated based on Adam K and Myles C's feedback
   if (weeklyActivityCount < 3) {
     trainingRecommendations.add(
-        "Gradually build to 3 sessions weekly, aiming for 12+ monthly sessions for effective results.");
+        "Gradually build to 3 sessions weekly (minimum 20-30 minutes each), aiming for 12+ monthly sessions for effective results.");
   }
 
-  // Weather recommendations
+  // Weather recommendations - updated based on research
   if (weatherData.isNotEmpty) {
     double currentTemp = safeParseDouble(temperature);
     if (currentTemp > 28) {
+      // Updated based on temperature impact research
       trainingRecommendations.add(
-          "For hot weather (${currentTemp.toStringAsFixed(1)}°C), ride in early morning and increase hydration by 100-200ml per 20 minutes.");
+          "For hot weather (${currentTemp.toStringAsFixed(1)}°C), ride in early morning to avoid heat stress and increase hydration by 100-200ml per 20 minutes to prevent dehydration.");
     } else if (currentTemp < 10) {
       trainingRecommendations.add(
           "For cold weather, ensure proper 10-15 minute warm-up before high-intensity work.");
     }
 
-    // Recovery recommendations
+    // Recovery recommendations - updated based on Dupuy et al.
     trainingRecommendations.add(
-        "For optimal recovery: 1) active recovery with light cycling, 2) compression garments, 3) cold therapy.");
+        "For optimal recovery: 1) active recovery with light cycling, 2) compression garments to reduce fatigue, 3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
 
-    // Health condition recommendations
+    // Health condition recommendations - updated based on chronic disease management research
     if (respiratoryCondition == "Yes") {
       healthRecommendations.add(
-          "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min).");
+          "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min). Avoid highly polluted areas as they can reduce lung function and performance.");
     }
 
     if (cardiovascularCondition == "Yes") {
+      // Updated based on AHA recommendations
       healthRecommendations.add(
-          "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm).");
+          "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm) and aim for 150 minutes weekly. Always get checked by a doctor first.");
     }
 
-    // Training structure
+    // Training structure - based on Weegu et al. (2023)
     if (weeklyActivityCount >= 3) {
       trainingRecommendations.add(
-          "Structure weekly rides: ${math.min(3, weeklyActivityCount - 1)} HIIT sessions plus ${math.max(1, weeklyActivityCount - 3)} moderate rides for recovery.");
+          "Structure weekly rides: ${math.min(3, weeklyActivityCount - 1)} HIIT sessions (with short work intervals <60s and active recovery <90s) plus ${math.max(1, weeklyActivityCount - 3)} moderate rides for recovery.");
     }
   }
 }
+
 
  void _generateCyclingEnduranceRecommendations() {
   // Basic data
@@ -4003,7 +4020,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   double targetDurationValue = safeParseDouble(targetDuration);
   double currentDurationValue = safeParseDouble(sessionDuration) / 60;
 
-  // Heart rate zones
+  // Heart rate zones - updated based on the research
   double maxHeartRate = 220 - age.toDouble();
   double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
   double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
@@ -4048,16 +4065,18 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       previousDistance > 0) {
     setState(() {
       recommendation = "⚠️ Distance Decreasing";
+      // Updated based on Myles C's advice on tapering
       feedback =
-          "Recent ride was shorter than previous. Focus on recovery before next endurance effort.";
+          "Recent ride was shorter than previous. Focus on recovery before next endurance effort. Remember to taper workouts rather than stopping abruptly.";
     });
   } else if (latestAverageSpeed < previousAverageSpeed &&
       latestAverageSpeed > 0 &&
       previousAverageSpeed > 0) {
     setState(() {
       recommendation = "⚠️ Speed Decreasing";
+      // Updated based on Myles C's advice on pacing
       feedback =
-          "Average speed dropped. Work on consistent pacing during long rides.";
+          "Average speed dropped. Work on consistent pacing during long rides. Adjusting pace is more effective than stopping and starting.";
     });
   } else if (latestDistance > 0 &&
       currentDistanceValue < targetDistanceValue) {
@@ -4069,8 +4088,9 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   } else {
     setState(() {
       recommendation = "ℹ️ Establishing Baseline";
+      // Updated based on Adam K's advice on distance tracking
       feedback =
-          "Track rides consistently for personalized endurance recommendations.";
+          "Track rides consistently for personalized endurance recommendations. Focus on distance as your primary metric.";
     });
   }
 
@@ -4090,12 +4110,13 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
       double improvementPercent = ((newestAvg - oldestAvg) / oldestAvg) * 100;
 
+      // Updated based on Myles C's advice on progress expectations
       if (improvementPercent > 10) {
         trainingRecommendations.add(
-            "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to earlier rides. Excellent progression!");
+            "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to earlier rides. Excellent progression! Remember progress varies by individual - some see changes in 2 weeks, others in 3 months.");
       } else if (improvementPercent < -10) {
         trainingRecommendations.add(
-            "Recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than earlier rides. Adjust training and ensure proper recovery.");
+            "Recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than earlier rides. Adjust training and ensure proper recovery. Progress isn't always linear.");
       } else {
         trainingRecommendations.add(
             "Your distance progression is stable. Continue improving by gradually increasing your longest ride each week (no more than 10% increase).");
@@ -4105,13 +4126,14 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     // Find longest ride ever
     double longestRide = distanceProgression.reduce(math.max);
     if (longestRide > 0 && targetDistanceValue > 0) {
+      // Updated based on recommendations for recreational cycling
       double percentOfTarget = (longestRide / targetDistanceValue) * 100;
       trainingRecommendations.add(
-          "Your longest ride (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target. For recreational cycling, aim for at least 30 minutes per day.");
+          "Your longest ride (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target. For recreational cycling, aim for at least 30 minutes per day (180 minutes/week).");
     }
   }
 
-  // Heart rate zone analysis from historical data
+  // Heart rate zone analysis from historical data - updated with HRM research
   if (heartrateProgression.length >= 3) {
     int enduranceZoneCount = 0;
     int aboveThresholdCount = 0;
@@ -4129,13 +4151,14 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     double thresholdPercent =
         (aboveThresholdCount / heartrateProgression.length) * 100;
 
+    // Updated based on heart rate monitoring research
     if (endurancePercent < 60 && thresholdPercent > 30) {
       trainingRecommendations.add(
-          "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm). Heart rate monitoring is valuable for measuring exercise intensity.");
+          "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm). Heart rate monitoring helps measure exercise intensity and prevent overtraining.");
     }
   }
 
-  // Recovery and overtraining prevention based on heart rate
+  // Recovery and overtraining prevention based on heart rate - updated based on HRM research
   if (heartrateProgression.length >= 10) {
     List<double> recentHRs = heartrateProgression.sublist(0, 5);
     List<double> earlierHRs = heartrateProgression.sublist(5, math.min(10, heartrateProgression.length));
@@ -4145,20 +4168,21 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     
     double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
     
+    // Updated based on HRM research for overtraining detection
     if (hrChangePercent > 5 && weeklyActivityCount > 3) {
       trainingRecommendations.add(
-          "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% recently. This may indicate fatigue. Add an additional recovery day and consider active recovery (light cycling at ${zone2HeartRate.toInt()} bpm).");
+          "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% recently. This may indicate fatigue or overtraining. Use HRM data to detect changes in max heart rate, a potential indicator of high training loads. Add an additional recovery day with light cycling at ${zone2HeartRate.toInt()} bpm.");
     } else if (hrChangePercent < -5) {
       trainingRecommendations.add(
           "Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% recently, suggesting improved cardiovascular efficiency. Great progress!");
     }
   }
 
-  // Current heart rate recommendations
+  // Current heart rate recommendations - updated based on Myles C's advice
   if (latestHeartRate > 0) {
     if (latestHeartRate > thresholdZoneUpper) {
       trainingRecommendations.add(
-          "Heart rate too high for endurance. For longer rides, stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range.");
+          "Heart rate too high for endurance. For recreational cycling, don't aim to reach your threshold. Stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range for longer rides.");
     } else if (latestHeartRate < enduranceZoneLower) {
       trainingRecommendations.add(
           "Increase intensity to ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm for better aerobic development.");
@@ -4174,7 +4198,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
   // Training structure based on research
   trainingRecommendations.add(
-      "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides. HRMs effectively measure exercise intensity and can help prevent overtraining.");
+      "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides. Heart rate monitors effectively measure exercise intensity and can help prevent overtraining.");
 
   // Distance progression
   if (currentDistanceValue > 0 &&
@@ -4189,56 +4213,81 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         "You're ${percentComplete.toStringAsFixed(0)}% to goal. For safe progression, increase your long ride by no more than ${weeklyIncrease.toStringAsFixed(1)} km/week.");
   }
 
-  // Frequency recommendations
+  // Frequency recommendations - updated based on Adam K & Myles C
   if (weeklyActivityCount < 3) {
     trainingRecommendations
-        .add("For optimal endurance benefits, aim for 3-4 rides/week: one long ride, 2-3 shorter recovery rides.");
+        .add("For optimal endurance benefits, aim for 3 rides/week (minimum 20 minutes each): one long ride, 2 shorter recovery rides.");
   }
 
-  // Recovery strategies based on research
+  // Recovery strategies based on research - updated with Dupuy et al. research
   trainingRecommendations.add(
-      "For optimal recovery: (1) active recovery with low-intensity cycling, (2) compression garments to reduce fatigue, and (3) proper nutrition timing.");
+      "For optimal recovery: (1) active recovery with low-intensity cycling to enhance blood flow and remove metabolic waste, (2) compression garments to reduce perceived fatigue, and (3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
 
-  // Weather and temperature considerations
+  // Weather and temperature considerations - updated based on research
   if (weatherData.isNotEmpty) {
     double currentTemp = safeParseDouble(temperature);
     double currentHumidity = safeParseDouble(humidity);
 
+    // Updated based on temperature impact research
     if (currentTemp > 28) {
       trainingRecommendations.add(
-          "At ${currentTemp.toStringAsFixed(1)}°C: Lower heart rate target by 5-10%, hydrate more frequently, and consider riding earlier in the morning to avoid heat stress.");
+          "At ${currentTemp.toStringAsFixed(1)}°C: Lower heart rate target by 5-10%, increase hydration frequency to prevent dehydration, and consider riding earlier in the morning to avoid heat stress.");
       
+      // Updated based on humidity research
       if (currentHumidity > 70) {
         trainingRecommendations.add(
-            "High humidity (${currentHumidity.toStringAsFixed(0)}%) restricts evaporative cooling. Reduce intensity and increase hydration further in these conditions.");
+            "High humidity (${currentHumidity.toStringAsFixed(0)}%) restricts evaporative cooling and increases thermal stress. Reduce intensity and increase hydration further in these conditions. Acclimatization is important when training in humid areas.");
       }
     } else if (currentTemp < 10) {
       trainingRecommendations.add(
           "Cold weather (${currentTemp.toStringAsFixed(1)}°C): Extend your warm-up to 15-20 minutes and use layered clothing for optimal temperature regulation.");
     }
 
-  // Health condition recommendations
+  // Health condition recommendations - updated based on research
   if (respiratoryCondition == "Yes") {
+    // Updated based on air quality research
     healthRecommendations.add(
-        "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise.");
+        "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
     healthRecommendations
-        .add("Only ride outdoors when AQI < 100, as pollution can exacerbate respiratory issues and decrease performance.");
+        .add("Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
   }
 
   if (cardiovascularCondition == "Yes") {
+    // Updated based on AHA research and Myles C's advice
     healthRecommendations.add(
-        "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly.");
+        "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly. Always get checked by a doctor first.");
     healthRecommendations
-        .add("Monitor heart rate carefully and increase intensity very gradually to avoid strain.");
+        .add("Monitor heart rate carefully with a device like an Apple Watch or Fitbit, and increase intensity very gradually to avoid strain.");
   }
   
-  // Nutrition recommendations
+  // Nutrition recommendations - updated based on research and Myles C's advice
   healthRecommendations
-      .add("Post-ride nutrition: 3:1 carb:protein ratio within 30 minutes to optimize recovery and glycogen replenishment.");
+      .add("Pre-ride nutrition: Eat a light meal (like a banana or boiled eggs) 30-60 minutes before riding. Never start on an empty stomach. Post-ride: consume a 3:1 carb:protein ratio within 30 minutes.");
       
+  // Updated based on Holland et al. (2017) hydration research
   if (currentDistanceValue > 30) {
-    healthRecommendations.add(
-        "For rides longer than 2 hours, consume 60-90g of carbohydrate per hour from multiple sources to maintain energy levels.");
+    double rideHours = currentDurationValue / 60;
+    double weightInKg = safeParseDouble(weight);
+    
+    if (rideHours >= 1 && rideHours <= 2) {
+      // For 1-2 hour moderate-intensity rides
+      double recommendedFluidRate = 0.175; // midpoint of 0.15-0.20 range
+      double totalFluidRecommendation = recommendedFluidRate * weightInKg * rideHours * 60;
+      
+      healthRecommendations.add(
+          "For your ${rideHours.toStringAsFixed(1)}-hour moderate rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid (${(recommendedFluidRate * weightInKg).toStringAsFixed(1)} ml/min) for optimal performance.");
+    } else if (rideHours > 2) {
+      // For rides longer than 2 hours
+      double recommendedFluidRate = 0.205; // midpoint of 0.14-0.27 range
+      double totalFluidRecommendation = recommendedFluidRate * weightInKg * rideHours * 60;
+      
+      healthRecommendations.add(
+          "For your ${rideHours.toStringAsFixed(1)}-hour rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid total and 60-90g of carbohydrates per hour from multiple sources to maintain energy levels.");
+    } else if (rideHours < 1 && latestAverageHeartrate > thresholdZoneLower) {
+      // For high-intensity rides under 1 hour
+      healthRecommendations.add(
+          "For high-intensity rides under 1 hour, excessive hydration can be counterproductive. Focus on pre-ride hydration instead of drinking large amounts during the ride.");
+    }
   }
 
   // Recovery recommendations
@@ -4247,18 +4296,18 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         .add("Add dedicated recovery days to prevent overtraining syndrome and reduce injury risk.");
   }
 
-  // Equipment recommendations
+  // Equipment recommendations - added HRM based on research
   equipmentRecommendations.add(
       "Proper bike fit is crucial for endurance - small discomforts become major issues on long rides.");
   equipmentRecommendations
-      .add("For longer rides, invest in quality padded shorts and use heart rate monitoring to maintain proper intensity.");
+      .add("For longer rides, invest in quality padded shorts and use a heart rate monitor to maintain proper intensity and track recovery.");
 }
 }
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
