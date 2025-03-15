@@ -678,7 +678,7 @@ Future<void> _updateWeeklyProgressData() async {
         days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
   }
 
-  @override
+ @override
 void initState() {
   super.initState();
   _currentWeekNumber = 1;
@@ -687,6 +687,9 @@ void initState() {
   _fetchSubgoalDetails();
   _confettiController =
       ConfettiController(duration: const Duration(seconds: 5));
+
+  // Check for stored dialog flags
+  _checkDialogFlags();
 
   Future.delayed(Duration(milliseconds: 500), () {
     _loadUserGoalAndActivities();
@@ -719,6 +722,24 @@ void initState() {
     ),
   );
   _animationController.forward();
+}
+
+// Add this method to check dialog flags
+Future<void> _checkDialogFlags() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Check if we need to reset the weekly dialog flag
+    bool hasShownDialogThisWeek = prefs.getBool('has_shown_dialog_this_week') ?? false;
+    
+    // If a new week has started, reset the flag
+    if (hasActiveSubgoal && DateTime.now().isAfter(subgoalEndDate)) {
+      await prefs.setBool('has_shown_dialog_this_week', false);
+      print("Reset dialog flag for new week");
+    }
+  } catch (e) {
+    print("Error checking dialog flags: $e");
+  }
 }
 
   @override
@@ -3610,7 +3631,6 @@ Future<void> _checkSubgoalCompletionStatus() async {
   DateTime now = DateTime.now();
   
   // Check if we're at the end of the subgoal period
-  bool isSubgoalCompleted = false;
   bool isSubgoalEnded = now.isAfter(subgoalEndDate) || now.isAtSameMomentAs(subgoalEndDate);
   
   // Calculate current progress
@@ -3620,7 +3640,6 @@ Future<void> _checkSubgoalCompletionStatus() async {
   Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
   if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
     progressPercent = currentWeekData['subgoalProgress'];
-    isSubgoalCompleted = progressPercent >= 1.0;
   } else {
     // Calculate progress based on subgoal type if not available in weekly data
     switch (subgoalType) {
@@ -3657,31 +3676,68 @@ Future<void> _checkSubgoalCompletionStatus() async {
         progressPercent = _weeklyActivities.length >= 3 ? 1.0 : _weeklyActivities.length / 3.0;
         break;
     }
-    
-    isSubgoalCompleted = progressPercent >= 1.0;
   }
   
   progressPercent = progressPercent.clamp(0.0, 1.0);
+  bool isSubgoalCompleted = progressPercent >= 1.0;
   
-  // Check if the subgoal is ended or completed
-  if (isSubgoalEnded || isSubgoalCompleted) {
-    // Deactivate the current subgoal in Firestore
-    await _deactivateCurrentSubgoal();
+  // Get SharedPreferences to check if we've already shown dialogs
+  final prefs = await SharedPreferences.getInstance();
+  String? lastCompletedSubgoalId = prefs.getString('last_completed_subgoal_id');
+  bool hasShownDialogThisWeek = prefs.getBool('has_shown_dialog_this_week') ?? false;
+  
+  // Fetch current active subgoal ID
+  String currentSubgoalId = '';
+  try {
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
     
-    // Show appropriate popup
+    if (subgoalQuery.docs.isNotEmpty) {
+      currentSubgoalId = subgoalQuery.docs.first.id;
+    }
+  } catch (e) {
+    print("Error fetching subgoal ID: $e");
+  }
+  
+  // Check if this is a new week (to reset the dialog shown flag)
+  if (isSubgoalEnded) {
+    // Week has ended, reset the dialog flag so it can show again next week
+    await prefs.setBool('has_shown_dialog_this_week', false);
+  }
+  
+  // Check if we need to show a dialog (either completed or ended)
+  if (!hasShownDialogThisWeek && 
+      (isSubgoalCompleted || isSubgoalEnded) && 
+      lastCompletedSubgoalId != currentSubgoalId) {
+    
+    // Deactivate current subgoal if needed
+    if (isSubgoalEnded || isSubgoalCompleted) {
+      await _deactivateCurrentSubgoal();
+    }
+    
+    // Show the appropriate dialog
     if (isSubgoalCompleted) {
       _showSubgoalCompletionDialog();
     } else if (isSubgoalEnded) {
       _showSubgoalEndedDialog();
     }
     
-    // Trigger the recommendation screen to show new subgoal cards
-    // We'll use a shared preferences flag to indicate this
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('show_subgoal_selection', true);
+    // Set flags to prevent showing dialog again
+    await prefs.setString('last_completed_subgoal_id', currentSubgoalId);
+    await prefs.setBool('has_shown_dialog_this_week', true);
+    
+    // Signal the recommendation page to show new subgoal options, but only
+    // if the week has ended or the user failed
+    if (isSubgoalEnded || (isSubgoalEnded && !isSubgoalCompleted)) {
+      await prefs.setBool('show_subgoal_selection', true);
+    }
   }
 }
-
+// Method to deactivate the current subgoal
 // Method to deactivate the current subgoal
 Future<void> _deactivateCurrentSubgoal() async {
   try {
@@ -3701,14 +3757,18 @@ Future<void> _deactivateCurrentSubgoal() async {
           .update({
             'isActive': false,
             'endedAt': FieldValue.serverTimestamp(),
+            'completedSuccessfully': DateTime.now().isBefore(subgoalEndDate), // Track if completed before end date
           });
       
       print("Deactivated subgoal: ${doc.id}");
     }
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('show_subgoal_selection', true);
-    print("Set show_subgoal_selection flag to true");
+    // Only set show_subgoal_selection to true if the week has ended
+    if (DateTime.now().isAfter(subgoalEndDate) || DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
+      await prefs.setBool('show_subgoal_selection', true);
+      print("Set show_subgoal_selection flag to true");
+    }
     
     setState(() {
       hasActiveSubgoal = false;
@@ -3718,6 +3778,9 @@ Future<void> _deactivateCurrentSubgoal() async {
   }
 }
 void _showSubgoalCompletionDialog() {
+  // Check if current time is before the end of the week
+  bool isBeforeWeekEnd = DateTime.now().isBefore(subgoalEndDate);
+  
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -3799,6 +3862,38 @@ void _showSubgoalCompletionDialog() {
                   ],
                 ),
               ),
+              // Show info about waiting until end of week
+              if (isBeforeWeekEnd) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[300]!, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue[700],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "You'll be able to set new goals after this week ends on ${DateFormat('MMM d').format(subgoalEndDate)}.",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               // Buttons
               Row(
@@ -3828,19 +3923,24 @@ void _showSubgoalCompletionDialog() {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => RecommendationPage()),
-                        );
-                      },
+                      onPressed: isBeforeWeekEnd 
+                        ? null // Disable button if before week end
+                        : () {
+                            Navigator.of(context).pop();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => RecommendationPage()),
+                            );
+                          },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryOrange,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        // Apply disabled styling when before week end
+                        disabledBackgroundColor: Colors.grey[400],
+                        disabledForegroundColor: Colors.white70,
                       ),
                       child: const Text(
                         "New Goals",
