@@ -9,6 +9,9 @@ import 'package:intl/intl.dart';
 import 'question.dart';
 import 'dart:math';
 import 'package:confetti/confetti.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+
 
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});
@@ -130,7 +133,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   DateTime? _latestActivityDate;
   double _latestDistance = 0;
   bool hasActiveSubgoal = false;
-  String subgoalType = ""; 
+  String subgoalType = "";
   double subgoalTargetValue = 0.0;
   DateTime subgoalStartDate = DateTime.now();
   DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
@@ -141,10 +144,12 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   double baselineDistance = 0.0;
   double baselinePace = 0.0;
   double baselineDuration = 0.0;
+  bool _isBaselineComplete = false;
 
   TextEditingController _updateWeightController = TextEditingController();
   TextEditingController _updateBodyFatController = TextEditingController();
-  TextEditingController _updateMetabolicRateController =TextEditingController();
+  TextEditingController _updateMetabolicRateController =
+      TextEditingController();
 
   static const Color primaryOrange = Color(0xFFFF8B3D);
   static const Color primaryBlack = Color(0xFF1A1A1A);
@@ -216,8 +221,8 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       'uid': uid,
       'goalId': goalId,
       'weekNumber': _currentWeekNumber,
-      'weekStartDate': Timestamp.fromDate(weekStart), 
-      'weekEndDate': Timestamp.fromDate(weekEnd), 
+      'weekStartDate': Timestamp.fromDate(weekStart),
+      'weekEndDate': Timestamp.fromDate(weekEnd),
       'timestamp': FieldValue.serverTimestamp(),
       'sessionsCompleted': 0,
       'totalDuration': 0.0,
@@ -312,134 +317,154 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     return weekNumber + 1;
   }
 
-// Update the weekly progress with latest activity data
-  Future<void> _updateWeeklyProgressData() async {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || userGoal == null) return;
+Future<void> _updateWeeklyProgressData() async {
+  String? uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null || userGoal == null) return;
 
-    // Ensure we have the current week's data
-    if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
-      String goalId = userGoal!['id'] ?? "";
-      _initializeCurrentWeekData(uid, goalId);
-    }
-
-    // Get the current week's data
-    Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
-
-    // Update common fields
-    weekData['sessionsCompleted'] = _weeklyActivities.length;
-    weekData['totalDuration'] = _totalWeeklyDuration;
-    weekData['totalDistance'] = _totalWeeklyDistance;
-    weekData['uniqueDays'] = _uniqueDays.toList();
-
-    // Update goal-specific fields
-    switch (userGoal!['goalType']) {
-      case 'Leisure':
-        weekData['dayProgress'] = _weeklyDaysProgress;
-        break;
-
-      case 'High Intensity Cycling':
-        // Only update end weight if current weight is valid
-        if (_currentUserWeight > 0) {
-          weekData['weekEndWeight'] = _currentUserWeight;
-        }
-
-        // Calculate calories burned from activities
-        double totalCalories = 0.0;
-        for (var activity in _weeklyActivities) {
-          if (activity.containsKey('calories_burned')) {
-            totalCalories += safeParseDouble(activity['calories_burned']);
-          }
-        }
-        weekData['caloriesBurned'] = totalCalories;
-
-        // Calculate weight loss progress
-        if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
-          weekData['weeklyWeightChange'] =
-              weekData['weekEndWeight'] - weekData['weekStartWeight'];
-        }
-        break;
-
-      case 'Endurance':
-        weekData['bestDistance'] = _bestDistance;
-
-        // Calculate pace if we have valid duration and distance
-        if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
-          double pace =
-              _getBestActivityDuration() / _bestDistance; // minutes per km
-          weekData['bestPace'] = pace;
-        }
-
-        if (_bestDistanceDate != null) {
-          weekData['bestDistanceDate'] = _bestDistanceDate;
-        }
-        break;
-    }
-
-    // Update subgoal progress if there's an active subgoal
-    if (hasActiveSubgoal) {
-      weekData['subgoalType'] = subgoalType;
-      weekData['subgoalTargetValue'] = subgoalTargetValue;
-
-      // Set current value based on subgoal type
-      switch (subgoalType) {
-        case "distance":
-          // Average distance per activity this week
-          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-              ? 0.0
-              : _totalWeeklyDistance / _weeklyActivities.length;
-          break;
-
-        case "pace":
-          // Calculate average pace this week
-          if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
-            double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
-            weekData['subgoalCurrentValue'] = avgPace;
-          }
-          break;
-
-        case "duration":
-          // Average duration per activity
-          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-              ? 0.0
-              : _totalWeeklyDuration / _weeklyActivities.length;
-          break;
-
-        case "maintain":
-          // Just count the number of activities as a progress indicator
-          weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
-          break;
-      }
-
-      // Calculate progress percentage for the subgoal
-      if (weekData['subgoalBaseline'] != null &&
-          weekData['subgoalTargetValue'] != null &&
-          weekData['subgoalCurrentValue'] != null) {
-        double baseline = weekData['subgoalBaseline'];
-        double target = weekData['subgoalTargetValue'];
-        double current = weekData['subgoalCurrentValue'];
-
-        // Different calculation based on subgoal type
-        if (subgoalType == "pace") {
-          // For pace, lower is better (improvement is baseline → target where baseline > target)
-          if (baseline > target) {
-            double progress = (baseline - current) / (baseline - target);
-            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
-          }
-        } else {
-          // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
-          if (target > baseline) {
-            double progress = (current - baseline) / (target - baseline);
-            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
-          }
-        }
-      }
-    }
-
-    // Save to Firestore
-    await _saveWeeklyProgressToFirestore(weekData);
+  // Ensure we have the current week's data
+  if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+    String goalId = userGoal!['id'] ?? "";
+    _initializeCurrentWeekData(uid, goalId);
   }
 
+  // Get the current week's data
+  Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
+
+  // Update common fields
+  weekData['sessionsCompleted'] = _weeklyActivities.length;
+  weekData['totalDuration'] = _totalWeeklyDuration;
+  weekData['totalDistance'] = _totalWeeklyDistance;
+  weekData['uniqueDays'] = _uniqueDays.toList();
+
+  // Update goal-specific fields
+  switch (userGoal!['goalType']) {
+    case 'Leisure':
+      weekData['dayProgress'] = _weeklyDaysProgress;
+      break;
+
+    case 'High Intensity Cycling':
+      // Only update end weight if current weight is valid
+      if (_currentUserWeight > 0) {
+        weekData['weekEndWeight'] = _currentUserWeight;
+      }
+
+      // Calculate calories burned from activities
+      double totalCalories = 0.0;
+      for (var activity in _weeklyActivities) {
+        if (activity.containsKey('calories_burned')) {
+          totalCalories += safeParseDouble(activity['calories_burned']);
+        }
+      }
+      weekData['caloriesBurned'] = totalCalories;
+
+      // Calculate weight loss progress
+      if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
+        weekData['weeklyWeightChange'] =
+            weekData['weekEndWeight'] - weekData['weekStartWeight'];
+      }
+      break;
+
+    case 'Endurance':
+      weekData['bestDistance'] = _bestDistance;
+
+      // Calculate pace if we have valid duration and distance
+      if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
+        double pace =
+            _getBestActivityDuration() / _bestDistance; // minutes per km
+        weekData['bestPace'] = pace;
+      }
+
+      if (_bestDistanceDate != null) {
+        weekData['bestDistanceDate'] = _bestDistanceDate;
+      }
+      break;
+  }
+
+  // Update subgoal progress if there's an active subgoal
+  if (hasActiveSubgoal) {
+    weekData['subgoalType'] = subgoalType;
+    weekData['subgoalTargetValue'] = subgoalTargetValue;
+
+    // Set current value based on subgoal type
+    switch (subgoalType) {
+      case "distance":
+        // Use actual average for all completed activities
+        // Important: We use the actual number of activities, not the daysPerWeek target
+        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+            ? 0.0
+            : _totalWeeklyDistance / _weeklyActivities.length;
+        break;
+
+      case "pace":
+        // Calculate average pace for all completed activities
+        if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+          double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+          weekData['subgoalCurrentValue'] = avgPace;
+        }
+        break;
+
+      case "duration":
+        // Use actual average for all completed activities
+        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+            ? 0.0
+            : _totalWeeklyDuration / _weeklyActivities.length;
+        break;
+
+      case "maintain":
+        // Just count the number of activities as a progress indicator
+        weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+        break;
+    }
+
+    // Calculate progress percentage for the subgoal
+    if (weekData['subgoalBaseline'] != null &&
+        weekData['subgoalTargetValue'] != null &&
+        weekData['subgoalCurrentValue'] != null) {
+      double baseline = weekData['subgoalBaseline'];
+      double target = weekData['subgoalTargetValue'];
+      double current = weekData['subgoalCurrentValue'];
+
+      // Different calculation based on subgoal type
+      if (subgoalType == "pace") {
+        // For pace, lower is better (improvement is baseline → target where baseline > target)
+        if (baseline > target) {
+          double progress = (baseline - current) / (baseline - target);
+          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+        }
+      } else {
+        // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
+        if (target > baseline) {
+          double progress = (current - baseline) / (target - baseline);
+          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+        }
+      }
+    }
+  }
+
+  // Save to Firestore
+  await _saveWeeklyProgressToFirestore(weekData);
+
+  // Check if the subgoal has been completed
+  if (hasActiveSubgoal && weekData['subgoalProgress'] != null && weekData['subgoalProgress'] >= 1.0) {
+    // Only show completion dialog if it hasn't been shown yet for this subgoal
+    bool hasShownCompletionForCurrentSubgoal = false;
+    final prefs = await SharedPreferences.getInstance();
+    final lastCompletedSubgoalId = prefs.getString('last_completed_subgoal_id');
+    
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: uid)
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
+    
+    if (subgoalQuery.docs.isNotEmpty && lastCompletedSubgoalId != subgoalQuery.docs.first.id) {
+      _showSubgoalCompletionDialog();
+      await prefs.setString('last_completed_subgoal_id', subgoalQuery.docs.first.id);
+      await prefs.setBool('show_subgoal_selection', true);
+    }
+  }
+}
 // Save weekly progress data to Firestore
   Future<void> _saveWeeklyProgressToFirestore(
       Map<String, dynamic> weekData) async {
@@ -654,31 +679,47 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _currentWeekNumber = 1;
-    _weekStartDate = DateTime.now();
-    _weekEndDate = DateTime.now().add(Duration(days: 7));
-    _fetchSubgoalDetails();
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 5));
+void initState() {
+  super.initState();
+  _currentWeekNumber = 1;
+  _weekStartDate = DateTime.now();
+  _weekEndDate = DateTime.now().add(Duration(days: 7));
+  _fetchSubgoalDetails();
+  _confettiController =
+      ConfettiController(duration: const Duration(seconds: 5));
 
-    Future.delayed(Duration(milliseconds: 500), () {
-      _loadUserGoalAndActivities();
-    });
+  Future.delayed(Duration(milliseconds: 500), () {
+    _loadUserGoalAndActivities();
+  });
 
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ),
-    );
-    _animationController.forward();
-  }
+  // Add a timer to periodically check subgoal status
+  Timer.periodic(Duration(hours: 12), (timer) {
+    if (mounted) {
+      _checkSubgoalCompletionStatus();
+    } else {
+      timer.cancel();
+    }
+  });
+
+  // Also check on init after a short delay
+  Future.delayed(Duration(seconds: 5), () {
+    if (mounted) {
+      _checkSubgoalCompletionStatus();
+    }
+  });
+
+  _animationController = AnimationController(
+    duration: const Duration(milliseconds: 800),
+    vsync: this,
+  );
+  _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ),
+  );
+  _animationController.forward();
+}
 
   @override
   void didChangeDependencies() {
@@ -861,6 +902,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
           print("Most recent goal data: $goalData");
 
           if (goalData != null) {
+            // Check if baseline_complete exists and set state accordingly
+            _isBaselineComplete = goalData['baseline_complete'] ?? false;
+            print("Baseline complete status: $_isBaselineComplete");
+
             Timestamp goalCreationTimestamp =
                 goalData['timestamp'] as Timestamp;
             _goalCreationDate = goalCreationTimestamp.toDate();
@@ -923,98 +968,165 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             }
           }
 
-          final athleteQuerySnapshot = await FirebaseFirestore.instance
-              .collection('athletes')
-              .where('app_id', isEqualTo: uid)
-              .limit(1)
-              .get();
-
-          bool hasActivity = false;
           _uniqueDays.clear();
+          bool hasActivity = false;
 
-          print("Athlete documents found: ${athleteQuerySnapshot.docs.length}");
+          // Only check for activities if baseline is complete
+          if (_isBaselineComplete) {
+            final athleteQuerySnapshot = await FirebaseFirestore.instance
+                .collection('athletes')
+                .where('app_id', isEqualTo: uid)
+                .limit(1)
+                .get();
 
-          if (athleteQuerySnapshot.docs.isNotEmpty) {
-            final athleteDoc = athleteQuerySnapshot.docs.first;
-            final athleteId = athleteDoc.id;
+            print(
+                "Athlete documents found: ${athleteQuerySnapshot.docs.length}");
 
-            int? userIdNumber;
+            if (athleteQuerySnapshot.docs.isNotEmpty) {
+              final athleteDoc = athleteQuerySnapshot.docs.first;
+              final athleteId = athleteDoc.id;
 
-            userIdNumber = int.tryParse(athleteId);
+              int? userIdNumber;
 
-            if (userIdNumber == null &&
-                athleteDoc.data().containsKey('user_id')) {
-              userIdNumber = athleteDoc.data()['user_id'] as int?;
-            }
+              userIdNumber = int.tryParse(athleteId);
 
-            if (userIdNumber == null) {
-              final numericPart =
-                  RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
-              userIdNumber =
-                  numericPart != null ? int.tryParse(numericPart) : null;
-            }
+              if (userIdNumber == null &&
+                  athleteDoc.data().containsKey('user_id')) {
+                userIdNumber = athleteDoc.data()['user_id'] as int?;
+              }
 
-            print("Athlete Document ID: $athleteId");
-            print("Converted User ID Number: $userIdNumber");
+              if (userIdNumber == null) {
+                final numericPart =
+                    RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
+                userIdNumber =
+                    numericPart != null ? int.tryParse(numericPart) : null;
+              }
 
-            if (userIdNumber != null) {
-              final goalCreationTimestamp = goalData['timestamp'] as Timestamp;
+              print("Athlete Document ID: $athleteId");
+              print("Converted User ID Number: $userIdNumber");
 
-              final allActivitiesSnapshot = await FirebaseFirestore.instance
-                  .collection('activities')
-                  .where('user_id', isEqualTo: userIdNumber)
-                  .where('start_date', isGreaterThan: goalCreationTimestamp)
-                  .get();
+              if (userIdNumber != null) {
+                final goalCreationTimestamp =
+                    goalData['timestamp'] as Timestamp;
 
-              print(
-                  "Activities found after goal creation: ${allActivitiesSnapshot.docs.length}");
+                final allActivitiesSnapshot = await FirebaseFirestore.instance
+                    .collection('activities')
+                    .where('user_id', isEqualTo: userIdNumber)
+                    .where('start_date', isGreaterThan: goalCreationTimestamp)
+                    .get();
 
-              hasActivity = allActivitiesSnapshot.docs.isNotEmpty;
+                print(
+                    "Activities found after goal creation: ${allActivitiesSnapshot.docs.length}");
 
-              if (hasActivity) {
-                if (goalData['goalType'] == 'Endurance') {
-                  print("Processing activities for Endurance goal");
+                hasActivity = allActivitiesSnapshot.docs.isNotEmpty;
 
-                  _bestDistance = 0;
-                  _bestDistanceDate = null;
-                  _bestDistanceActivity = null;
-                  _latestActivity = null;
-                  _latestActivityDate = null;
-                  _latestDistance = 0;
+                if (hasActivity) {
+                  if (goalData['goalType'] == 'Endurance') {
+                    print("Processing activities for Endurance goal");
 
-                  final sortedActivities = allActivitiesSnapshot.docs
-                      .map((doc) => doc.data())
-                      .toList()
-                    ..sort((a, b) {
-                      final dateA = (a['start_date'] as Timestamp).toDate();
-                      final dateB = (b['start_date'] as Timestamp).toDate();
-                      return dateB.compareTo(dateA);
-                    });
+                    _bestDistance = 0;
+                    _bestDistanceDate = null;
+                    _bestDistanceActivity = null;
+                    _latestActivity = null;
+                    _latestActivityDate = null;
+                    _latestDistance = 0;
 
-                  if (sortedActivities.isNotEmpty) {
-                    _latestActivity = sortedActivities.first;
-                    _latestActivityDate =
-                        (_latestActivity!['start_date'] as Timestamp).toDate();
+                    final sortedActivities = allActivitiesSnapshot.docs
+                        .map((doc) => doc.data())
+                        .toList()
+                      ..sort((a, b) {
+                        final dateA = (a['start_date'] as Timestamp).toDate();
+                        final dateB = (b['start_date'] as Timestamp).toDate();
+                        return dateB.compareTo(dateA);
+                      });
 
-                    var latestDistanceValue = _latestActivity!['distance'];
-                    if (latestDistanceValue is int) {
-                      _latestDistance = latestDistanceValue.toDouble();
-                    } else if (latestDistanceValue is double) {
-                      _latestDistance = latestDistanceValue;
-                    } else if (latestDistanceValue is String) {
-                      _latestDistance =
-                          double.tryParse(latestDistanceValue) ?? 0.0;
+                    if (sortedActivities.isNotEmpty) {
+                      _latestActivity = sortedActivities.first;
+                      _latestActivityDate =
+                          (_latestActivity!['start_date'] as Timestamp)
+                              .toDate();
+
+                      var latestDistanceValue = _latestActivity!['distance'];
+                      if (latestDistanceValue is int) {
+                        _latestDistance = latestDistanceValue.toDouble();
+                      } else if (latestDistanceValue is double) {
+                        _latestDistance = latestDistanceValue;
+                      } else if (latestDistanceValue is String) {
+                        _latestDistance =
+                            double.tryParse(latestDistanceValue) ?? 0.0;
+                      }
+
+                      print("Latest activity date: ${_latestActivityDate}");
+                      print("Latest distance: $_latestDistance");
                     }
 
-                    print("Latest activity date: ${_latestActivityDate}");
-                    print("Latest distance: $_latestDistance");
+                    for (final activityData in allActivitiesSnapshot.docs) {
+                      final data = activityData.data();
+
+                      double distance = 0.0;
+                      if (data['distance'] != null) {
+                        var distanceValue = data['distance'];
+                        if (distanceValue is int) {
+                          distance = distanceValue.toDouble();
+                        } else if (distanceValue is double) {
+                          distance = distanceValue;
+                        } else if (distanceValue is String) {
+                          distance = double.tryParse(distanceValue) ?? 0.0;
+                        }
+                      }
+
+                      if (distance > _bestDistance) {
+                        _bestDistance = distance;
+                        _bestDistanceDate =
+                            (data['start_date'] as Timestamp).toDate();
+                        _bestDistanceActivity = data;
+                        print(
+                            "New best distance: $_bestDistance on ${_bestDistanceDate}");
+                      }
+                    }
                   }
 
-                  for (final activityData in allActivitiesSnapshot.docs) {
-                    final data = activityData.data();
+                  final weeklyActivitiesSnapshot = await FirebaseFirestore
+                      .instance
+                      .collection('activities')
+                      .where('user_id', isEqualTo: userIdNumber)
+                      .where('start_date',
+                          isGreaterThanOrEqualTo:
+                              Timestamp.fromDate(_weekStartDate))
+                      .where('start_date',
+                          isLessThanOrEqualTo: Timestamp.fromDate(_weekEndDate))
+                      .get();
 
-                    double distance = 0.0;
+                  print(
+                      "Weekly activities found: ${weeklyActivitiesSnapshot.docs.length}");
+
+                  double totalDuration = 0;
+                  double totalDistance = 0;
+
+                  _weeklyActivities = weeklyActivitiesSnapshot.docs.map((doc) {
+                    final data = doc.data();
+
+                    DateTime activityDate =
+                        (data['start_date'] as Timestamp).toDate();
+                    String dayKey =
+                        DateFormat('yyyy-MM-dd').format(activityDate);
+                    _uniqueDays.add(dayKey);
+
+                    double duration = 0.0;
+                    var timeValue = data['elapsed_time'];
+                    if (timeValue is int) {
+                      duration = timeValue.toDouble();
+                    } else if (timeValue is double) {
+                      duration = timeValue;
+                    } else if (timeValue is String) {
+                      duration = double.tryParse(timeValue) ?? 0.0;
+                    }
+
+                    duration = duration / 60.0;
+                    totalDuration += duration;
+
                     if (data['distance'] != null) {
+                      double distance = 0.0;
                       var distanceValue = data['distance'];
                       if (distanceValue is int) {
                         distance = distanceValue.toDouble();
@@ -1023,95 +1135,41 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                       } else if (distanceValue is String) {
                         distance = double.tryParse(distanceValue) ?? 0.0;
                       }
+                      totalDistance += distance;
                     }
 
-                    if (distance > _bestDistance) {
-                      _bestDistance = distance;
-                      _bestDistanceDate =
-                          (data['start_date'] as Timestamp).toDate();
-                      _bestDistanceActivity = data;
-                      print(
-                          "New best distance: $_bestDistance on ${_bestDistanceDate}");
-                    }
-                  }
+                    return data;
+                  }).toList();
+
+                  _weeklyDaysProgress = _uniqueDays.length.toDouble();
+                  _totalWeeklyDuration = totalDuration;
+                  _averageSessionDuration = _weeklyActivities.isEmpty
+                      ? 0
+                      : totalDuration / _weeklyActivities.length;
+                  _totalWeeklyDistance = totalDistance;
+                  _checkEnduranceGoalCompletion();
                 }
-
-                final weeklyActivitiesSnapshot = await FirebaseFirestore
-                    .instance
-                    .collection('activities')
-                    .where('user_id', isEqualTo: userIdNumber)
-                    .where('start_date',
-                        isGreaterThanOrEqualTo:
-                            Timestamp.fromDate(_weekStartDate))
-                    .where('start_date',
-                        isLessThanOrEqualTo: Timestamp.fromDate(_weekEndDate))
-                    .get();
-
-                print(
-                    "Weekly activities found: ${weeklyActivitiesSnapshot.docs.length}");
-
-                double totalDuration = 0;
-                double totalDistance = 0;
-
-                _weeklyActivities = weeklyActivitiesSnapshot.docs.map((doc) {
-                  final data = doc.data();
-
-                  DateTime activityDate =
-                      (data['start_date'] as Timestamp).toDate();
-                  String dayKey = DateFormat('yyyy-MM-dd').format(activityDate);
-                  _uniqueDays.add(dayKey);
-
-                  double duration = 0.0;
-                  var timeValue = data['elapsed_time'];
-                  if (timeValue is int) {
-                    duration = timeValue.toDouble();
-                  } else if (timeValue is double) {
-                    duration = timeValue;
-                  } else if (timeValue is String) {
-                    duration = double.tryParse(timeValue) ?? 0.0;
-                  }
-
-                  duration = duration / 60.0;
-                  totalDuration += duration;
-
-                  if (data['distance'] != null) {
-                    double distance = 0.0;
-                    var distanceValue = data['distance'];
-                    if (distanceValue is int) {
-                      distance = distanceValue.toDouble();
-                    } else if (distanceValue is double) {
-                      distance = distanceValue;
-                    } else if (distanceValue is String) {
-                      distance = double.tryParse(distanceValue) ?? 0.0;
-                    }
-                    totalDistance += distance;
-                  }
-
-                  return data;
-                }).toList();
-
-                _weeklyDaysProgress = _uniqueDays.length.toDouble();
-                _totalWeeklyDuration = totalDuration;
-                _averageSessionDuration = _weeklyActivities.isEmpty
-                    ? 0
-                    : totalDuration / _weeklyActivities.length;
-                _totalWeeklyDistance = totalDistance;
-                _checkEnduranceGoalCompletion();
               }
+            } else {
+              print("No matching athlete found, but goal exists");
             }
           } else {
-            print("No matching athlete found, but goal exists");
+            print("Baseline not complete, skipping activity fetching");
+            hasActivity = false;
           }
+
           if (userGoal != null &&
               userGoal!['goalType'] == 'High Intensity Cycling') {
             await _fetchActiveSubgoal();
           }
+
           // After fetching the goal and before setting state
           await _fetchWeeklyProgressData();
 
           // After fetching activities
-          await _updateWeeklyProgressData();
-          await _updateWeeklyProgressData();
+          if (_isBaselineComplete) {
+            await _updateWeeklyProgressData();
+          }
 
           setState(() {
             userGoal = goalData;
@@ -1119,7 +1177,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
             _isLoading = false;
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (userGoal != null) {
+              if (userGoal != null && _isBaselineComplete) {
                 if (userGoal!['goalType'] == 'Endurance') {
                   _checkEnduranceGoalCompletion();
                 } else if (userGoal!['goalType'] == 'High Intensity Cycling') {
@@ -1333,7 +1391,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                               weekData['subgoalType'].toString().isNotEmpty) {
                             String subgoalDesc = "Subgoal: ";
 
-                            switch (weekData['subgoalType']) {   
+                            switch (weekData['subgoalType']) {
                               case "distance":
                                 subgoalDesc +=
                                     "Distance ${(weekData['subgoalCurrentValue'] ?? 0.0).toStringAsFixed(1)}/${(weekData['subgoalTargetValue'] ?? 0.0).toStringAsFixed(1)} km";
@@ -1496,683 +1554,649 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     return weekNumber + 1;
   }
 
-Widget _buildActiveSubgoalCard() {
-  if (!hasActiveSubgoal) return SizedBox.shrink();
+  Widget _buildActiveSubgoalCard() {
+    if (!hasActiveSubgoal) return SizedBox.shrink();
 
-  // Calculate days remaining
-  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
-  if (daysRemaining < 0) daysRemaining = 0;
+    // Calculate days remaining
+    int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+    if (daysRemaining < 0) daysRemaining = 0;
 
-  // Calculate progress based on weekly averages and current activity data
-  double progressPercent = 0.0;
-  String currentValueText = "";
-  String targetValueText = "";
-  String baselineValueText = "";
+    // Calculate progress based on weekly averages and current activity data
+    double progressPercent = 0.0;
+    String currentValueText = "";
+    String targetValueText = "";
+    String baselineValueText = "";
 
-  // Define variables for current week's performance metrics
-  double currentWeekAvgDistance = 0.0;
-  double currentWeekAvgPace = 0.0;
-  double currentWeekAvgDuration = 0.0;
+    // Define variables for current week's performance metrics
+    double currentWeekAvgDistance = 0.0;
+    double currentWeekAvgPace = 0.0;
+    double currentWeekAvgDuration = 0.0;
 
-  // This function will be called when activities are loaded
-  void calculateProgress() {
-    if (_weeklyActivities.isNotEmpty) {
-      double totalDistance = 0.0;
-      double totalDuration = 0.0;
-      List<double> paces = [];
+    // This function will be called when activities are loaded
+    void calculateProgress() {
+      if (_weeklyActivities.isNotEmpty) {
+        double totalDistance = 0.0;
+        double totalDuration = 0.0;
+        List<double> paces = [];
 
-      for (var activity in _weeklyActivities) {
-        // Get distance
-        double distance = 0.0;
-        if (activity['distance'] != null) {
-          var distanceValue = activity['distance'];
-          if (distanceValue is int) {
-            distance = distanceValue.toDouble();
-          } else if (distanceValue is double) {
-            distance = distanceValue;
-          } else if (distanceValue is String) {
-            distance = double.tryParse(distanceValue) ?? 0.0;
+        for (var activity in _weeklyActivities) {
+          // Get distance
+          double distance = 0.0;
+          if (activity['distance'] != null) {
+            var distanceValue = activity['distance'];
+            if (distanceValue is int) {
+              distance = distanceValue.toDouble();
+            } else if (distanceValue is double) {
+              distance = distanceValue;
+            } else if (distanceValue is String) {
+              distance = double.tryParse(distanceValue) ?? 0.0;
+            }
+          }
+          totalDistance += distance;
+
+          // Get duration in minutes
+          double duration = 0.0;
+          if (activity['elapsed_time'] != null) {
+            var timeValue = activity['elapsed_time'];
+            if (timeValue is int) {
+              duration = timeValue.toDouble() / 60.0;
+            } else if (timeValue is double) {
+              duration = timeValue / 60.0;
+            } else if (timeValue is String) {
+              duration = (double.tryParse(timeValue) ?? 0.0) / 60.0;
+            }
+          }
+          totalDuration += duration;
+
+          // Calculate pace (minutes per km)
+          if (distance > 0 && duration > 0) {
+            double pace = duration / distance;
+            paces.add(pace);
           }
         }
-        totalDistance += distance;
 
-        // Get duration in minutes
-        double duration = 0.0;
-        if (activity['elapsed_time'] != null) {
-          var timeValue = activity['elapsed_time'];
-          if (timeValue is int) {
-            duration = timeValue.toDouble() / 60.0;
-          } else if (timeValue is double) {
-            duration = timeValue / 60.0;
-          } else if (timeValue is String) {
-            duration = (double.tryParse(timeValue) ?? 0.0) / 60.0;
-          }
-        }
-        totalDuration += duration;
+        // Calculate proper averages based on daysPerWeek
+        int targetActivitiesPerWeek =
+            daysPerWeek ?? 1; // Default to 1 if not set
 
-        // Calculate pace (minutes per km)
-        if (distance > 0 && duration > 0) {
-          double pace = duration / distance;
-          paces.add(pace);
+        // The issue is in the calculations - we need per-workout averages, not weekly totals
+        // If user cycled 2 times (15km + 18km = 33km) with daysPerWeek = 3
+        // Current average should be 33/2 = 16.5km per workout (actual average)
+
+        // First calculate actual averages based on completed activities
+        double actualAvgDistance = _weeklyActivities.isEmpty
+            ? 0
+            : totalDistance / _weeklyActivities.length;
+        double actualAvgDuration = _weeklyActivities.isEmpty
+            ? 0
+            : totalDuration / _weeklyActivities.length;
+
+        // Use the actual averages for progress calculation
+        currentWeekAvgDistance = actualAvgDistance;
+        currentWeekAvgDuration = actualAvgDuration;
+
+        // For pace, calculate the true average pace across actual activities
+        if (paces.isNotEmpty) {
+          currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
         }
       }
 
-      // Calculate proper averages based on daysPerWeek
-      int targetActivitiesPerWeek = daysPerWeek ?? 1; // Default to 1 if not set
-      
-      // The issue is in the calculations - we need per-workout averages, not weekly totals
-      // If user cycled 2 times (15km + 18km = 33km) with daysPerWeek = 3
-      // Current average should be 33/2 = 16.5km per workout (actual average)
-      
-      // First calculate actual averages based on completed activities
-      double actualAvgDistance = _weeklyActivities.isEmpty ? 0 : totalDistance / _weeklyActivities.length;
-      double actualAvgDuration = _weeklyActivities.isEmpty ? 0 : totalDuration / _weeklyActivities.length;
-      
-      // Use the actual averages for progress calculation
-      currentWeekAvgDistance = actualAvgDistance;
-      currentWeekAvgDuration = actualAvgDuration;
+      // Calculate progress based on subgoal type
+      switch (subgoalType) {
+        case "distance":
+          // Calculate progress using weekly averages
+          if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
+            progressPercent = (currentWeekAvgDistance - baselineDistance) /
+                (subgoalTargetValue - baselineDistance);
 
-      // For pace, calculate the true average pace across actual activities
-      if (paces.isNotEmpty) {
-        currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+            if (progressPercent < 0) progressPercent = 0;
+            if (progressPercent > 1) progressPercent = 1;
+          } else {
+            progressPercent = currentWeekAvgDistance > 0 ? 0.5 : 0.0;
+          }
+
+          currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
+          baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
+          targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
+          break;
+
+        case "pace":
+          if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
+            progressPercent = (baselinePace - currentWeekAvgPace) /
+                (baselinePace - subgoalTargetValue);
+
+            if (progressPercent < 0) progressPercent = 0;
+            if (progressPercent > 1) progressPercent = 1;
+          } else {
+            progressPercent = currentWeekAvgPace > 0 ? 0.5 : 0.0;
+          }
+
+          currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
+          baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
+          targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
+          break;
+
+        case "duration":
+          if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
+            progressPercent = (currentWeekAvgDuration - baselineDuration) /
+                (subgoalTargetValue - baselineDuration);
+
+            if (progressPercent < 0) progressPercent = 0;
+            if (progressPercent > 1) progressPercent = 1;
+          } else {
+            progressPercent = currentWeekAvgDuration > 0 ? 0.5 : 0.0;
+          }
+
+          currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
+          baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
+          targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
+          break;
+
+        case "maintain":
+          progressPercent = 0.75;
+
+          currentValueText = "Maintaining consistent performance";
+          baselineValueText = "";
+          targetValueText = "";
+          break;
       }
     }
 
-    // Calculate progress based on subgoal type
+    // Call the calculate function with the current data
+    calculateProgress();
+
+    // Get goal title
+    String goalTitle = "";
+
     switch (subgoalType) {
       case "distance":
-        // Calculate progress using weekly averages
-        if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
-          progressPercent = (currentWeekAvgDistance - baselineDistance) /
-              (subgoalTargetValue - baselineDistance);
-
-          if (progressPercent < 0) progressPercent = 0;
-          if (progressPercent > 1) progressPercent = 1;
-        } else {
-          progressPercent = currentWeekAvgDistance > 0 ? 0.5 : 0.0;
-        }
-
-        currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
-        baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
-        targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
+        goalTitle =
+            "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
         break;
-
       case "pace":
-        if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
-          progressPercent = (baselinePace - currentWeekAvgPace) /
-              (baselinePace - subgoalTargetValue);
-
-          if (progressPercent < 0) progressPercent = 0;
-          if (progressPercent > 1) progressPercent = 1;
-        } else {
-          progressPercent = currentWeekAvgPace > 0 ? 0.5 : 0.0;
-        }
-
-        currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
-        baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
-        targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
+        goalTitle =
+            "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
         break;
-
       case "duration":
-        if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
-          progressPercent = (currentWeekAvgDuration - baselineDuration) /
-              (subgoalTargetValue - baselineDuration);
-
-          if (progressPercent < 0) progressPercent = 0;
-          if (progressPercent > 1) progressPercent = 1;
-        } else {
-          progressPercent = currentWeekAvgDuration > 0 ? 0.5 : 0.0;
-        }
-
-        currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
-        baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
-        targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
+        goalTitle =
+            "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
         break;
-
       case "maintain":
-        progressPercent = 0.75;
-
-        currentValueText = "Maintaining consistent performance";
-        baselineValueText = "";
-        targetValueText = "";
+        goalTitle = "Maintain current cycling performance";
         break;
     }
-  }
 
-  // Call the calculate function with the current data
-  calculateProgress();
+    Color progressColor =
+        progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
 
-  // Get goal title
-  String goalTitle = "";
-
-  switch (subgoalType) {
-    case "distance":
-      goalTitle =
-          "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
-      break;
-    case "pace":
-      goalTitle =
-          "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
-      break;
-    case "duration":
-      goalTitle =
-          "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
-      break;
-    case "maintain":
-      goalTitle = "Maintain current cycling performance";
-      break;
-  }
-
-  Color progressColor =
-      progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
-
-  return Container(
-    margin: EdgeInsets.only(top: 20, bottom: 20),
-    padding: EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 2,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "This Week's Cycling Goal",
-              style: TextStyle(
-                fontFamily: 'Fredoka-SemiBold',
-                fontSize: 18,
-                color: Colors.orangeAccent,
-                shadows: [
-                  Shadow(
-                    offset: Offset(2, 2),
-                    blurRadius: 6.0,
-                    color: Colors.orange.withOpacity(0.3),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.orange[300]!, width: 1),
-              ),
-              child: Text(
-                "$daysRemaining days left",
-                style: TextStyle(
-                  fontFamily: 'Lato',
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 12),
-
-        Text(
-          goalTitle,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+    return Container(
+      margin: EdgeInsets.only(top: 20, bottom: 20),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
-        ),
-
-        SizedBox(height: 16),
-
-        // Progress visualization with baseline included
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subgoalType != "maintain") ...[
-              // Progress indicators layout
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Progress status text with percentage
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Progress",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: progressPercent >= 1.0
-                                ? Colors.green[50]
-                                : progressPercent >= 0.5
-                                    ? Colors.orange[50]
-                                    : Colors.blue[50],
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: progressPercent >= 1.0
-                                    ? Colors.green[300]!
-                                    : progressPercent >= 0.5
-                                        ? Colors.orange[300]!
-                                        : Colors.blue[300]!,
-                                width: 1),
-                          ),
-                          child: Text(
-                            "${(progressPercent * 100).toInt()}%",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: progressPercent >= 1.0
-                                  ? Colors.green[700]
-                                  : progressPercent >= 0.5
-                                      ? Colors.orange[700]
-                                      : Colors.blue[700],
-                            ),
-                          ),
-                        ),
-                      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "This Week's Cycling Goal",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 18,
+                  color: Colors.orangeAccent,
+                  shadows: [
+                    Shadow(
+                      offset: Offset(2, 2),
+                      blurRadius: 6.0,
+                      color: Colors.orange.withOpacity(0.3),
                     ),
-                    SizedBox(height: 12),
+                  ],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orange[300]!, width: 1),
+                ),
+                child: Text(
+                  "$daysRemaining days left",
+                  style: TextStyle(
+                    fontFamily: 'Lato',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
 
-                    // Enhanced animated progress bar
-                    Stack(
-                      children: [
-                        // Markers for baseline and target
-                        Container(
-                          height: 12,
-                          width: double.infinity,
-                          child: CustomPaint(
-                            painter: ProgressMarkerPainter(
-                              baselinePosition: 0.0,
-                              targetPosition: 1.0,
-                              containerWidth:
-                                  MediaQuery.of(context).size.width -
-                                      80, // Adjust based on your padding
+          Text(
+            goalTitle,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          // Progress visualization with baseline included
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (subgoalType != "maintain") ...[
+                // Progress indicators layout
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Progress status text with percentage
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Progress",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
                           ),
-                        ),
-
-                        // Background track
-                        Container(
-                          height: 12,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(6),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: progressPercent >= 1.0
+                                  ? Colors.green[50]
+                                  : progressPercent >= 0.5
+                                      ? Colors.orange[50]
+                                      : Colors.blue[50],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: progressPercent >= 1.0
+                                      ? Colors.green[300]!
+                                      : progressPercent >= 0.5
+                                          ? Colors.orange[300]!
+                                          : Colors.blue[300]!,
+                                  width: 1),
+                            ),
+                            child: Text(
+                              "${(progressPercent * 100).toInt()}%",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: progressPercent >= 1.0
+                                    ? Colors.green[700]
+                                    : progressPercent >= 0.5
+                                        ? Colors.orange[700]
+                                        : Colors.blue[700],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
 
-                        // Animated progress fill
-                        TweenAnimationBuilder<double>(
-                            tween: Tween<double>(
-                                begin: 0.0, end: progressPercent),
-                            duration: Duration(milliseconds: 1500),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, animatedProgress, child) {
-                              return Container(
-                                height: 12,
-                                width:
-                                    (MediaQuery.of(context).size.width - 64) *
-                                        animatedProgress,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: progressPercent >= 1.0
-                                        ? [
-                                            Colors.green[400]!,
-                                            Colors.green[600]!
-                                          ]
-                                        : progressPercent >= 0.5
-                                            ? [
-                                                Colors.orange[300]!,
-                                                Colors.orange[500]!
-                                              ]
-                                            : [
-                                                Colors.blue[300]!,
-                                                Colors.blue[500]!
-                                              ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (progressPercent >= 1.0
-                                              ? Colors.green
-                                              : progressPercent >= 0.5
-                                                  ? Colors.orange
-                                                  : Colors.blue)
-                                          .withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
+                      // Enhanced animated progress bar
+                      Stack(
+                        children: [
+                          // Markers for baseline and target
+                          Container(
+                            height: 12,
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: ProgressMarkerPainter(
+                                baselinePosition: 0.0,
+                                targetPosition: 1.0,
+                                containerWidth:
+                                    MediaQuery.of(context).size.width -
+                                        80, // Adjust based on your padding
+                              ),
+                            ),
+                          ),
 
-                        // Current value marker
-                        TweenAnimationBuilder<double>(
-                            tween: Tween<double>(
-                                begin: 0.0, end: progressPercent),
-                            duration: Duration(milliseconds: 1500),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, animatedProgress, child) {
-                              return Positioned(
-                                left:
-                                    (MediaQuery.of(context).size.width - 64) *
-                                            animatedProgress -
-                                        7,
-                                top: -3,
-                                child: Container(
-                                  width: 14,
-                                  height: 18,
+                          // Background track
+                          Container(
+                            height: 12,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+
+                          // Animated progress fill
+                          TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                  begin: 0.0, end: progressPercent),
+                              duration: Duration(milliseconds: 1500),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, animatedProgress, child) {
+                                return Container(
+                                  height: 12,
+                                  width:
+                                      (MediaQuery.of(context).size.width - 64) *
+                                          animatedProgress,
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: progressPercent >= 1.0
-                                          ? Colors.green[600]!
+                                    gradient: LinearGradient(
+                                      colors: progressPercent >= 1.0
+                                          ? [
+                                              Colors.green[400]!,
+                                              Colors.green[600]!
+                                            ]
                                           : progressPercent >= 0.5
-                                              ? Colors.orange[600]!
-                                              : Colors.blue[600]!,
-                                      width: 2,
+                                              ? [
+                                                  Colors.orange[300]!,
+                                                  Colors.orange[500]!
+                                                ]
+                                              : [
+                                                  Colors.blue[300]!,
+                                                  Colors.blue[500]!
+                                                ],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
                                     ),
+                                    borderRadius: BorderRadius.circular(6),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
+                                        color: (progressPercent >= 1.0
+                                                ? Colors.green
+                                                : progressPercent >= 0.5
+                                                    ? Colors.orange
+                                                    : Colors.blue)
+                                            .withOpacity(0.3),
                                         blurRadius: 4,
                                         offset: Offset(0, 2),
                                       ),
                                     ],
                                   ),
+                                );
+                              }),
+
+                          // Current value marker
+                          TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                  begin: 0.0, end: progressPercent),
+                              duration: Duration(milliseconds: 1500),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, animatedProgress, child) {
+                                return Positioned(
+                                  left:
+                                      (MediaQuery.of(context).size.width - 64) *
+                                              animatedProgress -
+                                          7,
+                                  top: -3,
+                                  child: Container(
+                                    width: 14,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: progressPercent >= 1.0
+                                            ? Colors.green[600]!
+                                            : progressPercent >= 0.5
+                                                ? Colors.orange[600]!
+                                                : Colors.blue[600]!,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                        ],
+                      ),
+
+                      SizedBox(height: 16),
+
+                      // Value comparison section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Avg Last Week",
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[400],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    baselineValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Avg Current",
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: progressPercent >= 1.0
+                                          ? Colors.green[600]
+                                          : progressPercent >= 0.5
+                                              ? Colors.orange[600]
+                                              : Colors.blue[600],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    currentValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "Avg Target",
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[800],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    targetValueText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      // Status message
+                      if (subgoalType != "maintain") ...[
+                        SizedBox(height: 12),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: progressPercent >= 1.0
+                                ? Colors.green[50]
+                                : progressPercent >= 0.75
+                                    ? Colors.lime[50]
+                                    : progressPercent >= 0.5
+                                        ? Colors.orange[50]
+                                        : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                progressPercent >= 1.0
+                                    ? Icons.check_circle_outline
+                                    : progressPercent >= 0.75
+                                        ? Icons.thumb_up_outlined
+                                        : progressPercent >= 0.5
+                                            ? Icons.trending_up
+                                            : Icons.directions_run,
+                                size: 16,
+                                color: progressPercent >= 1.0
+                                    ? Colors.green[700]
+                                    : progressPercent >= 0.75
+                                        ? Colors.lime[700]
+                                        : progressPercent >= 0.5
+                                            ? Colors.orange[700]
+                                            : Colors.blue[700],
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  progressPercent >= 1.0
+                                      ? "Goal achieved! Great work!"
+                                      : progressPercent >= 0.75
+                                          ? "Almost there! Keep it up!"
+                                          : progressPercent >= 0.5
+                                              ? "Good progress! You're over halfway."
+                                              : "Keep going! You're making progress.",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: progressPercent >= 1.0
+                                        ? Colors.green[700]
+                                        : progressPercent >= 0.75
+                                            ? Colors.lime[700]
+                                            : progressPercent >= 0.5
+                                                ? Colors.orange[700]
+                                                : Colors.blue[700],
+                                  ),
                                 ),
-                              );
-                            }),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // Value comparison section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // For "maintain" type goals
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.teal[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.verified_outlined,
+                          color: Colors.teal[700], size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "Avg Last Week",
+                              "Consistency Goal",
                               style: TextStyle(
-                                  fontSize: 11, color: Colors.grey[600]),
-                            ),
-                            SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[400],
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  baselineValueText,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Avg Current",
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey[600]),
-                            ),
-                            SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: progressPercent >= 1.0
-                                        ? Colors.green[600]
-                                        : progressPercent >= 0.5
-                                            ? Colors.orange[600]
-                                            : Colors.blue[600],
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  currentValueText,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              "Avg Target",
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey[600]),
-                            ),
-                            SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: Colors.green[800],
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  targetValueText,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green[800],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    // Status message
-                    if (subgoalType != "maintain") ...[
-                      SizedBox(height: 12),
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: progressPercent >= 1.0
-                              ? Colors.green[50]
-                              : progressPercent >= 0.75
-                                  ? Colors.lime[50]
-                                  : progressPercent >= 0.5
-                                      ? Colors.orange[50]
-                                      : Colors.blue[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              progressPercent >= 1.0
-                                  ? Icons.check_circle_outline
-                                  : progressPercent >= 0.75
-                                      ? Icons.thumb_up_outlined
-                                      : progressPercent >= 0.5
-                                          ? Icons.trending_up
-                                          : Icons.directions_run,
-                              size: 16,
-                              color: progressPercent >= 1.0
-                                  ? Colors.green[700]
-                                  : progressPercent >= 0.75
-                                      ? Colors.lime[700]
-                                      : progressPercent >= 0.5
-                                          ? Colors.orange[700]
-                                          : Colors.blue[700],
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                progressPercent >= 1.0
-                                    ? "Goal achieved! Great work!"
-                                    : progressPercent >= 0.75
-                                        ? "Almost there! Keep it up!"
-                                        : progressPercent >= 0.5
-                                            ? "Good progress! You're over halfway."
-                                            : "Keep going! You're making progress.",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: progressPercent >= 1.0
-                                      ? Colors.green[700]
-                                      : progressPercent >= 0.75
-                                          ? Colors.lime[700]
-                                          : progressPercent >= 0.5
-                                              ? Colors.orange[700]
-                                              : Colors.blue[700],
-                                ),
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal[700],
                               ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              currentValueText,
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.teal[800]),
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ] else ...[
-              // For "maintain" type goals
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.teal[50],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.verified_outlined,
-                        color: Colors.teal[700], size: 24),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Consistency Goal",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.teal[700],
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            currentValueText,
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.teal[800]),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ],
-          ],
-        ),
-
-        SizedBox(height: 16),
-
-        Divider(),
-
-        Text(
-          "Action Plan:",
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
           ),
-        ),
 
-        SizedBox(height: 8),
+          SizedBox(height: 16),
 
-        // Suggestions list
-        Column(
-          children: subgoalSuggestions
-              .map((suggestion) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.check_circle_outline,
-                            size: 16, color: Colors.green[700]),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            suggestion,
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.black87),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ))
-              .toList(),
-        ),
+          Divider(),
 
-        // Warnings if available
-        if (subgoalWarnings.isNotEmpty) ...[
-          SizedBox(height: 12),
           Text(
-            "Important Notes:",
+            "Action Plan:",
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
@@ -2180,22 +2204,25 @@ Widget _buildActiveSubgoalCard() {
               color: Colors.black87,
             ),
           ),
+
           SizedBox(height: 8),
+
+          // Suggestions list
           Column(
-            children: subgoalWarnings
-                .map((warning) => Padding(
+            children: subgoalSuggestions
+                .map((suggestion) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_amber_outlined,
-                              size: 16, color: Colors.orange[700]),
+                          Icon(Icons.check_circle_outline,
+                              size: 16, color: Colors.green[700]),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              warning,
+                              suggestion,
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.grey[800]),
+                                  fontSize: 13, color: Colors.black87),
                             ),
                           ),
                         ],
@@ -2203,100 +2230,140 @@ Widget _buildActiveSubgoalCard() {
                     ))
                 .toList(),
           ),
+
+          // Warnings if available
+          if (subgoalWarnings.isNotEmpty) ...[
+            SizedBox(height: 12),
+            Text(
+              "Important Notes:",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8),
+            Column(
+              children: subgoalWarnings
+                  .map((warning) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.warning_amber_outlined,
+                                size: 16, color: Colors.orange[700]),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                warning,
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey[800]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
-}
-void _fetchActivitiesForSubgoal() async {
-  if (!hasActiveSubgoal) return;
-  
-  try {
-    // Get the current user's ID
-    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (userId.isEmpty) return;
-    
-    // Query the activities collection for activities between start and end date
-    QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
-        .collection('activities')
-        .where('userId', isEqualTo: userId)
-        .where('date', isGreaterThanOrEqualTo: subgoalStartDate)
-        .where('date', isLessThanOrEqualTo: subgoalEndDate)
-        .where('activityType', isEqualTo: 'cycling') // Assuming we're filtering for cycling activities
-        .get();
-    
-    // Clear the existing weekly activities
-    _weeklyActivities.clear();
-    
-    // Add the fetched activities to the list
-    for (var doc in activitiesSnapshot.docs) {
-      _weeklyActivities.add(doc.data() as Map<String, dynamic>);
-    }
-    
-    // Get days per week from goals collection to use for average calculation
-    DocumentSnapshot goalDoc = await FirebaseFirestore.instance
-        .collection('goals')
-        .doc(userId)
-        .get();
-    
-    if (goalDoc.exists) {
-      Map<String, dynamic> goalData = goalDoc.data() as Map<String, dynamic>;
-      if (goalData.containsKey('daysPerWeek')) {
-        daysPerWeek = goalData['daysPerWeek'];
+      ),
+    );
+  }
+
+  void _fetchActivitiesForSubgoal() async {
+    if (!hasActiveSubgoal) return;
+
+    try {
+      // Get the current user's ID
+      String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (userId.isEmpty) return;
+
+      // Query the activities collection for activities between start and end date
+      QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('userId', isEqualTo: userId)
+          .where('date', isGreaterThanOrEqualTo: subgoalStartDate)
+          .where('date', isLessThanOrEqualTo: subgoalEndDate)
+          .where('activityType',
+              isEqualTo:
+                  'cycling') // Assuming we're filtering for cycling activities
+          .get();
+
+      // Clear the existing weekly activities
+      _weeklyActivities.clear();
+
+      // Add the fetched activities to the list
+      for (var doc in activitiesSnapshot.docs) {
+        _weeklyActivities.add(doc.data() as Map<String, dynamic>);
       }
+
+      // Get days per week from goals collection to use for average calculation
+      DocumentSnapshot goalDoc = await FirebaseFirestore.instance
+          .collection('goals')
+          .doc(userId)
+          .get();
+
+      if (goalDoc.exists) {
+        Map<String, dynamic> goalData = goalDoc.data() as Map<String, dynamic>;
+        if (goalData.containsKey('daysPerWeek')) {
+          daysPerWeek = goalData['daysPerWeek'];
+        }
+      }
+
+      // Force UI update
+      if (mounted) setState(() {});
+    } catch (e) {
+      print('Error fetching activities for subgoal: $e');
     }
-    
-    // Force UI update
-    if (mounted) setState(() {});
-  } catch (e) {
-    print('Error fetching activities for subgoal: $e');
   }
-}
 
+  void _fetchSubgoalDetails() async {
+    try {
+      String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (userId.isEmpty) return;
 
-void _fetchSubgoalDetails() async {
-  try {
-    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (userId.isEmpty) return;
-    
-    // Get the active subgoal
-    QuerySnapshot subgoalSnapshot = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: userId)
-        .where('isActive', isEqualTo: true)
-        .limit(1)
-        .get();
-    
-    if (subgoalSnapshot.docs.isEmpty) {
+      // Get the active subgoal
+      QuerySnapshot subgoalSnapshot = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: userId)
+          .where('isActive', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (subgoalSnapshot.docs.isEmpty) {
+        setState(() {
+          hasActiveSubgoal = false;
+        });
+        return;
+      }
+
+      DocumentSnapshot subgoal = subgoalSnapshot.docs.first;
+      Map<String, dynamic> subgoalData = subgoal.data() as Map<String, dynamic>;
+
+      // Set subgoal properties
       setState(() {
-        hasActiveSubgoal = false;
+        hasActiveSubgoal = true;
+        subgoalType = subgoalData['type'] ?? '';
+        subgoalTargetValue = subgoalData['targetValue'] ?? 0.0;
+        baselineDistance = subgoalData['baselineDistance'] ?? 0.0;
+        baselinePace = subgoalData['baselinePace'] ?? 0.0;
+        baselineDuration = subgoalData['baselineDuration'] ?? 0.0;
+        subgoalStartDate = subgoalData['startDate']?.toDate() ?? DateTime.now();
+        subgoalEndDate = subgoalData['endDate']?.toDate() ??
+            DateTime.now().add(Duration(days: 7));
+        subgoalSuggestions =
+            List<String>.from(subgoalData['suggestions'] ?? []);
+        subgoalWarnings = List<String>.from(subgoalData['warnings'] ?? []);
       });
-      return;
+
+      // After fetching the subgoal details, fetch related activities
+      _fetchActivitiesForSubgoal();
+    } catch (e) {
+      print('Error fetching subgoal details: $e');
     }
-    
-    DocumentSnapshot subgoal = subgoalSnapshot.docs.first;
-    Map<String, dynamic> subgoalData = subgoal.data() as Map<String, dynamic>;
-    
-    // Set subgoal properties
-    setState(() {
-      hasActiveSubgoal = true;
-      subgoalType = subgoalData['type'] ?? '';
-      subgoalTargetValue = subgoalData['targetValue'] ?? 0.0;
-      baselineDistance = subgoalData['baselineDistance'] ?? 0.0;
-      baselinePace = subgoalData['baselinePace'] ?? 0.0;
-      baselineDuration = subgoalData['baselineDuration'] ?? 0.0;
-      subgoalStartDate = subgoalData['startDate']?.toDate() ?? DateTime.now();
-      subgoalEndDate = subgoalData['endDate']?.toDate() ?? DateTime.now().add(Duration(days: 7));
-      subgoalSuggestions = List<String>.from(subgoalData['suggestions'] ?? []);
-      subgoalWarnings = List<String>.from(subgoalData['warnings'] ?? []);
-    });
-    
-    // After fetching the subgoal details, fetch related activities
-    _fetchActivitiesForSubgoal();
-  } catch (e) {
-    print('Error fetching subgoal details: $e');
   }
-}
 // This function needs to be added to fetch activities within the date range
 
   void _checkEnduranceGoalCompletion() {
@@ -3178,339 +3245,351 @@ void _fetchSubgoalDetails() async {
     return goalHistory;
   }
 
- void _showGoalHistoryDialog() async {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return Dialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: _fetchGoalHistory(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              // Loading state
-              return Container(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Goal History",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 22,
-                        color: primaryBlack,
-                      ),
-                    ),
-                    SizedBox(height: 24),
-                    Container(
-                      height: 100,
-                      alignment: Alignment.center,
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(primaryOrange),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            } else if (snapshot.hasError) {
-              // Error state
-              return Container(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Goal History",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 22,
-                        color: primaryBlack,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "Error loading goals: ${snapshot.error}",
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    SizedBox(height: 24),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        "Close",
+  void _showGoalHistoryDialog() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _fetchGoalHistory(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                // Loading state
+                return Container(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Goal History",
                         style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          color: primaryGray,
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 22,
+                          color: primaryBlack,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              // Empty state
-              return Container(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Goal History",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 22,
-                        color: primaryBlack,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      "No goal history found.",
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                        color: primaryGray,
-                      ),
-                    ),
-                    SizedBox(height: 24),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        "Close",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          color: primaryGray,
+                      SizedBox(height: 24),
+                      Container(
+                        height: 100,
+                        alignment: Alignment.center,
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(primaryOrange),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            } else {
-              // Data loaded successfully
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header with gradient
-                  Container(
-                    padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.history,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          "Goal History",
-                          style: TextStyle(
-                            fontFamily: 'Fredoka-SemiBold',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                  
-                  // Content area with list
-                  Container(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.5,
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) {
-                        final goal = snapshot.data![index];
-                        final goalType = goal['goalType'] ?? 'Unknown';
-                        final createdAt = goal['timestamp'] != null
-                            ? (goal['timestamp'] as Timestamp).toDate()
-                            : DateTime.now();
-
-                        String details = '';
-                        IconData goalIcon = Icons.flag_outlined;
-
-                        if (goalType == 'Leisure') {
-                          goalIcon = Icons.pedal_bike_outlined;
-                          final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
-                          final sessionDuration = goal['sessionDuration'] ?? 'N/A';
-                          details = "$daysPerWeek days/week, $sessionDuration min/session";
-                        } else if (goalType == 'High Intensity Cycling') {
-                          goalIcon = Icons.speed_outlined;
-                          final targetWeight = goal['targetWeight'] ?? 'N/A';
-                          details = "Target weight: $targetWeight kg";
-                        } else if (goalType == 'Endurance') {
-                          goalIcon = Icons.timer_outlined;
-                          final targetDistance = goal['targetDistance'] ?? 'N/A';
-                          details = "Target distance: $targetDistance km";
-                        }
-
-                        return Container(
-                          margin: EdgeInsets.only(bottom: 12),
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: index == 0
-                                ? Color(0xffFFA500).withOpacity(0.1)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: index == 0
-                                  ? Color(0xffFFA500).withOpacity(0.3)
-                                  : Colors.grey.shade300,
-                              width: 1,
-                            ),
-                            boxShadow: index == 0 ? [
-                              BoxShadow(
-                                color: Color(0xffFFA500).withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              )
-                            ] : null,
+                );
+              } else if (snapshot.hasError) {
+                // Error state
+                return Container(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Goal History",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 22,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        "Error loading goals: ${snapshot.error}",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      SizedBox(height: 24),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text(
+                          "Close",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: primaryGray,
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: index == 0 
-                                    ? Color(0xffFFA500).withOpacity(0.2)
-                                    : Colors.grey.shade200,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  goalIcon,
-                                  size: 20,
-                                  color: index == 0 
-                                    ? Color(0xffFFA500)
-                                    : Colors.grey[700],
-                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                // Empty state
+                return Container(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Goal History",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 22,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        "No goal history found.",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: primaryGray,
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text(
+                          "Close",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: primaryGray,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // Data loaded successfully
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header with gradient
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            "Goal History",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Content area with list
+                    Container(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.5,
+                      ),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: snapshot.data!.length,
+                        itemBuilder: (context, index) {
+                          final goal = snapshot.data![index];
+                          final goalType = goal['goalType'] ?? 'Unknown';
+                          final createdAt = goal['timestamp'] != null
+                              ? (goal['timestamp'] as Timestamp).toDate()
+                              : DateTime.now();
+
+                          String details = '';
+                          IconData goalIcon = Icons.flag_outlined;
+
+                          if (goalType == 'Leisure') {
+                            goalIcon = Icons.pedal_bike_outlined;
+                            final daysPerWeek = goal['daysPerWeek'] ?? 'N/A';
+                            final sessionDuration =
+                                goal['sessionDuration'] ?? 'N/A';
+                            details =
+                                "$daysPerWeek days/week, $sessionDuration min/session";
+                          } else if (goalType == 'High Intensity Cycling') {
+                            goalIcon = Icons.speed_outlined;
+                            final targetWeight = goal['targetWeight'] ?? 'N/A';
+                            details = "Target weight: $targetWeight kg";
+                          } else if (goalType == 'Endurance') {
+                            goalIcon = Icons.timer_outlined;
+                            final targetDistance =
+                                goal['targetDistance'] ?? 'N/A';
+                            details = "Target distance: $targetDistance km";
+                          }
+
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: index == 0
+                                  ? Color(0xffFFA500).withOpacity(0.1)
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: index == 0
+                                    ? Color(0xffFFA500).withOpacity(0.3)
+                                    : Colors.grey.shade300,
+                                width: 1,
                               ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            goalType,
-                                            style: TextStyle(
-                                              fontFamily: 'Fredoka-SemiBold',
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: primaryBlack,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        if (index == 0)
-                                          Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: Color(0xffFFA500),
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
+                              boxShadow: index == 0
+                                  ? [
+                                      BoxShadow(
+                                        color:
+                                            Color(0xffFFA500).withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: index == 0
+                                        ? Color(0xffFFA500).withOpacity(0.2)
+                                        : Colors.grey.shade200,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    goalIcon,
+                                    size: 20,
+                                    color: index == 0
+                                        ? Color(0xffFFA500)
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
                                             child: Text(
-                                              "Current",
+                                              goalType,
                                               style: TextStyle(
-                                                fontFamily: 'Inter',
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.white,
+                                                fontFamily: 'Fredoka-SemiBold',
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: primaryBlack,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (index == 0)
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: Color(0xffFFA500),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: Text(
+                                                "Current",
+                                                style: TextStyle(
+                                                  fontFamily: 'Inter',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.white,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      "Created: ${DateFormat('MMM d, yyyy').format(createdAt)}",
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
+                                        ],
                                       ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      details,
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 13,
-                                        color: Colors.black87,
+                                      SizedBox(height: 4),
+                                      Text(
+                                        "Created: ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                                      SizedBox(height: 4),
+                                      Text(
+                                        details,
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 13,
+                                          color: Colors.black87,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Close button
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.grey[200],
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  
-                  // Close button
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.grey[200],
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                      child: Text(
-                        "Close",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
+                        child: Text(
+                          "Close",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[700],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              );
-            }
-          },
-        ),
-      );
-    },
-  );
-}
+                  ],
+                );
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
 
   String _getIconForGoalType(String goalType) {
     switch (goalType) {
@@ -3524,7 +3603,440 @@ void _fetchSubgoalDetails() async {
         return 'assets/leisure.png';
     }
   }
+Future<void> _checkSubgoalCompletionStatus() async {
+  if (!hasActiveSubgoal) return;
 
+  // Get the current date
+  DateTime now = DateTime.now();
+  
+  // Check if we're at the end of the subgoal period
+  bool isSubgoalCompleted = false;
+  bool isSubgoalEnded = now.isAfter(subgoalEndDate) || now.isAtSameMomentAs(subgoalEndDate);
+  
+  // Calculate current progress
+  double progressPercent = 0.0;
+  
+  // Get the relevant weekly data
+  Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
+  if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
+    progressPercent = currentWeekData['subgoalProgress'];
+    isSubgoalCompleted = progressPercent >= 1.0;
+  } else {
+    // Calculate progress based on subgoal type if not available in weekly data
+    switch (subgoalType) {
+      case "distance":
+        double currentAvgDistance = _weeklyActivities.isEmpty
+            ? 0.0
+            : _totalWeeklyDistance / _weeklyActivities.length;
+        if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
+          progressPercent = (currentAvgDistance - baselineDistance) /
+              (subgoalTargetValue - baselineDistance);
+        }
+        break;
+      case "pace":
+        double currentAvgPace = 0.0;
+        if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+          currentAvgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+          if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
+            progressPercent = (baselinePace - currentAvgPace) /
+                (baselinePace - subgoalTargetValue);
+          }
+        }
+        break;
+      case "duration":
+        double currentAvgDuration = _weeklyActivities.isEmpty
+            ? 0.0
+            : _totalWeeklyDuration / _weeklyActivities.length;
+        if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
+          progressPercent = (currentAvgDuration - baselineDuration) /
+              (subgoalTargetValue - baselineDuration);
+        }
+        break;
+      case "maintain":
+        // For maintenance goals, we consider it complete if they've done at least 3 activities
+        progressPercent = _weeklyActivities.length >= 3 ? 1.0 : _weeklyActivities.length / 3.0;
+        break;
+    }
+    
+    isSubgoalCompleted = progressPercent >= 1.0;
+  }
+  
+  progressPercent = progressPercent.clamp(0.0, 1.0);
+  
+  // Check if the subgoal is ended or completed
+  if (isSubgoalEnded || isSubgoalCompleted) {
+    // Deactivate the current subgoal in Firestore
+    await _deactivateCurrentSubgoal();
+    
+    // Show appropriate popup
+    if (isSubgoalCompleted) {
+      _showSubgoalCompletionDialog();
+    } else if (isSubgoalEnded) {
+      _showSubgoalEndedDialog();
+    }
+    
+    // Trigger the recommendation screen to show new subgoal cards
+    // We'll use a shared preferences flag to indicate this
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('show_subgoal_selection', true);
+  }
+}
+
+// Method to deactivate the current subgoal
+Future<void> _deactivateCurrentSubgoal() async {
+  try {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    
+    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: uid)
+        .where('isActive', isEqualTo: true)
+        .get();
+    
+    for (var doc in subgoalQuery.docs) {
+      await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .doc(doc.id)
+          .update({
+            'isActive': false,
+            'endedAt': FieldValue.serverTimestamp(),
+          });
+      
+      print("Deactivated subgoal: ${doc.id}");
+    }
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('show_subgoal_selection', true);
+    print("Set show_subgoal_selection flag to true");
+    
+    setState(() {
+      hasActiveSubgoal = false;
+    });
+  } catch (e) {
+    print("Error deactivating subgoal: $e");
+  }
+}
+void _showSubgoalCompletionDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.green[700],
+                  size: 64,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Heading
+              Text(
+                "Goal Achieved!",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 22,
+                  color: Colors.green[700],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Description
+              Text(
+                "Congratulations! You've successfully completed your cycling goal. Keep up the great work!",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: primaryBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Subgoal details
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getSubgoalTypeTitle(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: primaryBlack,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getSubgoalDescription(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Close",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: primaryGray,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => RecommendationPage()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryOrange,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "New Goals",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void _showSubgoalEndedDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Info icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: Colors.orange[700],
+                  size: 64,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Heading
+              Text(
+                "Time's Up!",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 22,
+                  color: Colors.orange[700],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Description
+              Text(
+                "Your cycling goal period has ended. While you didn't reach 100%, you still made progress! Ready to set a new goal?",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: primaryBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Subgoal details
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getSubgoalTypeTitle(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: primaryBlack,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getSubgoalDescription(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: primaryGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "Close",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: primaryGray,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => RecommendationPage()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryOrange,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "New Goals",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+// Helper methods to get descriptions for dialogs
+String _getSubgoalTypeTitle() {
+  switch (subgoalType) {
+    case "distance":
+      return "Distance Goal";
+    case "pace":
+      return "Pace Goal";
+    case "duration":
+      return "Duration Goal";
+    case "maintain":
+      return "Maintenance Goal";
+    default:
+      return "Cycling Goal";
+  }
+}
+
+String _getSubgoalDescription() {
+  switch (subgoalType) {
+    case "distance":
+      return "Average ${subgoalTargetValue.toStringAsFixed(1)} km per ride";
+    case "pace":
+      return "Average pace of ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+    case "duration":
+      return "Average ${subgoalTargetValue.toStringAsFixed(0)} minutes per ride";
+    case "maintain":
+      return "Maintain consistent cycling performance";
+    default:
+      return "Complete cycling activities regularly";
+  }
+}
   Widget _buildFirstActivityPrompt() {
     final goalType = userGoal!['goalType'] ?? 'Cycling';
 
@@ -3738,354 +4250,363 @@ void _fetchSubgoalDetails() async {
     }
   }
 
-void _showUpdateWeightDialog() {
-  _updateWeightController.text = "";
-  _updateBodyFatController.text = "";
-  _updateMetabolicRateController.text = "";
+  void _showUpdateWeightDialog() {
+    _updateWeightController.text = "";
+    _updateBodyFatController.text = "";
+    _updateMetabolicRateController.text = "";
 
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (BuildContext context) {
-      return Dialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: SingleChildScrollView(
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header with icon
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: SingleChildScrollView(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
                   ),
-                  child: Row(
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header with icon
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.monitor_weight_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "Update Your Progress",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // Weight field with icon
+                  _buildInputField(
+                    controller: _updateWeightController,
+                    labelText: "Current Weight (kg)",
+                    hintText: "Enter your current weight",
+                    icon: Icons.scale_outlined,
+                    iconColor: Color(0xffFFA500),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Body fat field with icon
+                  _buildInputField(
+                    controller: _updateBodyFatController,
+                    labelText: "Body Fat Percentage (%)",
+                    hintText: "Enter your body fat %",
+                    icon: Icons.percent_rounded,
+                    iconColor: Color(0xffFF7E00),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Metabolic rate field with icon
+                  _buildInputField(
+                    controller: _updateMetabolicRateController,
+                    labelText: "Basal Metabolic Rate (kcal)",
+                    hintText: "Enter your BMR",
+                    icon: Icons.local_fire_department_outlined,
+                    iconColor: Color(0xffFF5900),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // Motivation text
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[200]!, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: Colors.blue[700],
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Regular tracking helps you stay on top of your goals and measure your progress accurately.",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: Colors.blue[800],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // Action buttons with better styling
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        Icons.monitor_weight_rounded,
-                        color: Colors.white,
-                        size: 28,
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.grey[200],
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ),
                       ),
                       SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          "Update Your Progress",
-                          style: TextStyle(
-                            fontFamily: 'Fredoka-SemiBold',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _updateUserMetrics();
+                            Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xffFFA500),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            "Save",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                
-                SizedBox(height: 24),
-                
-                // Weight field with icon
-                _buildInputField(
-                  controller: _updateWeightController,
-                  labelText: "Current Weight (kg)",
-                  hintText: "Enter your current weight",
-                  icon: Icons.scale_outlined,
-                  iconColor: Color(0xffFFA500),
-                ),
-                
-                SizedBox(height: 16),
-                
-                // Body fat field with icon
-                _buildInputField(
-                  controller: _updateBodyFatController,
-                  labelText: "Body Fat Percentage (%)",
-                  hintText: "Enter your body fat %",
-                  icon: Icons.percent_rounded,
-                  iconColor: Color(0xffFF7E00),
-                ),
-                
-                SizedBox(height: 16),
-                
-                // Metabolic rate field with icon
-                _buildInputField(
-                  controller: _updateMetabolicRateController,
-                  labelText: "Basal Metabolic Rate (kcal)",
-                  hintText: "Enter your BMR",
-                  icon: Icons.local_fire_department_outlined,
-                  iconColor: Color(0xffFF5900),
-                ),
-                
-                SizedBox(height: 24),
-                
-                // Motivation text
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue[200]!, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: Colors.blue[700],
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "Regular tracking helps you stay on top of your goals and measure your progress accurately.",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            color: Colors.blue[800],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 24),
-                
-                // Action buttons with better styling
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: Colors.grey[200],
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          "Cancel",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _updateUserMetrics();
-                          Navigator.of(context).pop();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xffFFA500),
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          "Save",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
 // Helper method to build consistent input fields with fully rounded icon backgrounds
-Widget _buildInputField({
-  required TextEditingController controller,
-  required String labelText,
-  required String hintText,
-  required IconData icon,
-  required Color iconColor,
-}) {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.grey[50],
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey[300]!, width: 1),
-    ),
-    child: Row(
-      children: [
-        // Fully rounded icon container
-        Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 20,
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String labelText,
+    required String hintText,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Row(
+        children: [
+          // Fully rounded icon container
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 20,
+              ),
             ),
           ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              color: Colors.black87,
-            ),
-            decoration: InputDecoration(
-              labelText: labelText,
-              hintText: hintText,
-              hintStyle: TextStyle(
+          SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(
                 fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.grey[400],
+                fontSize: 15,
+                color: Colors.black87,
               ),
-              labelStyle: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.grey[700],
+              decoration: InputDecoration(
+                labelText: labelText,
+                hintText: hintText,
+                hintStyle: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  color: Colors.grey[400],
+                ),
+                labelStyle: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 16),
               ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 16),
             ),
           ),
-        ),
-        SizedBox(width: 12),
-      ],
-    ),
-  );
-}
-  Future<void> _updateUserMetrics() async {
-  try {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    // Parse the new metric values
-    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
-    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
-    double newMetabolicRate =
-        double.tryParse(_updateMetabolicRateController.text) ?? 0;
-
-    // Query the latest userData document for the user
-    final userDataQuery = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-
-    // Prepare the new data to be saved
-    Map<String, dynamic> newData = {
-      'uid': uid,
-      'timestamp': FieldValue.serverTimestamp(),
-      'weight': newWeight,
-      'bodyFat': newBodyFat,
-      'basalMetabolicRate': newMetabolicRate,
-    };
-
-    // Copy over existing fields from the latest userData document
-    if (userDataQuery.docs.isNotEmpty) {
-      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-      existingData.forEach((key, value) {
-        if (key != 'uid' &&
-            key != 'timestamp' &&
-            key != 'weight' &&
-            key != 'bodyFat') {
-          newData[key] = value;
-        }
-      });
-    }
-
-    // Save the new userData document
-    await FirebaseFirestore.instance.collection('userData').add(newData);
-
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Progress updated successfully!')));
-
-    // Check and update baseline_complete in the goals collection
-    final goalsSnapshot = await FirebaseFirestore.instance
-        .collection('goals')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-
-    if (goalsSnapshot.docs.isNotEmpty) {
-      final goalDoc = goalsSnapshot.docs.first;
-      final goalData = goalDoc.data();
-
-      // Check if baseline_complete exists and is false
-      if (goalData['baseline_complete'] == null || goalData['baseline_complete'] == false) {
-        // Update baseline_complete to true
-        await FirebaseFirestore.instance
-            .collection('goals')
-            .doc(goalDoc.id)
-            .update({'baseline_complete': true});
-        print('Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
-      } else {
-        print('baseline_complete is already true. No update needed.');
-      }
-    } else {
-      print('No goal documents found for user with UID: $uid');
-    }
-
-    // Reload user goal and activities
-    await _loadUserGoalAndActivities();
-  } catch (e) {
-    print('Error updating metrics: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update progress: $e')));
+          SizedBox(width: 12),
+        ],
+      ),
+    );
   }
-}
+
+  Future<void> _updateUserMetrics() async {
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      // Parse the new metric values
+      double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
+      double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+      double newMetabolicRate =
+          double.tryParse(_updateMetabolicRateController.text) ?? 0;
+
+      // Query the latest userData document for the user
+      final userDataQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      // Prepare the new data to be saved
+      Map<String, dynamic> newData = {
+        'uid': uid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'weight': newWeight,
+        'bodyFat': newBodyFat,
+        'basalMetabolicRate': newMetabolicRate,
+      };
+
+      // Copy over existing fields from the latest userData document
+      if (userDataQuery.docs.isNotEmpty) {
+        Map<String, dynamic> existingData = userDataQuery.docs.first.data();
+        existingData.forEach((key, value) {
+          if (key != 'uid' &&
+              key != 'timestamp' &&
+              key != 'weight' &&
+              key != 'bodyFat') {
+            newData[key] = value;
+          }
+        });
+      }
+
+      // Save the new userData document
+      await FirebaseFirestore.instance.collection('userData').add(newData);
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Progress updated successfully!')));
+
+      // Check and update baseline_complete in the goals collection
+      final goalsSnapshot = await FirebaseFirestore.instance
+          .collection('goals')
+          .where('uid', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (goalsSnapshot.docs.isNotEmpty) {
+        final goalDoc = goalsSnapshot.docs.first;
+        final goalData = goalDoc.data();
+
+        // Check if baseline_complete exists and is false
+        if (goalData['baseline_complete'] == null ||
+            goalData['baseline_complete'] == false) {
+          // Update baseline_complete to true
+          await FirebaseFirestore.instance
+              .collection('goals')
+              .doc(goalDoc.id)
+              .update({'baseline_complete': true});
+
+          // Update local state variable
+          setState(() {
+            _isBaselineComplete = true;
+          });
+
+          print(
+              'Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
+        } else {
+          print('baseline_complete is already true. No update needed.');
+        }
+      } else {
+        print('No goal documents found for user with UID: $uid');
+      }
+
+      // Reload user goal and activities
+      await _loadUserGoalAndActivities();
+    } catch (e) {
+      print('Error updating metrics: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update progress: $e')));
+    }
+  }
 
   Widget _buildProgressCard(String title, double progress, double target,
       String unit, Color color, IconData icon,
@@ -4315,6 +4836,12 @@ Widget _buildInputField({
       );
     }
 
+    // Check if baseline is complete, if not, show the first activity prompt
+    if (!_isBaselineComplete) {
+      return _buildFirstActivityPrompt();
+    }
+
+    // If baseline is complete but there are no activities, show first activity prompt
     if (!_hasActivityAfterGoal) {
       return _buildFirstActivityPrompt();
     }
