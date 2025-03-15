@@ -191,6 +191,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double baselinePace = 0.0;
   double baselineDuration = 0.0;
 
+  double previousWeekDistance = 0.0;
+  double previousWeekPace = 0.0;
+  double previousWeekDuration = 0.0;
+
   String recommendation = "Loading...";
   String feedback = "";
   bool showAllLogs = false;
