@@ -21,8 +21,8 @@ class PieEfficiencyData {
 
 class PaceCaloriesData {
   final DateTime date;
-  final double pace; 
-  final double calories; 
+  final double pace;
+  final double calories;
   final String activityName;
 
   PaceCaloriesData(this.date, this.pace, this.calories, this.activityName);
@@ -103,9 +103,9 @@ class RecommendationPage extends StatefulWidget {
 
 class TemperatureActivityData {
   final double temperature;
-  final double speed; 
-  final double distance; 
-  final double duration; 
+  final double speed;
+  final double distance;
+  final double duration;
   final DateTime date;
 
   TemperatureActivityData(
@@ -120,14 +120,17 @@ class HeartRateSpeedData {
 
   HeartRateSpeedData(this.date, this.heartRate, this.speed, this.activityName);
 }
+
 class HeartRateZoneData {
   final String zoneName;
   final double averageSpeed;
   final int activityCount;
   final Color zoneColor;
 
-  HeartRateZoneData(this.zoneName, this.averageSpeed, this.activityCount, this.zoneColor);
+  HeartRateZoneData(
+      this.zoneName, this.averageSpeed, this.activityCount, this.zoneColor);
 }
+
 class ErrorBoundary extends StatelessWidget {
   final Widget child;
 
@@ -180,7 +183,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<Map<String, dynamic>> nutritionData = [];
   Map<String, dynamic> baselineComparison = {};
   bool hasActiveSubgoal = false;
-  String subgoalType = ""; 
+  String subgoalType = "";
   double subgoalTargetValue = 0.0;
   DateTime subgoalStartDate = DateTime.now();
   DateTime subgoalEndDate = DateTime.now().add(Duration(days: 7));
@@ -194,6 +197,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
   double previousWeekDistance = 0.0;
   double previousWeekPace = 0.0;
   double previousWeekDuration = 0.0;
+
+  bool usingPreviousGoal = false;
+  double referenceDistance = 0.0;
+  double referencePace = 0.0;
+  double referenceDuration = 0.0;
 
   String recommendation = "Loading...";
   String feedback = "";
@@ -229,7 +237,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String temperature = "0";
   String humidity = "0";
   String weatherCondition = "-";
-  String airQuality = "Good"; 
+  String airQuality = "Good";
 
   String foodIntake = "-";
   String foodType = "-";
@@ -342,347 +350,382 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return [];
     }
   }
-Widget _buildHeartRateSpeedGraph() {
-  return FutureBuilder<List<HeartRateSpeedData>>(
-    future: _fetchHeartRateSpeedData(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return _buildLoadingGraph();
-      }
 
-      if (snapshot.hasError || !snapshot.hasData) {
-        return _buildEmptyGraph("Error loading heart rate and speed data");
-      }
-
-      List<HeartRateSpeedData> data = snapshot.data!;
-      
-      if (data.isEmpty) {
-        return _buildEmptyGraph("No activities with heart rate data found");
-      }
-
-      double correlationValue = 0.0;
-      String correlationText = "Insufficient data for correlation analysis";
-      
-      if (data.length >= 3) {
-        List<double> heartRates = data.map((e) => e.heartRate).toList();
-        List<double> speeds = data.map((e) => e.speed).toList();
-        
-        correlationValue = _calculatePearsonCorrelation(heartRates, speeds);
-        
-        if (correlationValue > 0.7) {
-          correlationText = "Strong positive correlation (${correlationValue.toStringAsFixed(2)}). Higher heart rates consistently increase your speed.";
-        } else if (correlationValue > 0.4) {
-          correlationText = "Moderate positive correlation (${correlationValue.toStringAsFixed(2)}). Your speed tends to increase with heart rate.";
-        } else if (correlationValue > 0.2) {
-          correlationText = "Weak positive correlation (${correlationValue.toStringAsFixed(2)}). Your speed is somewhat affected by heart rate.";
-        } else if (correlationValue > -0.2) {
-          correlationText = "No significant correlation (${correlationValue.toStringAsFixed(2)}). Your speed varies independently of your heart rate.";
-        } else if (correlationValue > -0.4) {
-          correlationText = "Weak negative correlation (${correlationValue.toStringAsFixed(2)}). Lower heart rates sometimes relate to higher speeds.";
-        } else if (correlationValue > -0.7) {
-          correlationText = "Moderate negative correlation (${correlationValue.toStringAsFixed(2)}). Unusual pattern - your speed decreases with higher heart rates.";
-        } else {
-          correlationText = "Strong negative correlation (${correlationValue.toStringAsFixed(2)}). Unusual pattern - your speed significantly decreases with higher heart rates.";
+  Widget _buildHeartRateSpeedGraph() {
+    return FutureBuilder<List<HeartRateSpeedData>>(
+      future: _fetchHeartRateSpeedData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
         }
-      }
 
-      double minSpeed = data.map((e) => e.speed).reduce(math.min);
-      double maxSpeed = data.map((e) => e.speed).reduce(math.max);
-      
-      double speedRange = maxSpeed - minSpeed;
-      double speedMin = math.max(0, minSpeed - (speedRange * 0.1));
-      double speedMax = maxSpeed + (speedRange * 0.1);
+        if (snapshot.hasError || !snapshot.hasData) {
+          return _buildEmptyGraph("Error loading heart rate and speed data");
+        }
 
-      List<HeartRateZoneData> zoneData = [];
-      
-      if (age > 0) {
-        List<HeartRateSpeedData> zone1Points = [];
-        List<HeartRateSpeedData> zone2Points = [];
-        List<HeartRateSpeedData> zone3Points = [];
-        List<HeartRateSpeedData> zone4Points = [];
-        List<HeartRateSpeedData> zone5Points = [];
-        
-        for (var point in data) {
-          if (point.heartRate < zone2HeartRate) {
-            zone1Points.add(point);
-          } else if (point.heartRate < zone3HeartRate) {
-            zone2Points.add(point);
-          } else if (point.heartRate < zone4HeartRate) {
-            zone3Points.add(point);
-          } else if (point.heartRate < zone5HeartRate) {
-            zone4Points.add(point);
+        List<HeartRateSpeedData> data = snapshot.data!;
+
+        if (data.isEmpty) {
+          return _buildEmptyGraph("No activities with heart rate data found");
+        }
+
+        double correlationValue = 0.0;
+        String correlationText = "Insufficient data for correlation analysis";
+
+        if (data.length >= 3) {
+          List<double> heartRates = data.map((e) => e.heartRate).toList();
+          List<double> speeds = data.map((e) => e.speed).toList();
+
+          correlationValue = _calculatePearsonCorrelation(heartRates, speeds);
+
+          if (correlationValue > 0.7) {
+            correlationText =
+                "Strong positive correlation (${correlationValue.toStringAsFixed(2)}). Higher heart rates consistently increase your speed.";
+          } else if (correlationValue > 0.4) {
+            correlationText =
+                "Moderate positive correlation (${correlationValue.toStringAsFixed(2)}). Your speed tends to increase with heart rate.";
+          } else if (correlationValue > 0.2) {
+            correlationText =
+                "Weak positive correlation (${correlationValue.toStringAsFixed(2)}). Your speed is somewhat affected by heart rate.";
+          } else if (correlationValue > -0.2) {
+            correlationText =
+                "No significant correlation (${correlationValue.toStringAsFixed(2)}). Your speed varies independently of your heart rate.";
+          } else if (correlationValue > -0.4) {
+            correlationText =
+                "Weak negative correlation (${correlationValue.toStringAsFixed(2)}). Lower heart rates sometimes relate to higher speeds.";
+          } else if (correlationValue > -0.7) {
+            correlationText =
+                "Moderate negative correlation (${correlationValue.toStringAsFixed(2)}). Unusual pattern - your speed decreases with higher heart rates.";
           } else {
-            zone5Points.add(point);
+            correlationText =
+                "Strong negative correlation (${correlationValue.toStringAsFixed(2)}). Unusual pattern - your speed significantly decreases with higher heart rates.";
           }
         }
-        
-        if (zone1Points.isNotEmpty) {
-          double avgSpeed = zone1Points.map((e) => e.speed).reduce((a, b) => a + b) / zone1Points.length;
-          zoneData.add(HeartRateZoneData('Zone 1', avgSpeed, zone1Points.length, Colors.green[700]!));
-        } else {
-          zoneData.add(HeartRateZoneData('Zone 1', 0, 0, Colors.green[700]!));
-        }
-        
-        if (zone2Points.isNotEmpty) {
-          double avgSpeed = zone2Points.map((e) => e.speed).reduce((a, b) => a + b) / zone2Points.length;
-          zoneData.add(HeartRateZoneData('Zone 2', avgSpeed, zone2Points.length, Colors.green[400]!));
-        } else {
-          zoneData.add(HeartRateZoneData('Zone 2', 0, 0, Colors.green[400]!));
-        }
-        
-        if (zone3Points.isNotEmpty) {
-          double avgSpeed = zone3Points.map((e) => e.speed).reduce((a, b) => a + b) / zone3Points.length;
-          zoneData.add(HeartRateZoneData('Zone 3', avgSpeed, zone3Points.length, Colors.orange[400]!));
-        } else {
-          zoneData.add(HeartRateZoneData('Zone 3', 0, 0, Colors.orange[400]!));
-        }
-        
-        if (zone4Points.isNotEmpty) {
-          double avgSpeed = zone4Points.map((e) => e.speed).reduce((a, b) => a + b) / zone4Points.length;
-          zoneData.add(HeartRateZoneData('Zone 4', avgSpeed, zone4Points.length, Colors.red[400]!));
-        } else {
-          zoneData.add(HeartRateZoneData('Zone 4', 0, 0, Colors.red[400]!));
-        }
-        
-        if (zone5Points.isNotEmpty) {
-          double avgSpeed = zone5Points.map((e) => e.speed).reduce((a, b) => a + b) / zone5Points.length;
-          zoneData.add(HeartRateZoneData('Zone 5', avgSpeed, zone5Points.length, Colors.red[700]!));
-        } else {
-          zoneData.add(HeartRateZoneData('Zone 5', 0, 0, Colors.red[700]!));
-        }
-      }
 
-      if (zoneData.isEmpty) {
-        return _buildEmptyGraph("Heart rate zones not available - enter your age in profile");
-      }
+        double minSpeed = data.map((e) => e.speed).reduce(math.min);
+        double maxSpeed = data.map((e) => e.speed).reduce(math.max);
 
-      return _buildGraphContainer(
-        title: "Speed by\nHeart Rate Zone",
-        subtitle: "Training Zone Analysis",
-        height: 340,
-        child: Column(
-          children: [
-            // Main chart
-            Expanded(
-              child: SfCartesianChart(
-                margin: EdgeInsets.all(10),
-                plotAreaBorderWidth: 0,
-                primaryXAxis: CategoryAxis(
-                  title: AxisTitle(
-                    text: 'Heart Rate Zones',
-                    textStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  majorGridLines: MajorGridLines(
-                    width: 0,
-                  ),
-                  labelStyle: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 10,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                primaryYAxis: NumericAxis(
-                  title: AxisTitle(
-                    text: 'Average Speed (km/h)',
-                    textStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue[700],
-                    ),
-                  ),
-                  minimum: speedMin,
-                  maximum: speedMax,
-                  interval: 2,
-                  majorGridLines: MajorGridLines(
-                    width: 0.5,
-                    color: Colors.grey[200],
-                    dashArray: <double>[3, 3],
-                  ),
-                  labelStyle: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 10,
-                    color: Colors.grey[700],
-                  ),
-                  labelFormat: '{value} km/h',
-                ),
-                series: <ChartSeries>[
-                  LineSeries<HeartRateZoneData, String>(
-                    name: 'Average Speed',
-                    dataSource: zoneData,
-                    xValueMapper: (HeartRateZoneData zone, _) => zone.zoneName,
-                    yValueMapper: (HeartRateZoneData zone, _) => zone.averageSpeed,
-                    color: Colors.blue[600],
-                    width: 2.5,
-                    markerSettings: MarkerSettings(
-                      isVisible: true,
-                      shape: DataMarkerType.circle,
-                      height: 8,
-                      width: 8,
-                      borderWidth: 2,
-                      borderColor: Colors.white,
-                    ),
-                    pointColorMapper: (HeartRateZoneData zone, _) => zone.zoneColor,
-                    enableTooltip: true,
-                  ),
-                ],
-                tooltipBehavior: TooltipBehavior(
-                  enable: true,
-                  builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
-                    HeartRateZoneData zoneData = data;
-                    return Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
+        double speedRange = maxSpeed - minSpeed;
+        double speedMin = math.max(0, minSpeed - (speedRange * 0.1));
+        double speedMax = maxSpeed + (speedRange * 0.1);
+
+        List<HeartRateZoneData> zoneData = [];
+
+        if (age > 0) {
+          List<HeartRateSpeedData> zone1Points = [];
+          List<HeartRateSpeedData> zone2Points = [];
+          List<HeartRateSpeedData> zone3Points = [];
+          List<HeartRateSpeedData> zone4Points = [];
+          List<HeartRateSpeedData> zone5Points = [];
+
+          for (var point in data) {
+            if (point.heartRate < zone2HeartRate) {
+              zone1Points.add(point);
+            } else if (point.heartRate < zone3HeartRate) {
+              zone2Points.add(point);
+            } else if (point.heartRate < zone4HeartRate) {
+              zone3Points.add(point);
+            } else if (point.heartRate < zone5HeartRate) {
+              zone4Points.add(point);
+            } else {
+              zone5Points.add(point);
+            }
+          }
+
+          if (zone1Points.isNotEmpty) {
+            double avgSpeed =
+                zone1Points.map((e) => e.speed).reduce((a, b) => a + b) /
+                    zone1Points.length;
+            zoneData.add(HeartRateZoneData(
+                'Zone 1', avgSpeed, zone1Points.length, Colors.green[700]!));
+          } else {
+            zoneData.add(HeartRateZoneData('Zone 1', 0, 0, Colors.green[700]!));
+          }
+
+          if (zone2Points.isNotEmpty) {
+            double avgSpeed =
+                zone2Points.map((e) => e.speed).reduce((a, b) => a + b) /
+                    zone2Points.length;
+            zoneData.add(HeartRateZoneData(
+                'Zone 2', avgSpeed, zone2Points.length, Colors.green[400]!));
+          } else {
+            zoneData.add(HeartRateZoneData('Zone 2', 0, 0, Colors.green[400]!));
+          }
+
+          if (zone3Points.isNotEmpty) {
+            double avgSpeed =
+                zone3Points.map((e) => e.speed).reduce((a, b) => a + b) /
+                    zone3Points.length;
+            zoneData.add(HeartRateZoneData(
+                'Zone 3', avgSpeed, zone3Points.length, Colors.orange[400]!));
+          } else {
+            zoneData
+                .add(HeartRateZoneData('Zone 3', 0, 0, Colors.orange[400]!));
+          }
+
+          if (zone4Points.isNotEmpty) {
+            double avgSpeed =
+                zone4Points.map((e) => e.speed).reduce((a, b) => a + b) /
+                    zone4Points.length;
+            zoneData.add(HeartRateZoneData(
+                'Zone 4', avgSpeed, zone4Points.length, Colors.red[400]!));
+          } else {
+            zoneData.add(HeartRateZoneData('Zone 4', 0, 0, Colors.red[400]!));
+          }
+
+          if (zone5Points.isNotEmpty) {
+            double avgSpeed =
+                zone5Points.map((e) => e.speed).reduce((a, b) => a + b) /
+                    zone5Points.length;
+            zoneData.add(HeartRateZoneData(
+                'Zone 5', avgSpeed, zone5Points.length, Colors.red[700]!));
+          } else {
+            zoneData.add(HeartRateZoneData('Zone 5', 0, 0, Colors.red[700]!));
+          }
+        }
+
+        if (zoneData.isEmpty) {
+          return _buildEmptyGraph(
+              "Heart rate zones not available - enter your age in profile");
+        }
+
+        return _buildGraphContainer(
+          title: "Speed by\nHeart Rate Zone",
+          subtitle: "Training Zone Analysis",
+          height: 340,
+          child: Column(
+            children: [
+              // Main chart
+              Expanded(
+                child: SfCartesianChart(
+                  margin: EdgeInsets.all(10),
+                  plotAreaBorderWidth: 0,
+                  primaryXAxis: CategoryAxis(
+                    title: AxisTitle(
+                      text: 'Heart Rate Zones',
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                         color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(8),
                       ),
+                    ),
+                    majorGridLines: MajorGridLines(
+                      width: 0,
+                    ),
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  primaryYAxis: NumericAxis(
+                    title: AxisTitle(
+                      text: 'Average Speed (km/h)',
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                    minimum: speedMin,
+                    maximum: speedMax,
+                    interval: 2,
+                    majorGridLines: MajorGridLines(
+                      width: 0.5,
+                      color: Colors.grey[200],
+                      dashArray: <double>[3, 3],
+                    ),
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      color: Colors.grey[700],
+                    ),
+                    labelFormat: '{value} km/h',
+                  ),
+                  series: <ChartSeries>[
+                    LineSeries<HeartRateZoneData, String>(
+                      name: 'Average Speed',
+                      dataSource: zoneData,
+                      xValueMapper: (HeartRateZoneData zone, _) =>
+                          zone.zoneName,
+                      yValueMapper: (HeartRateZoneData zone, _) =>
+                          zone.averageSpeed,
+                      color: Colors.blue[600],
+                      width: 2.5,
+                      markerSettings: MarkerSettings(
+                        isVisible: true,
+                        shape: DataMarkerType.circle,
+                        height: 8,
+                        width: 8,
+                        borderWidth: 2,
+                        borderColor: Colors.white,
+                      ),
+                      pointColorMapper: (HeartRateZoneData zone, _) =>
+                          zone.zoneColor,
+                      enableTooltip: true,
+                    ),
+                  ],
+                  tooltipBehavior: TooltipBehavior(
+                    enable: true,
+                    builder: (dynamic data, dynamic point, dynamic series,
+                        int pointIndex, int seriesIndex) {
+                      HeartRateZoneData zoneData = data;
+                      return Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              zoneData.zoneName,
+                              style: TextStyle(
+                                color: zoneData.zoneColor,
+                                fontFamily: 'Inter',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "Speed: ${zoneData.averageSpeed.toStringAsFixed(1)} km/h",
+                              style: TextStyle(
+                                color: Colors.blue[300],
+                                fontFamily: 'Inter',
+                                fontSize: 10,
+                              ),
+                            ),
+                            Text(
+                              "Activities: ${zoneData.activityCount}",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Inter',
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  legend: Legend(
+                    isVisible: true,
+                    position: LegendPosition.bottom,
+                    overflowMode: LegendItemOverflowMode.wrap,
+                  ),
+                ),
+              ),
+
+              // Zone description
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildZoneIndicator(
+                          "Zone 1", "50-60%", Colors.green[700]!),
+                      SizedBox(width: 8),
+                      _buildZoneIndicator(
+                          "Zone 2", "60-70%", Colors.green[400]!),
+                      SizedBox(width: 8),
+                      _buildZoneIndicator(
+                          "Zone 3", "70-80%", Colors.orange[400]!),
+                      SizedBox(width: 8),
+                      _buildZoneIndicator("Zone 4", "80-90%", Colors.red[400]!),
+                      SizedBox(width: 8),
+                      _buildZoneIndicator(
+                          "Zone 5", "90-100%", Colors.red[700]!),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Correlation insight box
+              Container(
+                margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue[200]!, width: 1),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.insights_rounded,
+                      color: Colors.blue[700],
+                      size: 18,
+                    ),
+                    SizedBox(width: 5),
+                    Expanded(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            zoneData.zoneName,
+                            correlationText,
                             style: TextStyle(
-                              color: zoneData.zoneColor,
                               fontFamily: 'Inter',
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            "Speed: ${zoneData.averageSpeed.toStringAsFixed(1)} km/h",
-                            style: TextStyle(
-                              color: Colors.blue[300],
-                              fontFamily: 'Inter',
-                              fontSize: 10,
-                            ),
-                          ),
-                          Text(
-                            "Activities: ${zoneData.activityCount}",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'Inter',
-                              fontSize: 10,
+                              fontSize: 11,
+                              color: Colors.grey[800],
+                              height: 1.2,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
-                legend: Legend(
-                  isVisible: true,
-                  position: LegendPosition.bottom,
-                  overflowMode: LegendItemOverflowMode.wrap,
-                ),
-              ),
-            ),
-            
-            // Zone description
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildZoneIndicator("Zone 1", "50-60%", Colors.green[700]!),
-                    SizedBox(width: 8),
-                    _buildZoneIndicator("Zone 2", "60-70%", Colors.green[400]!),
-                    SizedBox(width: 8),
-                    _buildZoneIndicator("Zone 3", "70-80%", Colors.orange[400]!),
-                    SizedBox(width: 8),
-                    _buildZoneIndicator("Zone 4", "80-90%", Colors.red[400]!),
-                    SizedBox(width: 8),
-                    _buildZoneIndicator("Zone 5", "90-100%", Colors.red[700]!),
+                    ),
                   ],
                 ),
               ),
-            ),
-            
-            // Correlation insight box
-            Container(
-              margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!, width: 1),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.insights_rounded,
-                    color: Colors.blue[700],
-                    size: 18,
-                  ),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          correlationText,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: Colors.grey[800],
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
+            ],
+          ),
+        );
+      },
+    );
+  }
 
 // Helper widget for zone indicators
-Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
-  return Container(
-    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: color.withOpacity(0.3), width: 1),
-    ),
-    child: Row(
-      children: [
-        Container(
-          height: 10,
-          width: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
+  Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 10,
+            width: 10,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
           ),
-        ),
-        SizedBox(width: 4),
-        Text(
-          "$zoneName ($zoneRange)",
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 10,
-            color: color,
-            fontWeight: FontWeight.bold,
+          SizedBox(width: 4),
+          Text(
+            "$zoneName ($zoneRange)",
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 10,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
+
   Future<List<NutritionActivityData>> _fetchNutritionActivityData() async {
     if (userId == null) return [];
 
@@ -738,8 +781,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
             if (newDistance > existingDistance) {
               activitiesByDate[dateKey] = {
-                'elapsedTime': safeParseDouble(data['elapsed_time']) /
-                    60, 
+                'elapsedTime': safeParseDouble(data['elapsed_time']) / 60,
                 'distance': safeParseDouble(data['distance']),
                 'averageSpeed': safeParseDouble(data['average_speed']),
                 'date': date,
@@ -1271,7 +1313,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('userData')
           .where('uid', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
-          .limit(14) 
+          .limit(14)
           .get();
 
       // Fetch food entries for calorie consumed data
@@ -1279,7 +1321,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('food_entries')
           .where('userId', isEqualTo: userId)
           .orderBy('date', descending: true)
-          .limit(14) 
+          .limit(14)
           .get();
 
       // Fetch activity data for calories burned
@@ -1287,7 +1329,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .collection('activities')
           .where('uid', isEqualTo: userId)
           .orderBy('start_date', descending: true)
-          .limit(30) 
+          .limit(30)
           .get();
 
       // Process weight data
@@ -1418,12 +1460,13 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
 // Method to fetch active subgoal when loading the page
   Future<void> _fetchActiveSubgoal() async {
-    if (userId == null) return;
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
     try {
       QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
           .collection('cycling_subgoals')
-          .where('userId', isEqualTo: userId)
+          .where('userId', isEqualTo: uid)
           .where('endDate', isGreaterThan: DateTime.now())
           .orderBy('endDate', descending: false)
           .limit(1)
@@ -1453,7 +1496,130 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         setState(() {
           hasActiveSubgoal = false;
         });
-        print("No active subgoal found");
+
+        // Now check for the most recently completed subgoal
+        // to use as reference for new subgoal suggestions
+        try {
+          QuerySnapshot completedSubgoalQuery = await FirebaseFirestore.instance
+              .collection('cycling_subgoals')
+              .where('userId', isEqualTo: uid)
+              .where('endDate', isLessThan: DateTime.now())
+              .orderBy('endDate', descending: true)
+              .limit(1)
+              .get();
+
+          if (completedSubgoalQuery.docs.isNotEmpty) {
+            DocumentSnapshot subgoalDoc = completedSubgoalQuery.docs.first;
+            var data = subgoalDoc.data() as Map<String, dynamic>;
+
+            // First ensure we have baseline data
+            if (baselineDistance == 0.0) {
+              _calculateBaselines();
+            }
+
+            // Get the subgoal date range to fetch relevant activities
+            DateTime startDate = data['startDate'].toDate();
+            DateTime endDate = data['endDate'].toDate();
+            String completedType = data['subgoalType'];
+
+            // Fetch activities within the previous subgoal's time period
+            QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
+                .collection('activities')
+                .where('uid', isEqualTo: uid)
+                .where('start_date',
+                    isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+                .where('start_date',
+                    isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+                .get();
+
+            // Calculate actual performance metrics from these activities
+            double actualTotalDistance = 0.0;
+            double actualTotalDuration = 0.0; // in minutes
+            List<double> paces = [];
+
+            for (var doc in activitiesSnapshot.docs) {
+              var activityData = doc.data() as Map<String, dynamic>;
+
+              double distance = safeParseDouble(activityData['distance']);
+              double durationSeconds =
+                  safeParseDouble(activityData['elapsed_time']);
+              double durationMinutes = durationSeconds / 60.0;
+
+              if (distance > 0) actualTotalDistance += distance;
+              if (durationMinutes > 0) actualTotalDuration += durationMinutes;
+
+              // Calculate pace (minutes per km) for this activity
+              if (distance > 0 && durationMinutes > 0) {
+                double pace = durationMinutes / distance;
+                paces.add(pace);
+              }
+            }
+
+            // Calculate averages if there were activities
+            int activityCount = activitiesSnapshot.docs.length;
+            double actualAvgDistance =
+                activityCount > 0 ? actualTotalDistance / activityCount : 0.0;
+            double actualAvgDuration =
+                activityCount > 0 ? actualTotalDuration / activityCount : 0.0;
+            double actualAvgPace = 0.0;
+
+            if (paces.isNotEmpty) {
+              actualAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+            }
+
+            // Then update our reference values based on completed subgoal
+            setState(() {
+              if (activityCount > 0) {
+                // Use actual performance metrics if we have activities
+                referenceDistance = actualAvgDistance;
+                referencePace = actualAvgPace;
+                referenceDuration = actualAvgDuration;
+                usingPreviousGoal = false;
+              } else {
+                // If no activities found, fall back to previous subgoal target values
+                if (completedType == "distance") {
+                  referenceDistance = data['targetValue'];
+                  referencePace = baselinePace;
+                  referenceDuration = baselineDuration;
+                } else if (completedType == "pace") {
+                  referenceDistance = baselineDistance;
+                  referencePace = data['targetValue'];
+                  referenceDuration = baselineDuration;
+                } else if (completedType == "duration") {
+                  referenceDistance = baselineDistance;
+                  referencePace = baselinePace;
+                  referenceDuration = data['targetValue'];
+                } else if (completedType == "maintain") {
+                  // For maintain goals, use the baseline values
+                  referenceDistance = baselineDistance;
+                  referencePace = baselinePace;
+                  referenceDuration = baselineDuration;
+                }
+                usingPreviousGoal = true;
+              }
+            });
+
+            print(
+                "Using performance data from previous subgoal period: Distance=${actualAvgDistance.toStringAsFixed(2)}km, Pace=${actualAvgPace.toStringAsFixed(2)}min/km, Duration=${actualAvgDuration.toStringAsFixed(0)}min");
+          } else {
+            // No completed subgoal found, use baseline values
+            setState(() {
+              referenceDistance = baselineDistance;
+              referencePace = baselinePace;
+              referenceDuration = baselineDuration;
+              usingPreviousGoal = false;
+            });
+            print("No completed subgoal found. Using baseline values.");
+          }
+        } catch (e) {
+          print("Error fetching completed subgoal: $e");
+          setState(() {
+            referenceDistance = baselineDistance;
+            referencePace = baselinePace;
+            referenceDuration = baselineDuration;
+            usingPreviousGoal = false;
+          });
+        }
       }
     } catch (e) {
       print("Error fetching active subgoal: $e");
@@ -1462,95 +1628,102 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
 // Method to set a new cycling subgoal
   void _setCyclingSubgoal(String type, double targetValue) {
-    if (baselineDistance == 0.0) {
-      _calculateBaselines();
-    }
-
-    String title = "";
-    List<String> suggestions = [];
-    List<String> warnings = [];
-
-    switch (type) {
-      case "distance":
-        title =
-            "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
-
-        // Generate suggestions
-        suggestions.add(
-            "Start with a proper warm-up to prepare for the longer distance");
-        suggestions.add("Increase your hydration for longer rides");
-        suggestions.add("Plan a route with the target distance in advance");
-
-        if (targetValue > baselineDistance * 1.3 && baselineDistance > 0) {
-          warnings.add(
-              "This is a ${((targetValue / baselineDistance - 1) * 100).toStringAsFixed(0)}% increase from your average. Consider a more gradual progression.");
-        }
-
-        if (respiratoryCondition == "Yes" &&
-            targetValue > baselineDistance * 1.2) {
-          warnings.add(
-              "With your respiratory condition, consider a more moderate increase in distance.");
-        }
-        break;
-
-      case "pace":
-        double currentPaceMinPerKm = baselinePace;
-        title =
-            "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
-
-        suggestions.add("Include interval training in your routine");
-        suggestions.add("Focus on consistent pedaling cadence");
-        suggestions.add(
-            "Make sure your bike is properly maintained for optimal efficiency");
-
-        if (currentPaceMinPerKm > 0 &&
-            targetValue < currentPaceMinPerKm * 0.8) {
-          warnings.add(
-              "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase, which may be challenging. Consider a gradual approach.");
-        }
-
-        if (cardiovascularCondition == "Yes") {
-          warnings.add(
-              "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
-        }
-        break;
-
-      case "duration":
-        title =
-            "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
-
-        suggestions.add("Build endurance with a steady pace");
-        suggestions.add("Ensure proper nutrition before longer sessions");
-        suggestions.add("Take small breaks if needed during the extended ride");
-
-        if (targetValue > baselineDuration * 1.5 && baselineDuration > 0) {
-          warnings.add(
-              "This is a ${((targetValue / baselineDuration - 1) * 100).toStringAsFixed(0)}% increase in duration, which may lead to fatigue. Consider a more gradual approach.");
-        }
-
-        break;
-
-      case "maintain":
-        title = "Maintain current cycling performance";
-
-        suggestions.add("Focus on consistency in your current routine");
-        suggestions.add("Work on technique refinement");
-        suggestions.add("Use this period to establish a sustainable rhythm");
-        break;
-    }
-
-    setState(() {
-      hasActiveSubgoal = true;
-      subgoalType = type;
-      subgoalTargetValue = targetValue;
-      subgoalStartDate = DateTime.now();
-      subgoalEndDate = DateTime.now().add(Duration(days: 7));
-      subgoalSuggestions = suggestions;
-      subgoalWarnings = warnings;
-    });
-
-    _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
+  if (baselineDistance == 0.0) {
+    _calculateBaselines();
   }
+
+  String title = "";
+  List<String> suggestions = [];
+  List<String> warnings = [];
+  String dataSource = usingPreviousGoal ? 
+      "previous goal target" : 
+      "your actual cycling performance";
+
+  switch (type) {
+    case "distance":
+      title =
+          "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
+
+      // Generate suggestions
+      suggestions.add(
+          "Start with a proper warm-up to prepare for the longer distance");
+      suggestions.add("Increase your hydration for longer rides");
+      suggestions.add("Plan a route with the target distance in advance");
+
+      if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
+        warnings.add(
+            "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
+      }
+
+      if (respiratoryCondition == "Yes" &&
+          targetValue > referenceDistance * 1.2) {
+        warnings.add(
+            "With your respiratory condition, consider a more moderate increase in distance.");
+      }
+      break;
+
+    case "pace":
+      double currentPaceMinPerKm = referencePace;
+      title =
+          "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
+
+      suggestions.add("Include interval training in your routine");
+      suggestions.add("Focus on consistent pedaling cadence");
+      suggestions.add(
+          "Make sure your bike is properly maintained for optimal efficiency");
+
+      if (currentPaceMinPerKm > 0 &&
+          targetValue < currentPaceMinPerKm * 0.8) {
+        warnings.add(
+            "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
+      }
+
+      if (cardiovascularCondition == "Yes") {
+        warnings.add(
+            "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
+      }
+      break;
+
+    case "duration":
+      title =
+          "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
+
+      suggestions.add("Build endurance with a steady pace");
+      suggestions.add("Ensure proper nutrition before longer sessions");
+      suggestions.add("Take small breaks if needed during the extended ride");
+
+      if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
+        warnings.add(
+            "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
+      }
+
+      break;
+
+    case "maintain":
+      title = "Maintain current cycling performance";
+
+      suggestions.add("Focus on consistency in your current routine");
+      suggestions.add("Work on technique refinement");
+      suggestions.add("Use this period to establish a sustainable rhythm");
+      break;
+  }
+
+  // Add a note about the data source to the suggestions
+  suggestions.add("This goal is based on $dataSource from your previous training period.");
+
+  setState(() {
+    hasActiveSubgoal = true;
+    subgoalType = type;
+    subgoalTargetValue = targetValue;
+    subgoalStartDate = DateTime.now();
+    subgoalEndDate = DateTime.now().add(Duration(days: 7));
+    subgoalSuggestions = suggestions;
+    subgoalWarnings = warnings;
+  });
+
+  _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
+}
+
 
   Future<void> _fetchFoodDiaryData() async {
     if (userId == null) return;
@@ -1565,7 +1738,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           .where('userId', isEqualTo: userId)
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(oneWeekAgo))
           .orderBy('date', descending: true)
-          .limit(7) 
+          .limit(7)
           .get();
 
       if (foodEntrySnapshot.docs.isNotEmpty) {
@@ -1597,7 +1770,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             "total_calories": data['total_calories'] ?? 0,
             "date": data['date'],
             "timestamp": data['timestamp'],
-
           });
         }
 
@@ -1634,29 +1806,42 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         safeParseDouble(latestFoodEntry['lunch_calories'].toString());
     double dinnerCalories =
         safeParseDouble(latestFoodEntry['dinner_calories'].toString());
-    double totalCarbs = safeParseDouble(latestFoodEntry['total_carbs'].toString());
+    double totalCarbs =
+        safeParseDouble(latestFoodEntry['total_carbs'].toString());
     double totalFat = safeParseDouble(latestFoodEntry['total_fat'].toString());
-    double totalProtein = safeParseDouble(latestFoodEntry['total_protein'].toString());
-    double breakfastCarbs = safeParseDouble(latestFoodEntry['breakfast_carbs'].toString());
-    double lunchCarbs = safeParseDouble(latestFoodEntry['lunch_carbs'].toString());
-    double dinnerCarbs = safeParseDouble(latestFoodEntry['dinner_carbs'].toString());
-    double breakfastFat = safeParseDouble(latestFoodEntry['breakfast_fat'].toString());
+    double totalProtein =
+        safeParseDouble(latestFoodEntry['total_protein'].toString());
+    double breakfastCarbs =
+        safeParseDouble(latestFoodEntry['breakfast_carbs'].toString());
+    double lunchCarbs =
+        safeParseDouble(latestFoodEntry['lunch_carbs'].toString());
+    double dinnerCarbs =
+        safeParseDouble(latestFoodEntry['dinner_carbs'].toString());
+    double breakfastFat =
+        safeParseDouble(latestFoodEntry['breakfast_fat'].toString());
     double lunchFat = safeParseDouble(latestFoodEntry['lunch_fat'].toString());
-    double dinnerFat = safeParseDouble(latestFoodEntry['dinner_fat'].toString());
-    double breakfastProtein = safeParseDouble(latestFoodEntry['breakfast_protein'].toString());
-    double lunchProtein = safeParseDouble(latestFoodEntry['lunch_protein'].toString());
-    double dinnerProtein = safeParseDouble(latestFoodEntry['dinner_protein'].toString());
-  
+    double dinnerFat =
+        safeParseDouble(latestFoodEntry['dinner_fat'].toString());
+    double breakfastProtein =
+        safeParseDouble(latestFoodEntry['breakfast_protein'].toString());
+    double lunchProtein =
+        safeParseDouble(latestFoodEntry['lunch_protein'].toString());
+    double dinnerProtein =
+        safeParseDouble(latestFoodEntry['dinner_protein'].toString());
+
     // Calculate macronutrient percentages if calories > 0
-    double carbPercent = totalCalories > 0 ? (totalCarbs * 4 / totalCalories) * 100 : 0;
-    double fatPercent = totalCalories > 0 ? (totalFat * 9 / totalCalories) * 100 : 0;
-    double proteinPercent = totalCalories > 0 ? (totalProtein * 4 / totalCalories) * 100 : 0;
+    double carbPercent =
+        totalCalories > 0 ? (totalCarbs * 4 / totalCalories) * 100 : 0;
+    double fatPercent =
+        totalCalories > 0 ? (totalFat * 9 / totalCalories) * 100 : 0;
+    double proteinPercent =
+        totalCalories > 0 ? (totalProtein * 4 / totalCalories) * 100 : 0;
 
     // Get BMR directly from user input
     double bmr = safeParseDouble(basalMetabolicRate);
     double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
     double dailyCaloriesBurned = weeklyCaloriesBurned / 7.0;
-    
+
     // Calculate total daily calorie needs based on BMR and actual calories burned
     double dailyCalorieNeeds = bmr + dailyCaloriesBurned;
     double weightInKg = safeParseDouble(weight);
@@ -1665,13 +1850,16 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     // Calculate recommended protein needs based on weight, body fat and training type
     double leanBodyMass = weightInKg * (1 - (bodyFatPercentage / 100));
     double recommendedProteinGrams = 0;
-    
+
     if (goalType == "Leisure") {
-      recommendedProteinGrams = leanBodyMass * 1.6; // 1.6g per kg LBM for recreational
+      recommendedProteinGrams =
+          leanBodyMass * 1.6; // 1.6g per kg LBM for recreational
     } else if (goalType == "Endurance") {
-      recommendedProteinGrams = leanBodyMass * 1.8; // 1.8g per kg LBM for endurance
+      recommendedProteinGrams =
+          leanBodyMass * 1.8; // 1.8g per kg LBM for endurance
     } else if (goalType == "High Intensity Cycling") {
-      recommendedProteinGrams = leanBodyMass * 2.0; // 2.0g per kg LBM for high intensity
+      recommendedProteinGrams =
+          leanBodyMass * 2.0; // 2.0g per kg LBM for high intensity
     } else {
       recommendedProteinGrams = leanBodyMass * 1.6; // Default
     }
@@ -1679,11 +1867,13 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     // If body fat percentage is unavailable, fall back to total body weight
     if (bodyFatPercentage <= 0) {
       if (goalType == "Leisure") {
-        recommendedProteinGrams = weightInKg * 1.2; // 1.2g per kg for recreational
+        recommendedProteinGrams =
+            weightInKg * 1.2; // 1.2g per kg for recreational
       } else if (goalType == "Endurance") {
         recommendedProteinGrams = weightInKg * 1.4; // 1.4g per kg for endurance
       } else if (goalType == "High Intensity Cycling") {
-        recommendedProteinGrams = weightInKg * 1.6; // 1.6g per kg for high intensity
+        recommendedProteinGrams =
+            weightInKg * 1.6; // 1.6g per kg for high intensity
       } else {
         recommendedProteinGrams = weightInKg * 1.2; // Default
       }
@@ -1707,15 +1897,19 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     } else {
       recommendedCarbPercent = 50; // Default
     }
-    
+
     // Calculate recommended carb grams based on percentage of calories
-    double recommendedCarbGrams = (recommendedCarbPercent / 100) * dailyCalorieNeeds / 4;
+    double recommendedCarbGrams =
+        (recommendedCarbPercent / 100) * dailyCalorieNeeds / 4;
 
     // Determine recommended fat based on the remaining calories
-    double recommendedFatPercent = 100 - recommendedCarbPercent - (recommendedProteinGrams * 4 * 100 / dailyCalorieNeeds);
+    double recommendedFatPercent = 100 -
+        recommendedCarbPercent -
+        (recommendedProteinGrams * 4 * 100 / dailyCalorieNeeds);
     // Ensure fat doesn't go below 20% for hormonal health
     recommendedFatPercent = math.max(20, recommendedFatPercent);
-    double recommendedFatGrams = (recommendedFatPercent / 100) * dailyCalorieNeeds / 9;
+    double recommendedFatGrams =
+        (recommendedFatPercent / 100) * dailyCalorieNeeds / 9;
 
     // Calorie recommendations based on actual cycling data and body composition
     if (totalCalories < dailyCalorieNeeds * 0.8) {
@@ -1782,12 +1976,15 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     // Meal-specific macronutrient recommendations tied to training data
     if (totalCalories > 0) {
       // Breakfast macronutrient recommendations
-      if (breakfastProtein < (recommendedProteinGrams * 0.25) && breakfastCalories > 0) {
+      if (breakfastProtein < (recommendedProteinGrams * 0.25) &&
+          breakfastCalories > 0) {
         nutritionRecommendations.add(
             "With only ${breakfastProtein.toInt()}g protein at breakfast, you're missing an opportunity for recovery. Aim for ${(recommendedProteinGrams * 0.25).toInt()}-${(recommendedProteinGrams * 0.33).toInt()}g protein at breakfast, especially important after morning rides.");
       }
 
-      if (breakfastCarbs < 30 && goalType == "Endurance" && breakfastCalories > 0) {
+      if (breakfastCarbs < 30 &&
+          goalType == "Endurance" &&
+          breakfastCalories > 0) {
         nutritionRecommendations.add(
             "Your breakfast carbohydrate intake (${breakfastCarbs.toInt()}g) is insufficient for your endurance training. Morning carbs replenish glycogen depleted overnight and prepare you for ${weeklyDistanceTotal / weeklyActivityCount} km average rides.");
       }
@@ -1797,14 +1994,14 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     if (goalType == "Endurance") {
       nutritionRecommendations.add(
           "For your endurance training (${weeklyDistanceTotal.toInt()} km weekly), prioritize nutrient timing: consume high-carb meals (60-100g) 2-3 hours before rides and recovery nutrition within 30 minutes after.");
-      
+
       // Specific recommendations for longer rides
       double longestRide = 0;
       for (var activity in activityData) {
         double distance = safeParseDouble(activity['distance']);
         if (distance > longestRide) longestRide = distance;
       }
-      
+
       if (longestRide > 40) {
         nutritionRecommendations.add(
             "For your long rides (${longestRide.toInt()} km), consume 60-90g carbs/hour from multiple sources (sports drinks, gels, bananas) after the first hour to maintain performance and prevent bonking.");
@@ -1812,7 +2009,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     } else if (goalType == "High Intensity Cycling") {
       nutritionRecommendations.add(
           "For high-intensity cycling, your protein needs are higher (${recommendedProteinGrams.toInt()}g daily based on your body composition). This supports recovery from your ${weeklyActivityCount} high-intensity sessions.");
-      
+
       // Calculate average intensity from heart rate data
       double avgHeartRate = 0;
       int hrDataPoints = 0;
@@ -1846,7 +2043,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     double avgRideTime = 0;
     int timeDataPoints = 0;
     for (var activity in activityData) {
-      double time = safeParseDouble(activity['elapsed_time']) / 60; // convert to minutes
+      double time =
+          safeParseDouble(activity['elapsed_time']) / 60; // convert to minutes
       if (time > 0) {
         avgRideTime += time;
         timeDataPoints++;
@@ -1854,7 +2052,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     }
     if (timeDataPoints > 0) {
       avgRideTime /= timeDataPoints;
-      double recommendedFluidPerRide = (avgRideTime / 60) * 750; // 750ml per hour
+      double recommendedFluidPerRide =
+          (avgRideTime / 60) * 750; // 750ml per hour
       nutritionRecommendations.add(
           "For your average ${avgRideTime.toInt()}-minute rides, consume approximately ${recommendedFluidPerRide.toInt()} ml of fluid. Stay hydrated with 2-3 liters of water daily plus electrolytes when training in hot conditions.");
     } else {
@@ -1879,6 +2078,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         'endDate': subgoalEndDate,
         'createdAt': DateTime.now(),
         'isWeeklyAverage': true,
+        'completedSuccessfully': false,
       });
     } catch (e) {
       print("Error saving cycling subgoal: $e");
@@ -2325,7 +2525,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     }
   }
 
-
   Widget _buildSubgoalSelectionCard() {
     if (hasActiveSubgoal || goalType != "High Intensity Cycling")
       return SizedBox.shrink();
@@ -2482,7 +2681,35 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
     if (baselineDistance == 0.0) {
       _calculateBaselines();
+
+      // Update reference values if we're not yet using previous goals
+      if (!usingPreviousGoal) {
+        referenceDistance = baselineDistance;
+        referencePace = baselinePace;
+        referenceDuration = baselineDuration;
+      }
     }
+
+    double distanceOption1 = math
+        .max(referenceDistance * 1.1, referenceDistance + 1)
+        .roundToDouble();
+    double distanceOption2 = math
+        .max(referenceDistance * 1.2, referenceDistance + 2)
+        .roundToDouble();
+
+    double paceOption1 = referencePace > 0
+        ? math.max(referencePace * 0.95, referencePace - 0.5)
+        : 0;
+    double paceOption2 = referencePace > 0
+        ? math.max(referencePace * 0.9, referencePace - 1)
+        : 0;
+
+    double durationOption1 = math
+        .max(referenceDuration * 1.1, referenceDuration + 10)
+        .roundToDouble();
+    double durationOption2 = math
+        .max(referenceDuration * 1.2, referenceDuration + 15)
+        .roundToDouble();
 
     if (activityData.isEmpty || weeklyActivityCount < 2) {
       return Container(
@@ -2554,149 +2781,120 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
       );
     }
 
-    double distanceOption1 =
-        math.max(baselineDistance * 1.1, baselineDistance + 1).roundToDouble();
-    double distanceOption2 =
-        math.max(baselineDistance * 1.2, baselineDistance + 2).roundToDouble();
-
-    double paceOption1 = baselinePace > 0
-        ? math.max(baselinePace * 0.95, baselinePace - 0.5)
-        : 0;
-    double paceOption2 =
-        baselinePace > 0 ? math.max(baselinePace * 0.9, baselinePace - 1) : 0;
-
-    double durationOption1 =
-        math.max(baselineDuration * 1.1, baselineDuration + 10).roundToDouble();
-    double durationOption2 =
-        math.max(baselineDuration * 1.2, baselineDuration + 15).roundToDouble();
-
     return Container(
-      margin: EdgeInsets.only(top: 20, bottom: 20),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+    padding: EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: usingPreviousGoal ? Colors.purple[50] : Colors.blue[50],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: usingPreviousGoal ? Colors.purple[200]! : Colors.blue[100]!, 
+        width: 1
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  "Set Your Next Week's Goal!",
-                  style: GoogleFonts.fredoka(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            "Set a goal for your weekly average cycling metrics based on your data from this week.",
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-          ),
-          SizedBox(height: 16),
-
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue[100]!, width: 1),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              usingPreviousGoal 
+                ? Icons.emoji_events_outlined  // Trophy icon for previous goals
+                : Icons.analytics_outlined,    // Analytics icon for performance data
+              size: 16,
+              color: usingPreviousGoal ? Colors.purple[800] : Colors.blue[800],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            SizedBox(width: 6),
+            Text(
+              usingPreviousGoal 
+                ? "Your Previous Goal Target:" 
+                : "Your Actual Performance:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: usingPreviousGoal ? Colors.purple[800] : Colors.blue[800]
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Column(
               children: [
                 Text(
-                  "Your Current Weekly Averages:",
+                  "${referenceDistance.toStringAsFixed(1)} km",
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue[800]),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        Text(
-                          "${baselineDistance.toStringAsFixed(1)} km",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87),
-                        ),
-                        Text(
-                          "Distance",
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[700]),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          "${baselinePace > 0 ? baselinePace.toStringAsFixed(1) : '-'} min/km",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87),
-                        ),
-                        Text(
-                          "Pace",
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[700]),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          "${baselineDuration.toStringAsFixed(0)} min",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87),
-                        ),
-                        Text(
-                          "Duration",
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[700]),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SizedBox(height: 4),
-                Center(
-                  child: Text(
-                    "Based on your ${weeklyActivityCount} activities this week",
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                        color: Colors.grey[700]),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87
                   ),
+                ),
+                Text(
+                  "Distance",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
               ],
             ),
+            Column(
+              children: [
+                Text(
+                  "${referencePace > 0 ? referencePace.toStringAsFixed(1) : '-'} min/km",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87
+                  ),
+                ),
+                Text(
+                  "Pace",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+            Column(
+              children: [
+                Text(
+                  "${referenceDuration.toStringAsFixed(0)} min",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87
+                  ),
+                ),
+                Text(
+                  "Duration",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+          ],
+        ),
+        SizedBox(height: 6),
+        Center(
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: usingPreviousGoal 
+                ? Colors.purple[100]!.withOpacity(0.4) 
+                : Colors.blue[100]!.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              usingPreviousGoal
+                ? "Based on previous goal target value"
+                : "Based on your actual cycling performance",
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: usingPreviousGoal ? Colors.purple[900] : Colors.blue[900],
+                fontWeight: FontWeight.w500,
+
+                ),
+              ),
+            ),
           ),
-
           SizedBox(height: 16),
-
           _buildSubgoalOptionTitle(
               "Weekly Average Distance", Icons.straighten_outlined),
           SizedBox(height: 8),
@@ -2706,28 +2904,24 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 child: _buildSubgoalOptionButton(
                     "Moderate",
                     "${distanceOption1.toStringAsFixed(1)} km/ride",
-                    "From ${baselineDistance.toStringAsFixed(1)} km avg",
+                    "From ${referenceDistance.toStringAsFixed(1)} km ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                     Colors.blue[700]!,
-                    "distance", 
-                    distanceOption1 
-                    ),
+                    "distance",
+                    distanceOption1),
               ),
               SizedBox(width: 8),
               Expanded(
                 child: _buildSubgoalOptionButton(
                     "Challenging",
                     "${distanceOption2.toStringAsFixed(1)} km/ride",
-                    "From ${baselineDistance.toStringAsFixed(1)} km avg",
+                    "From ${referenceDistance.toStringAsFixed(1)} km ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                     Colors.blue[900]!,
-                    "distance", 
-                    distanceOption2 
-                    ),
+                    "distance",
+                    distanceOption2),
               ),
             ],
           ),
-
           SizedBox(height: 16),
-
           if (baselinePace > 0) ...[
             _buildSubgoalOptionTitle(
                 "Weekly Average Pace", Icons.speed_outlined),
@@ -2738,29 +2932,25 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                   child: _buildSubgoalOptionButton(
                       "Moderate",
                       "${paceOption1.toStringAsFixed(1)} min/km",
-                      "From ${baselinePace.toStringAsFixed(1)} min/km avg",
+                      "From ${referencePace.toStringAsFixed(1)} min/km ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                       Colors.orange[700]!,
-                      "pace", 
-                      paceOption1 
-                      ),
+                      "pace",
+                      paceOption1),
                 ),
                 SizedBox(width: 8),
                 Expanded(
                   child: _buildSubgoalOptionButton(
                       "Challenging",
                       "${paceOption2.toStringAsFixed(1)} min/km",
-                      "From ${baselinePace.toStringAsFixed(1)} min/km avg",
+                      "From ${referencePace.toStringAsFixed(1)} min/km ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                       Colors.orange[900]!,
-                      "pace", 
-                      paceOption2
-                      ),
+                      "pace",
+                      paceOption2),
                 ),
               ],
             ),
           ],
-
           SizedBox(height: 16),
-
           _buildSubgoalOptionTitle(
               "Weekly Average Duration", Icons.timer_outlined),
           SizedBox(height: 8),
@@ -2770,7 +2960,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 child: _buildSubgoalOptionButton(
                     "Moderate",
                     "${durationOption1.toStringAsFixed(0)} min/ride",
-                    "From ${baselineDuration.toStringAsFixed(0)} min avg",
+                    "From ${referenceDuration.toStringAsFixed(0)} min ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                     Colors.green[700]!,
                     "duration",
                     durationOption1),
@@ -2780,17 +2970,14 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                 child: _buildSubgoalOptionButton(
                     "Challenging",
                     "${durationOption2.toStringAsFixed(0)} min/ride",
-                    "From ${baselineDuration.toStringAsFixed(0)} min avg",
+                    "From ${referenceDuration.toStringAsFixed(0)} min ${usingPreviousGoal ? 'previous goal' : 'avg'}",
                     Colors.green[900]!,
-                    "duration", 
-                    durationOption2 
-                    ),
+                    "duration",
+                    durationOption2),
               ),
             ],
           ),
-
           SizedBox(height: 16),
-
           _buildSubgoalOptionTitle(
               "Maintain Current Level", Icons.equalizer_outlined),
           SizedBox(height: 8),
@@ -2833,9 +3020,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
               ),
             ),
           ),
-
           SizedBox(height: 16),
-
           Container(
             padding: EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -3275,16 +3460,11 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
           // Calculate heart rate zones
           maxHeartRateCalculated = 220 - age;
-          zone1HeartRate =
-              (maxHeartRateCalculated * 0.6).round(); 
-          zone2HeartRate =
-              (maxHeartRateCalculated * 0.7).round(); 
-          zone3HeartRate =
-              (maxHeartRateCalculated * 0.8).round(); 
-          zone4HeartRate =
-              (maxHeartRateCalculated * 0.9).round(); 
-          zone5HeartRate =
-              (maxHeartRateCalculated * 0.95).round(); 
+          zone1HeartRate = (maxHeartRateCalculated * 0.6).round();
+          zone2HeartRate = (maxHeartRateCalculated * 0.7).round();
+          zone3HeartRate = (maxHeartRateCalculated * 0.8).round();
+          zone4HeartRate = (maxHeartRateCalculated * 0.9).round();
+          zone5HeartRate = (maxHeartRateCalculated * 0.95).round();
           recommendedHeartRate = maxHeartRateCalculated;
         });
       }
@@ -3373,7 +3553,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
             .collection('food_entries')
             .where('userId', isEqualTo: userId)
             .orderBy('timestamp', descending: true)
-            .limit(7) 
+            .limit(7)
             .get();
 
         if (nutritionSnapshot.docs.isNotEmpty) {
@@ -3944,541 +4124,561 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
   }
 
   void _generateWeightManagementRecommendations() {
-  double targetWeightValue = safeParseDouble(targetWeight);
-  double currentWeightValue = safeParseDouble(weight);
-  double bmr = safeParseDouble(basalMetabolicRate);
-  double bodyFatPercentage = safeParseDouble(bodyFat);
-  double totalCaloriesBurned = safeParseDouble(caloriesBurned);
+    double targetWeightValue = safeParseDouble(targetWeight);
+    double currentWeightValue = safeParseDouble(weight);
+    double bmr = safeParseDouble(basalMetabolicRate);
+    double bodyFatPercentage = safeParseDouble(bodyFat);
+    double totalCaloriesBurned = safeParseDouble(caloriesBurned);
 
-  // Updated heart rate zones based on research (Fletcher, 2023)
-  double maxHeartRate = 220 - age.toDouble();
-  // Updated fat burning zone based on research (60-80% of max HR)
-  double fatBurningZoneLower = maxHeartRate * 0.6;
-  double fatBurningZoneUpper = maxHeartRate * 0.8;
-  double zone2HeartRate = maxHeartRate * 0.65;
+    // Updated heart rate zones based on research (Fletcher, 2023)
+    double maxHeartRate = 220 - age.toDouble();
+    // Updated fat burning zone based on research (60-80% of max HR)
+    double fatBurningZoneLower = maxHeartRate * 0.6;
+    double fatBurningZoneUpper = maxHeartRate * 0.8;
+    double zone2HeartRate = maxHeartRate * 0.65;
 
-  double latestHeartRate = safeParseDouble(averageHeartrate);
+    double latestHeartRate = safeParseDouble(averageHeartrate);
 
-  // Weight and body fat progress tracking
-  if (latestWeight < previousWeight &&
-      latestBodyFat < previousBodyFat &&
-      latestWeight > 0 &&
-      previousWeight > 0 &&
-      latestBodyFat > 0 &&
-      previousBodyFat > 0) {
-    setState(() {
-      recommendation = "✅ Great Progress";
-      feedback = "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
-    });
-  } else if (latestWeight < previousWeight &&
-      latestBodyFat >= previousBodyFat &&
-      latestWeight > 0 &&
-      previousWeight > 0 &&
-      latestBodyFat > 0 &&
-      previousBodyFat > 0) {
-    setState(() {
-      recommendation = "⚠️ Mixed Results";
-      // Updated based on Weegu et al. (2023) findings
-      feedback = "Losing weight but not body fat. Add more HIIT with short work intervals (<60s) and active recovery periods (<90s) for better body composition.";
-    });
-  } else if (latestWeight > previousWeight &&
-      latestBodyFat < previousBodyFat &&
-      latestWeight > 0 &&
-      previousWeight > 0 &&
-      latestBodyFat > 0 &&
-      previousBodyFat > 0) {
-    setState(() {
-      recommendation = "✅ Gaining Muscle";
-      // Updated based on cycling HIIT research (Weegu et al., 2023)
-      feedback = "Gaining weight while reducing body fat suggests muscle building. Cycling HIIT is effective for recruiting lower body muscles.";
-    });
-  } else if (latestWeight == previousWeight &&
-      latestBodyFat < previousBodyFat &&
-      latestWeight > 0 &&
-      previousWeight > 0 &&
-      latestBodyFat > 0 &&
-      previousBodyFat > 0) {
-    setState(() {
-      recommendation = "✅ Body Recomposition";
-      feedback = "Stable weight with reduced body fat means you're building muscle. Keep it up!";
-    });
-  } else if (latestWeight >= previousWeight &&
-      latestBodyFat >= previousBodyFat &&
-      latestWeight > 0 &&
-      previousWeight > 0 &&
-      latestBodyFat > 0 &&
-      previousBodyFat > 0) {
-    setState(() {
-      recommendation = "⚠️ Needs Adjustment";
-      // Updated based on HIIT research (Weegu et al., 2023)
-      feedback = "Adjust your training and nutrition. HIIT sessions 3x weekly for 8+ weeks are most effective for body composition changes.";
-    });
-  } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
-    setState(() {
-      recommendation = "ℹ️ In Progress";
-      feedback = "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
-    });
-  } else {
-    if (latestWeight > 0 && latestBodyFat > 0) {
+    // Weight and body fat progress tracking
+    if (latestWeight < previousWeight &&
+        latestBodyFat < previousBodyFat &&
+        latestWeight > 0 &&
+        previousWeight > 0 &&
+        latestBodyFat > 0 &&
+        previousBodyFat > 0) {
       setState(() {
-        recommendation = "ℹ️ Monitoring Progress";
-        // Updated based on Myles C's recommendations
-        feedback = "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. For results, aim for 30 minutes daily (180 minutes/week).";
+        recommendation = "✅ Great Progress";
+        feedback =
+            "You're losing both weight and body fat! Your high-intensity cycling is working effectively.";
       });
-    } else if (safeParseDouble(weight) > 0) {
+    } else if (latestWeight < previousWeight &&
+        latestBodyFat >= previousBodyFat &&
+        latestWeight > 0 &&
+        previousWeight > 0 &&
+        latestBodyFat > 0 &&
+        previousBodyFat > 0) {
       setState(() {
-        recommendation = "ℹ️ Starting Point Established";
-        // Updated based on Adam K's recommendations
-        feedback = "Your weight: ${weight} kg. Record post-workout data to track progress. Aim for 3x weekly cycling for at least 20 minutes each session.";
+        recommendation = "⚠️ Mixed Results";
+        // Updated based on Weegu et al. (2023) findings
+        feedback =
+            "Losing weight but not body fat. Add more HIIT with short work intervals (<60s) and active recovery periods (<90s) for better body composition.";
+      });
+    } else if (latestWeight > previousWeight &&
+        latestBodyFat < previousBodyFat &&
+        latestWeight > 0 &&
+        previousWeight > 0 &&
+        latestBodyFat > 0 &&
+        previousBodyFat > 0) {
+      setState(() {
+        recommendation = "✅ Gaining Muscle";
+        // Updated based on cycling HIIT research (Weegu et al., 2023)
+        feedback =
+            "Gaining weight while reducing body fat suggests muscle building. Cycling HIIT is effective for recruiting lower body muscles.";
+      });
+    } else if (latestWeight == previousWeight &&
+        latestBodyFat < previousBodyFat &&
+        latestWeight > 0 &&
+        previousWeight > 0 &&
+        latestBodyFat > 0 &&
+        previousBodyFat > 0) {
+      setState(() {
+        recommendation = "✅ Body Recomposition";
+        feedback =
+            "Stable weight with reduced body fat means you're building muscle. Keep it up!";
+      });
+    } else if (latestWeight >= previousWeight &&
+        latestBodyFat >= previousBodyFat &&
+        latestWeight > 0 &&
+        previousWeight > 0 &&
+        latestBodyFat > 0 &&
+        previousBodyFat > 0) {
+      setState(() {
+        recommendation = "⚠️ Needs Adjustment";
+        // Updated based on HIIT research (Weegu et al., 2023)
+        feedback =
+            "Adjust your training and nutrition. HIIT sessions 3x weekly for 8+ weeks are most effective for body composition changes.";
+      });
+    } else if (latestWeight > 0 && currentWeightValue > targetWeightValue) {
+      setState(() {
+        recommendation = "ℹ️ In Progress";
+        feedback =
+            "You're ${(currentWeightValue - targetWeightValue).toStringAsFixed(1)} kg from your target. Let's refine your strategy.";
       });
     } else {
-      setState(() {
-        recommendation = "ℹ️ Building Baseline";
-        // Based on Adam K's input about monitoring distance
-        feedback = "Track metrics consistently for personalized recommendations. Focus on distance and heart rate for progress monitoring.";
-      });
-    }
-  }
-
-  // Calorie deficit recommendations
-  if (totalCaloriesBurned > 0) {
-    double dailyDeficitNeeded = (3500 * 2) / 30; // 2kg/month
-
-    if (totalCaloriesBurned < dailyDeficitNeeded / 2 && activityData.isNotEmpty) {
-      trainingRecommendations.add(
-          "Increase session duration by 15-20 minutes or add HIIT with short intervals (<60s) and active recovery (<90s) for better results.");
-    } else if (totalCaloriesBurned > dailyDeficitNeeded) {
-      // Updated based on recovery science (Dupuy et al.)
-      trainingRecommendations.add(
-          "Great calorie burn! Focus on recovery with compression garments, cold therapy, and protein intake after sessions to reduce muscle damage and inflammation.");
-    }
-  }
-
-  // Body fat percentage recommendations
-  if (bodyFatPercentage > 0) {
-    String bodyFatCategory = "";
-    if (bodyFatPercentage < 10) {
-      bodyFatCategory = "essential fat";
-    } else if (bodyFatPercentage < 19) {
-      bodyFatCategory = "athletic";
-    } else if (bodyFatPercentage < 25) {
-      bodyFatCategory = "fitness";
-    } else if (bodyFatPercentage < 32) {
-      bodyFatCategory = "average";
-    } else {
-      bodyFatCategory = "obesity";
+      if (latestWeight > 0 && latestBodyFat > 0) {
+        setState(() {
+          recommendation = "ℹ️ Monitoring Progress";
+          // Updated based on Myles C's recommendations
+          feedback =
+              "Your current metrics: ${latestWeight.toStringAsFixed(1)} kg weight and ${latestBodyFat.toStringAsFixed(1)}% body fat. For results, aim for 30 minutes daily (180 minutes/week).";
+        });
+      } else if (safeParseDouble(weight) > 0) {
+        setState(() {
+          recommendation = "ℹ️ Starting Point Established";
+          // Updated based on Adam K's recommendations
+          feedback =
+              "Your weight: ${weight} kg. Record post-workout data to track progress. Aim for 3x weekly cycling for at least 20 minutes each session.";
+        });
+      } else {
+        setState(() {
+          recommendation = "ℹ️ Building Baseline";
+          // Based on Adam K's input about monitoring distance
+          feedback =
+              "Track metrics consistently for personalized recommendations. Focus on distance and heart rate for progress monitoring.";
+        });
+      }
     }
 
-    healthRecommendations.add(
-        "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range.");
+    // Calorie deficit recommendations
+    if (totalCaloriesBurned > 0) {
+      double dailyDeficitNeeded = (3500 * 2) / 30; // 2kg/month
 
-    if (bodyFatCategory == "obesity") {
-      int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
-      // Updated based on Weegu et al. (2023) research
-      healthRecommendations.add(
-          "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
-    } else if (bodyFatCategory == "average") {
-      // Updated based on HIIT research
-      healthRecommendations.add(
-          "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
-    } else if (bodyFatCategory == "fitness") {
-      // Updated based on nutrition timing research
-      healthRecommendations.add(
-          "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
-    } else if (bodyFatCategory == "athletic") {
-      // Updated based on carbohydrate research
-      healthRecommendations.add(
-          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
-    } else if (bodyFatCategory == "essential fat") {
-      healthRecommendations.add(
-          "Maintain current level through consistent performance rather than further reduction.");
-    }
-  } else {
-    // Updated based on Myles C's advice on BMI vs body fat
-    healthRecommendations.add(
-        "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
-  }
-
-  // BMR-based recommendations
-  if (bmr > 0) {
-    double activityFactor = weeklyActivityCount <= 2 ? 1.375 : weeklyActivityCount <= 4 ? 1.55 : 1.725;
-    double weightLossTarget = bmr * activityFactor - 500;
-
-    // Updated based on nutrition research
-    trainingRecommendations.add(
-        "Aim for ${weightLossTarget.toInt()} kcal daily intake for sustainable weight loss. Never start your workout on an empty stomach - eat something light 30-60 minutes before.");
-
-    if (bmr > 1800) {
-      trainingRecommendations.add(
-          "Add 1-2 longer steady-state rides (60+ min) weekly to maximize fat utilization.");
-    } else if (bmr < 1400) {
-      trainingRecommendations.add(
-          "Add resistance training 2x weekly to boost your metabolic rate alongside cycling.");
-    }
-  }
-
-  // Heart rate recommendations - updated based on fat burning zone research
-  if (latestHeartRate > 0) {
-    if (latestHeartRate < fatBurningZoneLower) {
-      trainingRecommendations.add(
-          "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning. This zone varies by individual fitness level.");
-    } else if (latestHeartRate > fatBurningZoneUpper) {
-      trainingRecommendations.add(
-          "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better lactate clearance and fat oxidation.");
-    } else {
-      trainingRecommendations.add(
-          "Perfect fat-burning zone! Maintain this intensity for optimal results, but remember fat can be burned at various heart rates.");
-    }
-  }
-
-  // HIIT session analysis - updated based on Weegu et al. (2023)
-  int totalHighIntensitySessions = 0;
-  List<int> lastFiveHeartRates = [];
-
-  for (int i = 0; i < math.min(activityData.length, 20); i++) {
-    double hr = safeParseDouble(activityData[i]['average_heartrate']);
-    if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
-    if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
-  }
-
-  if (totalHighIntensitySessions < 12 && activityData.length >= 15) {
-    trainingRecommendations.add(
-        "Aim for at least 12 high-intensity sessions monthly (3x weekly) for optimal body composition changes.");
-  }
-
-  // Frequency recommendations - updated based on Adam K and Myles C's feedback
-  if (weeklyActivityCount < 3) {
-    trainingRecommendations.add(
-        "Gradually build to 3 sessions weekly (minimum 20-30 minutes each), aiming for 12+ monthly sessions for effective results.");
-  }
-
-  // Weather recommendations - updated based on research
-  if (weatherData.isNotEmpty) {
-    double currentTemp = safeParseDouble(temperature);
-    if (currentTemp > 28) {
-      // Updated based on temperature impact research
-      trainingRecommendations.add(
-          "For hot weather (${currentTemp.toStringAsFixed(1)}°C), ride in early morning to avoid heat stress and increase hydration by 100-200ml per 20 minutes to prevent dehydration.");
-    } else if (currentTemp < 10) {
-      trainingRecommendations.add(
-          "For cold weather, ensure proper 10-15 minute warm-up before high-intensity work.");
-    }
-
-    // Recovery recommendations - updated based on Dupuy et al.
-    trainingRecommendations.add(
-        "For optimal recovery: 1) active recovery with light cycling, 2) compression garments to reduce fatigue, 3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
-
-    // Health condition recommendations - updated based on chronic disease management research
-    if (respiratoryCondition == "Yes") {
-      healthRecommendations.add(
-          "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min). Avoid highly polluted areas as they can reduce lung function and performance.");
-    }
-
-    if (cardiovascularCondition == "Yes") {
-      // Updated based on AHA recommendations
-      healthRecommendations.add(
-          "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm) and aim for 150 minutes weekly. Always get checked by a doctor first.");
-    }
-
-    // Training structure - based on Weegu et al. (2023)
-    if (weeklyActivityCount >= 3) {
-      trainingRecommendations.add(
-          "Structure weekly rides: ${math.min(3, weeklyActivityCount - 1)} HIIT sessions (with short work intervals <60s and active recovery <90s) plus ${math.max(1, weeklyActivityCount - 3)} moderate rides for recovery.");
-    }
-  }
-}
-
-
- void _generateCyclingEnduranceRecommendations() {
-  // Basic data
-  double targetDistanceValue = safeParseDouble(targetDistance);
-  double currentDistanceValue = safeParseDouble(distance);
-  double targetDurationValue = safeParseDouble(targetDuration);
-  double currentDurationValue = safeParseDouble(sessionDuration) / 60;
-
-  // Heart rate zones - updated based on the research
-  double maxHeartRate = 220 - age.toDouble();
-  double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
-  double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
-  double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
-  double thresholdZoneUpper = maxHeartRate * 0.90; // 90% of max HR
-  
-  // Zone 2 training for recovery and base building (60-70% of max HR)
-  double zone2HeartRateLower = maxHeartRate * 0.6;
-  double zone2HeartRateUpper = maxHeartRate * 0.7;
-  double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
-
-  double latestHeartRate = safeParseDouble(averageHeartrate);
-
-  // Tracking progress and providing feedback
-  if (latestDistance > previousDistance &&
-      latestDistance > 0 &&
-      previousDistance > 0) {
-    setState(() {
-      recommendation = "✅ Distance Improving";
-      feedback =
-          "Great progress! Your distance increased from ${previousDistance.toStringAsFixed(1)} km to ${latestDistance.toStringAsFixed(1)} km.";
-    });
-  } else if (latestAverageSpeed > previousAverageSpeed &&
-      latestAverageSpeed > 0 &&
-      previousAverageSpeed > 0) {
-    setState(() {
-      recommendation = "✅ Speed Improving";
-      feedback =
-          "Your speed increased while maintaining distance. Cycling efficiency is improving!";
-    });
-  } else if (latestAverageHeartrate < previousAverageHeartrate &&
-      latestDistance >= previousDistance &&
-      latestAverageHeartrate > 0 &&
-      previousAverageHeartrate > 0) {
-    setState(() {
-      recommendation = "✅ Efficiency Improving";
-      feedback =
-          "Lower heart rate at same/higher distance shows improved cardiovascular efficiency!";
-    });
-  } else if (latestDistance < previousDistance &&
-      latestDistance > 0 &&
-      previousDistance > 0) {
-    setState(() {
-      recommendation = "⚠️ Distance Decreasing";
-      // Updated based on Myles C's advice on tapering
-      feedback =
-          "Recent ride was shorter than previous. Focus on recovery before next endurance effort. Remember to taper workouts rather than stopping abruptly.";
-    });
-  } else if (latestAverageSpeed < previousAverageSpeed &&
-      latestAverageSpeed > 0 &&
-      previousAverageSpeed > 0) {
-    setState(() {
-      recommendation = "⚠️ Speed Decreasing";
-      // Updated based on Myles C's advice on pacing
-      feedback =
-          "Average speed dropped. Work on consistent pacing during long rides. Adjusting pace is more effective than stopping and starting.";
-    });
-  } else if (latestDistance > 0 &&
-      currentDistanceValue < targetDistanceValue) {
-    setState(() {
-      recommendation = "ℹ️ Building Endurance";
-      feedback =
-          "Currently at ${currentDistanceValue.toStringAsFixed(1)} km toward ${targetDistanceValue.toStringAsFixed(1)} km goal.";
-    });
-  } else {
-    setState(() {
-      recommendation = "ℹ️ Establishing Baseline";
-      // Updated based on Adam K's advice on distance tracking
-      feedback =
-          "Track rides consistently for personalized endurance recommendations. Focus on distance as your primary metric.";
-    });
-  }
-
-  // Historical distance progression analysis
-  if (distanceProgression.length >= 5) {
-    double oldestAvg = 0;
-    double newestAvg = 0;
-
-    int midpoint = distanceProgression.length ~/ 2;
-    if (midpoint > 1) {
-      oldestAvg =
-          distanceProgression.sublist(midpoint).reduce((a, b) => a + b) /
-              (distanceProgression.length - midpoint);
-      newestAvg =
-          distanceProgression.sublist(0, midpoint).reduce((a, b) => a + b) /
-              midpoint;
-
-      double improvementPercent = ((newestAvg - oldestAvg) / oldestAvg) * 100;
-
-      // Updated based on Myles C's advice on progress expectations
-      if (improvementPercent > 10) {
+      if (totalCaloriesBurned < dailyDeficitNeeded / 2 &&
+          activityData.isNotEmpty) {
         trainingRecommendations.add(
-            "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to earlier rides. Excellent progression! Remember progress varies by individual - some see changes in 2 weeks, others in 3 months.");
-      } else if (improvementPercent < -10) {
+            "Increase session duration by 15-20 minutes or add HIIT with short intervals (<60s) and active recovery (<90s) for better results.");
+      } else if (totalCaloriesBurned > dailyDeficitNeeded) {
+        // Updated based on recovery science (Dupuy et al.)
         trainingRecommendations.add(
-            "Recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than earlier rides. Adjust training and ensure proper recovery. Progress isn't always linear.");
+            "Great calorie burn! Focus on recovery with compression garments, cold therapy, and protein intake after sessions to reduce muscle damage and inflammation.");
+      }
+    }
+
+    // Body fat percentage recommendations
+    if (bodyFatPercentage > 0) {
+      String bodyFatCategory = "";
+      if (bodyFatPercentage < 10) {
+        bodyFatCategory = "essential fat";
+      } else if (bodyFatPercentage < 19) {
+        bodyFatCategory = "athletic";
+      } else if (bodyFatPercentage < 25) {
+        bodyFatCategory = "fitness";
+      } else if (bodyFatPercentage < 32) {
+        bodyFatCategory = "average";
+      } else {
+        bodyFatCategory = "obesity";
+      }
+
+      healthRecommendations.add(
+          "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range.");
+
+      if (bodyFatCategory == "obesity") {
+        int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
+        // Updated based on Weegu et al. (2023) research
+        healthRecommendations.add(
+            "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
+      } else if (bodyFatCategory == "average") {
+        // Updated based on HIIT research
+        healthRecommendations.add(
+            "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
+      } else if (bodyFatCategory == "fitness") {
+        // Updated based on nutrition timing research
+        healthRecommendations.add(
+            "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
+      } else if (bodyFatCategory == "athletic") {
+        // Updated based on carbohydrate research
+        healthRecommendations.add(
+            "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
+      } else if (bodyFatCategory == "essential fat") {
+        healthRecommendations.add(
+            "Maintain current level through consistent performance rather than further reduction.");
+      }
+    } else {
+      // Updated based on Myles C's advice on BMI vs body fat
+      healthRecommendations.add(
+          "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
+    }
+
+    // BMR-based recommendations
+    if (bmr > 0) {
+      double activityFactor = weeklyActivityCount <= 2
+          ? 1.375
+          : weeklyActivityCount <= 4
+              ? 1.55
+              : 1.725;
+      double weightLossTarget = bmr * activityFactor - 500;
+
+      // Updated based on nutrition research
+      trainingRecommendations.add(
+          "Aim for ${weightLossTarget.toInt()} kcal daily intake for sustainable weight loss. Never start your workout on an empty stomach - eat something light 30-60 minutes before.");
+
+      if (bmr > 1800) {
+        trainingRecommendations.add(
+            "Add 1-2 longer steady-state rides (60+ min) weekly to maximize fat utilization.");
+      } else if (bmr < 1400) {
+        trainingRecommendations.add(
+            "Add resistance training 2x weekly to boost your metabolic rate alongside cycling.");
+      }
+    }
+
+    // Heart rate recommendations - updated based on fat burning zone research
+    if (latestHeartRate > 0) {
+      if (latestHeartRate < fatBurningZoneLower) {
+        trainingRecommendations.add(
+            "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning. This zone varies by individual fitness level.");
+      } else if (latestHeartRate > fatBurningZoneUpper) {
+        trainingRecommendations.add(
+            "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better lactate clearance and fat oxidation.");
       } else {
         trainingRecommendations.add(
-            "Your distance progression is stable. Continue improving by gradually increasing your longest ride each week (no more than 10% increase).");
+            "Perfect fat-burning zone! Maintain this intensity for optimal results, but remember fat can be burned at various heart rates.");
       }
     }
 
-    // Find longest ride ever
-    double longestRide = distanceProgression.reduce(math.max);
-    if (longestRide > 0 && targetDistanceValue > 0) {
-      // Updated based on recommendations for recreational cycling
-      double percentOfTarget = (longestRide / targetDistanceValue) * 100;
-      trainingRecommendations.add(
-          "Your longest ride (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target. For recreational cycling, aim for at least 30 minutes per day (180 minutes/week).");
-    }
-  }
+    // HIIT session analysis - updated based on Weegu et al. (2023)
+    int totalHighIntensitySessions = 0;
+    List<int> lastFiveHeartRates = [];
 
-  // Heart rate zone analysis from historical data - updated with HRM research
-  if (heartrateProgression.length >= 3) {
-    int enduranceZoneCount = 0;
-    int aboveThresholdCount = 0;
-
-    for (double hr in heartrateProgression) {
-      if (hr >= enduranceZoneLower && hr <= enduranceZoneUpper) {
-        enduranceZoneCount++;
-      } else if (hr > thresholdZoneUpper) {
-        aboveThresholdCount++;
-      }
+    for (int i = 0; i < math.min(activityData.length, 20); i++) {
+      double hr = safeParseDouble(activityData[i]['average_heartrate']);
+      if (hr > fatBurningZoneLower) totalHighIntensitySessions++;
+      if (i < 5 && hr > 0) lastFiveHeartRates.add(hr.toInt());
     }
 
-    double endurancePercent =
-        (enduranceZoneCount / heartrateProgression.length) * 100;
-    double thresholdPercent =
-        (aboveThresholdCount / heartrateProgression.length) * 100;
-
-    // Updated based on heart rate monitoring research
-    if (endurancePercent < 60 && thresholdPercent > 30) {
+    if (totalHighIntensitySessions < 12 && activityData.length >= 15) {
       trainingRecommendations.add(
-          "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm). Heart rate monitoring helps measure exercise intensity and prevent overtraining.");
+          "Aim for at least 12 high-intensity sessions monthly (3x weekly) for optimal body composition changes.");
     }
-  }
 
-  // Recovery and overtraining prevention based on heart rate - updated based on HRM research
-  if (heartrateProgression.length >= 10) {
-    List<double> recentHRs = heartrateProgression.sublist(0, 5);
-    List<double> earlierHRs = heartrateProgression.sublist(5, math.min(10, heartrateProgression.length));
-    
-    double recentAvg = recentHRs.reduce((a, b) => a + b) / recentHRs.length;
-    double earlierAvg = earlierHRs.reduce((a, b) => a + b) / earlierHRs.length;
-    
-    double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
-    
-    // Updated based on HRM research for overtraining detection
-    if (hrChangePercent > 5 && weeklyActivityCount > 3) {
+    // Frequency recommendations - updated based on Adam K and Myles C's feedback
+    if (weeklyActivityCount < 3) {
       trainingRecommendations.add(
-          "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% recently. This may indicate fatigue or overtraining. Use HRM data to detect changes in max heart rate, a potential indicator of high training loads. Add an additional recovery day with light cycling at ${zone2HeartRate.toInt()} bpm.");
-    } else if (hrChangePercent < -5) {
-      trainingRecommendations.add(
-          "Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% recently, suggesting improved cardiovascular efficiency. Great progress!");
+          "Gradually build to 3 sessions weekly (minimum 20-30 minutes each), aiming for 12+ monthly sessions for effective results.");
     }
-  }
 
-  // Current heart rate recommendations - updated based on Myles C's advice
-  if (latestHeartRate > 0) {
-    if (latestHeartRate > thresholdZoneUpper) {
-      trainingRecommendations.add(
-          "Heart rate too high for endurance. For recreational cycling, don't aim to reach your threshold. Stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range for longer rides.");
-    } else if (latestHeartRate < enduranceZoneLower) {
-      trainingRecommendations.add(
-          "Increase intensity to ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm for better aerobic development.");
-    } else if (latestHeartRate >= enduranceZoneLower &&
-        latestHeartRate <= enduranceZoneUpper) {
-      trainingRecommendations.add(
-          "Perfect endurance zone! This heart rate range is optimal for building aerobic capacity.");
-    } else {
-      trainingRecommendations.add(
-          "You're in threshold zone - good for tempo sessions but not longer endurance rides.");
-    }
-  }
-
-  // Training structure based on research
-  trainingRecommendations.add(
-      "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides. Heart rate monitors effectively measure exercise intensity and can help prevent overtraining.");
-
-  // Distance progression
-  if (currentDistanceValue > 0 &&
-      targetDistanceValue > 0 &&
-      currentDistanceValue < targetDistanceValue) {
-    double percentComplete =
-        (currentDistanceValue / targetDistanceValue) * 100;
-    // Limit to 10% increase per week based on research
-    double weeklyIncrease = math.min(targetDistanceValue * 0.1, currentDistanceValue * 0.1);
-
-    trainingRecommendations.add(
-        "You're ${percentComplete.toStringAsFixed(0)}% to goal. For safe progression, increase your long ride by no more than ${weeklyIncrease.toStringAsFixed(1)} km/week.");
-  }
-
-  // Frequency recommendations - updated based on Adam K & Myles C
-  if (weeklyActivityCount < 3) {
-    trainingRecommendations
-        .add("For optimal endurance benefits, aim for 3 rides/week (minimum 20 minutes each): one long ride, 2 shorter recovery rides.");
-  }
-
-  // Recovery strategies based on research - updated with Dupuy et al. research
-  trainingRecommendations.add(
-      "For optimal recovery: (1) active recovery with low-intensity cycling to enhance blood flow and remove metabolic waste, (2) compression garments to reduce perceived fatigue, and (3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
-
-  // Weather and temperature considerations - updated based on research
-  if (weatherData.isNotEmpty) {
-    double currentTemp = safeParseDouble(temperature);
-    double currentHumidity = safeParseDouble(humidity);
-
-    // Updated based on temperature impact research
-    if (currentTemp > 28) {
-      trainingRecommendations.add(
-          "At ${currentTemp.toStringAsFixed(1)}°C: Lower heart rate target by 5-10%, increase hydration frequency to prevent dehydration, and consider riding earlier in the morning to avoid heat stress.");
-      
-      // Updated based on humidity research
-      if (currentHumidity > 70) {
+    // Weather recommendations - updated based on research
+    if (weatherData.isNotEmpty) {
+      double currentTemp = safeParseDouble(temperature);
+      if (currentTemp > 28) {
+        // Updated based on temperature impact research
         trainingRecommendations.add(
-            "High humidity (${currentHumidity.toStringAsFixed(0)}%) restricts evaporative cooling and increases thermal stress. Reduce intensity and increase hydration further in these conditions. Acclimatization is important when training in humid areas.");
+            "For hot weather (${currentTemp.toStringAsFixed(1)}°C), ride in early morning to avoid heat stress and increase hydration by 100-200ml per 20 minutes to prevent dehydration.");
+      } else if (currentTemp < 10) {
+        trainingRecommendations.add(
+            "For cold weather, ensure proper 10-15 minute warm-up before high-intensity work.");
       }
-    } else if (currentTemp < 10) {
+
+      // Recovery recommendations - updated based on Dupuy et al.
       trainingRecommendations.add(
-          "Cold weather (${currentTemp.toStringAsFixed(1)}°C): Extend your warm-up to 15-20 minutes and use layered clothing for optimal temperature regulation.");
-    }
+          "For optimal recovery: 1) active recovery with light cycling, 2) compression garments to reduce fatigue, 3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
 
-  // Health condition recommendations - updated based on research
-  if (respiratoryCondition == "Yes") {
-    // Updated based on air quality research
-    healthRecommendations.add(
-        "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
-    healthRecommendations
-        .add("Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
-  }
+      // Health condition recommendations - updated based on chronic disease management research
+      if (respiratoryCondition == "Yes") {
+        healthRecommendations.add(
+            "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min). Avoid highly polluted areas as they can reduce lung function and performance.");
+      }
 
-  if (cardiovascularCondition == "Yes") {
-    // Updated based on AHA research and Myles C's advice
-    healthRecommendations.add(
-        "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly. Always get checked by a doctor first.");
-    healthRecommendations
-        .add("Monitor heart rate carefully with a device like an Apple Watch or Fitbit, and increase intensity very gradually to avoid strain.");
-  }
-  
-  // Nutrition recommendations - updated based on research and Myles C's advice
-  healthRecommendations
-      .add("Pre-ride nutrition: Eat a light meal (like a banana or boiled eggs) 30-60 minutes before riding. Never start on an empty stomach. Post-ride: consume a 3:1 carb:protein ratio within 30 minutes.");
-      
-  // Updated based on Holland et al. (2017) hydration research
-  if (currentDistanceValue > 30) {
-    double rideHours = currentDurationValue / 60;
-    double weightInKg = safeParseDouble(weight);
-    
-    if (rideHours >= 1 && rideHours <= 2) {
-      // For 1-2 hour moderate-intensity rides
-      double recommendedFluidRate = 0.175; // midpoint of 0.15-0.20 range
-      double totalFluidRecommendation = recommendedFluidRate * weightInKg * rideHours * 60;
-      
-      healthRecommendations.add(
-          "For your ${rideHours.toStringAsFixed(1)}-hour moderate rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid (${(recommendedFluidRate * weightInKg).toStringAsFixed(1)} ml/min) for optimal performance.");
-    } else if (rideHours > 2) {
-      // For rides longer than 2 hours
-      double recommendedFluidRate = 0.205; // midpoint of 0.14-0.27 range
-      double totalFluidRecommendation = recommendedFluidRate * weightInKg * rideHours * 60;
-      
-      healthRecommendations.add(
-          "For your ${rideHours.toStringAsFixed(1)}-hour rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid total and 60-90g of carbohydrates per hour from multiple sources to maintain energy levels.");
-    } else if (rideHours < 1 && latestAverageHeartrate > thresholdZoneLower) {
-      // For high-intensity rides under 1 hour
-      healthRecommendations.add(
-          "For high-intensity rides under 1 hour, excessive hydration can be counterproductive. Focus on pre-ride hydration instead of drinking large amounts during the ride.");
+      if (cardiovascularCondition == "Yes") {
+        // Updated based on AHA recommendations
+        healthRecommendations.add(
+            "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm) and aim for 150 minutes weekly. Always get checked by a doctor first.");
+      }
+
+      // Training structure - based on Weegu et al. (2023)
+      if (weeklyActivityCount >= 3) {
+        trainingRecommendations.add(
+            "Structure weekly rides: ${math.min(3, weeklyActivityCount - 1)} HIIT sessions (with short work intervals <60s and active recovery <90s) plus ${math.max(1, weeklyActivityCount - 3)} moderate rides for recovery.");
+      }
     }
   }
 
-  // Recovery recommendations
-  if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
-    healthRecommendations
-        .add("Add dedicated recovery days to prevent overtraining syndrome and reduce injury risk.");
+  void _generateCyclingEnduranceRecommendations() {
+    // Basic data
+    double targetDistanceValue = safeParseDouble(targetDistance);
+    double currentDistanceValue = safeParseDouble(distance);
+    double targetDurationValue = safeParseDouble(targetDuration);
+    double currentDurationValue = safeParseDouble(sessionDuration) / 60;
+
+    // Heart rate zones - updated based on the research
+    double maxHeartRate = 220 - age.toDouble();
+    double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
+    double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
+    double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
+    double thresholdZoneUpper = maxHeartRate * 0.90; // 90% of max HR
+
+    // Zone 2 training for recovery and base building (60-70% of max HR)
+    double zone2HeartRateLower = maxHeartRate * 0.6;
+    double zone2HeartRateUpper = maxHeartRate * 0.7;
+    double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
+
+    double latestHeartRate = safeParseDouble(averageHeartrate);
+
+    // Tracking progress and providing feedback
+    if (latestDistance > previousDistance &&
+        latestDistance > 0 &&
+        previousDistance > 0) {
+      setState(() {
+        recommendation = "✅ Distance Improving";
+        feedback =
+            "Great progress! Your distance increased from ${previousDistance.toStringAsFixed(1)} km to ${latestDistance.toStringAsFixed(1)} km.";
+      });
+    } else if (latestAverageSpeed > previousAverageSpeed &&
+        latestAverageSpeed > 0 &&
+        previousAverageSpeed > 0) {
+      setState(() {
+        recommendation = "✅ Speed Improving";
+        feedback =
+            "Your speed increased while maintaining distance. Cycling efficiency is improving!";
+      });
+    } else if (latestAverageHeartrate < previousAverageHeartrate &&
+        latestDistance >= previousDistance &&
+        latestAverageHeartrate > 0 &&
+        previousAverageHeartrate > 0) {
+      setState(() {
+        recommendation = "✅ Efficiency Improving";
+        feedback =
+            "Lower heart rate at same/higher distance shows improved cardiovascular efficiency!";
+      });
+    } else if (latestDistance < previousDistance &&
+        latestDistance > 0 &&
+        previousDistance > 0) {
+      setState(() {
+        recommendation = "⚠️ Distance Decreasing";
+        // Updated based on Myles C's advice on tapering
+        feedback =
+            "Recent ride was shorter than previous. Focus on recovery before next endurance effort. Remember to taper workouts rather than stopping abruptly.";
+      });
+    } else if (latestAverageSpeed < previousAverageSpeed &&
+        latestAverageSpeed > 0 &&
+        previousAverageSpeed > 0) {
+      setState(() {
+        recommendation = "⚠️ Speed Decreasing";
+        // Updated based on Myles C's advice on pacing
+        feedback =
+            "Average speed dropped. Work on consistent pacing during long rides. Adjusting pace is more effective than stopping and starting.";
+      });
+    } else if (latestDistance > 0 &&
+        currentDistanceValue < targetDistanceValue) {
+      setState(() {
+        recommendation = "ℹ️ Building Endurance";
+        feedback =
+            "Currently at ${currentDistanceValue.toStringAsFixed(1)} km toward ${targetDistanceValue.toStringAsFixed(1)} km goal.";
+      });
+    } else {
+      setState(() {
+        recommendation = "ℹ️ Establishing Baseline";
+        // Updated based on Adam K's advice on distance tracking
+        feedback =
+            "Track rides consistently for personalized endurance recommendations. Focus on distance as your primary metric.";
+      });
+    }
+
+    // Historical distance progression analysis
+    if (distanceProgression.length >= 5) {
+      double oldestAvg = 0;
+      double newestAvg = 0;
+
+      int midpoint = distanceProgression.length ~/ 2;
+      if (midpoint > 1) {
+        oldestAvg =
+            distanceProgression.sublist(midpoint).reduce((a, b) => a + b) /
+                (distanceProgression.length - midpoint);
+        newestAvg =
+            distanceProgression.sublist(0, midpoint).reduce((a, b) => a + b) /
+                midpoint;
+
+        double improvementPercent = ((newestAvg - oldestAvg) / oldestAvg) * 100;
+
+        // Updated based on Myles C's advice on progress expectations
+        if (improvementPercent > 10) {
+          trainingRecommendations.add(
+              "Your endurance has improved ${improvementPercent.toStringAsFixed(0)}% compared to earlier rides. Excellent progression! Remember progress varies by individual - some see changes in 2 weeks, others in 3 months.");
+        } else if (improvementPercent < -10) {
+          trainingRecommendations.add(
+              "Recent distances are ${(-improvementPercent).toStringAsFixed(0)}% shorter than earlier rides. Adjust training and ensure proper recovery. Progress isn't always linear.");
+        } else {
+          trainingRecommendations.add(
+              "Your distance progression is stable. Continue improving by gradually increasing your longest ride each week (no more than 10% increase).");
+        }
+      }
+
+      // Find longest ride ever
+      double longestRide = distanceProgression.reduce(math.max);
+      if (longestRide > 0 && targetDistanceValue > 0) {
+        // Updated based on recommendations for recreational cycling
+        double percentOfTarget = (longestRide / targetDistanceValue) * 100;
+        trainingRecommendations.add(
+            "Your longest ride (${longestRide.toStringAsFixed(1)} km) is ${percentOfTarget.toStringAsFixed(0)}% of your target. For recreational cycling, aim for at least 30 minutes per day (180 minutes/week).");
+      }
+    }
+
+    // Heart rate zone analysis from historical data - updated with HRM research
+    if (heartrateProgression.length >= 3) {
+      int enduranceZoneCount = 0;
+      int aboveThresholdCount = 0;
+
+      for (double hr in heartrateProgression) {
+        if (hr >= enduranceZoneLower && hr <= enduranceZoneUpper) {
+          enduranceZoneCount++;
+        } else if (hr > thresholdZoneUpper) {
+          aboveThresholdCount++;
+        }
+      }
+
+      double endurancePercent =
+          (enduranceZoneCount / heartrateProgression.length) * 100;
+      double thresholdPercent =
+          (aboveThresholdCount / heartrateProgression.length) * 100;
+
+      // Updated based on heart rate monitoring research
+      if (endurancePercent < 60 && thresholdPercent > 30) {
+        trainingRecommendations.add(
+            "${thresholdPercent.toStringAsFixed(0)}% of your rides are above threshold zone. For endurance, focus more on Zone 2 (${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm). Heart rate monitoring helps measure exercise intensity and prevent overtraining.");
+      }
+    }
+
+    // Recovery and overtraining prevention based on heart rate - updated based on HRM research
+    if (heartrateProgression.length >= 10) {
+      List<double> recentHRs = heartrateProgression.sublist(0, 5);
+      List<double> earlierHRs = heartrateProgression.sublist(
+          5, math.min(10, heartrateProgression.length));
+
+      double recentAvg = recentHRs.reduce((a, b) => a + b) / recentHRs.length;
+      double earlierAvg =
+          earlierHRs.reduce((a, b) => a + b) / earlierHRs.length;
+
+      double hrChangePercent = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+
+      // Updated based on HRM research for overtraining detection
+      if (hrChangePercent > 5 && weeklyActivityCount > 3) {
+        trainingRecommendations.add(
+            "Your heart rate has increased by ${hrChangePercent.toStringAsFixed(1)}% recently. This may indicate fatigue or overtraining. Use HRM data to detect changes in max heart rate, a potential indicator of high training loads. Add an additional recovery day with light cycling at ${zone2HeartRate.toInt()} bpm.");
+      } else if (hrChangePercent < -5) {
+        trainingRecommendations.add(
+            "Your heart rate has decreased by ${(-hrChangePercent).toStringAsFixed(1)}% recently, suggesting improved cardiovascular efficiency. Great progress!");
+      }
+    }
+
+    // Current heart rate recommendations - updated based on Myles C's advice
+    if (latestHeartRate > 0) {
+      if (latestHeartRate > thresholdZoneUpper) {
+        trainingRecommendations.add(
+            "Heart rate too high for endurance. For recreational cycling, don't aim to reach your threshold. Stay within ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm range for longer rides.");
+      } else if (latestHeartRate < enduranceZoneLower) {
+        trainingRecommendations.add(
+            "Increase intensity to ${enduranceZoneLower.toInt()}-${enduranceZoneUpper.toInt()} bpm for better aerobic development.");
+      } else if (latestHeartRate >= enduranceZoneLower &&
+          latestHeartRate <= enduranceZoneUpper) {
+        trainingRecommendations.add(
+            "Perfect endurance zone! This heart rate range is optimal for building aerobic capacity.");
+      } else {
+        trainingRecommendations.add(
+            "You're in threshold zone - good for tempo sessions but not longer endurance rides.");
+      }
+    }
+
+    // Training structure based on research
+    trainingRecommendations.add(
+        "Follow 80/20 rule: 80% low intensity, 20% higher intensity rides. Heart rate monitors effectively measure exercise intensity and can help prevent overtraining.");
+
+    // Distance progression
+    if (currentDistanceValue > 0 &&
+        targetDistanceValue > 0 &&
+        currentDistanceValue < targetDistanceValue) {
+      double percentComplete =
+          (currentDistanceValue / targetDistanceValue) * 100;
+      // Limit to 10% increase per week based on research
+      double weeklyIncrease =
+          math.min(targetDistanceValue * 0.1, currentDistanceValue * 0.1);
+
+      trainingRecommendations.add(
+          "You're ${percentComplete.toStringAsFixed(0)}% to goal. For safe progression, increase your long ride by no more than ${weeklyIncrease.toStringAsFixed(1)} km/week.");
+    }
+
+    // Frequency recommendations - updated based on Adam K & Myles C
+    if (weeklyActivityCount < 3) {
+      trainingRecommendations.add(
+          "For optimal endurance benefits, aim for 3 rides/week (minimum 20 minutes each): one long ride, 2 shorter recovery rides.");
+    }
+
+    // Recovery strategies based on research - updated with Dupuy et al. research
+    trainingRecommendations.add(
+        "For optimal recovery: (1) active recovery with low-intensity cycling to enhance blood flow and remove metabolic waste, (2) compression garments to reduce perceived fatigue, and (3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
+
+    // Weather and temperature considerations - updated based on research
+    if (weatherData.isNotEmpty) {
+      double currentTemp = safeParseDouble(temperature);
+      double currentHumidity = safeParseDouble(humidity);
+
+      // Updated based on temperature impact research
+      if (currentTemp > 28) {
+        trainingRecommendations.add(
+            "At ${currentTemp.toStringAsFixed(1)}°C: Lower heart rate target by 5-10%, increase hydration frequency to prevent dehydration, and consider riding earlier in the morning to avoid heat stress.");
+
+        // Updated based on humidity research
+        if (currentHumidity > 70) {
+          trainingRecommendations.add(
+              "High humidity (${currentHumidity.toStringAsFixed(0)}%) restricts evaporative cooling and increases thermal stress. Reduce intensity and increase hydration further in these conditions. Acclimatization is important when training in humid areas.");
+        }
+      } else if (currentTemp < 10) {
+        trainingRecommendations.add(
+            "Cold weather (${currentTemp.toStringAsFixed(1)}°C): Extend your warm-up to 15-20 minutes and use layered clothing for optimal temperature regulation.");
+      }
+
+      // Health condition recommendations - updated based on research
+      if (respiratoryCondition == "Yes") {
+        // Updated based on air quality research
+        healthRecommendations.add(
+            "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
+        healthRecommendations.add(
+            "Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
+      }
+
+      if (cardiovascularCondition == "Yes") {
+        // Updated based on AHA research and Myles C's advice
+        healthRecommendations.add(
+            "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly. Always get checked by a doctor first.");
+        healthRecommendations.add(
+            "Monitor heart rate carefully with a device like an Apple Watch or Fitbit, and increase intensity very gradually to avoid strain.");
+      }
+
+      // Nutrition recommendations - updated based on research and Myles C's advice
+      healthRecommendations.add(
+          "Pre-ride nutrition: Eat a light meal (like a banana or boiled eggs) 30-60 minutes before riding. Never start on an empty stomach. Post-ride: consume a 3:1 carb:protein ratio within 30 minutes.");
+
+      // Updated based on Holland et al. (2017) hydration research
+      if (currentDistanceValue > 30) {
+        double rideHours = currentDurationValue / 60;
+        double weightInKg = safeParseDouble(weight);
+
+        if (rideHours >= 1 && rideHours <= 2) {
+          // For 1-2 hour moderate-intensity rides
+          double recommendedFluidRate = 0.175; // midpoint of 0.15-0.20 range
+          double totalFluidRecommendation =
+              recommendedFluidRate * weightInKg * rideHours * 60;
+
+          healthRecommendations.add(
+              "For your ${rideHours.toStringAsFixed(1)}-hour moderate rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid (${(recommendedFluidRate * weightInKg).toStringAsFixed(1)} ml/min) for optimal performance.");
+        } else if (rideHours > 2) {
+          // For rides longer than 2 hours
+          double recommendedFluidRate = 0.205; // midpoint of 0.14-0.27 range
+          double totalFluidRecommendation =
+              recommendedFluidRate * weightInKg * rideHours * 60;
+
+          healthRecommendations.add(
+              "For your ${rideHours.toStringAsFixed(1)}-hour rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid total and 60-90g of carbohydrates per hour from multiple sources to maintain energy levels.");
+        } else if (rideHours < 1 &&
+            latestAverageHeartrate > thresholdZoneLower) {
+          // For high-intensity rides under 1 hour
+          healthRecommendations.add(
+              "For high-intensity rides under 1 hour, excessive hydration can be counterproductive. Focus on pre-ride hydration instead of drinking large amounts during the ride.");
+        }
+      }
+
+      // Recovery recommendations
+      if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
+        healthRecommendations.add(
+            "Add dedicated recovery days to prevent overtraining syndrome and reduce injury risk.");
+      }
+
+      // Equipment recommendations - added HRM based on research
+      equipmentRecommendations.add(
+          "Proper bike fit is crucial for endurance - small discomforts become major issues on long rides.");
+      equipmentRecommendations.add(
+          "For longer rides, invest in quality padded shorts and use a heart rate monitor to maintain proper intensity and track recovery.");
+    }
   }
 
-  // Equipment recommendations - added HRM based on research
-  equipmentRecommendations.add(
-      "Proper bike fit is crucial for endurance - small discomforts become major issues on long rides.");
-  equipmentRecommendations
-      .add("For longer rides, invest in quality padded shorts and use a heart rate monitor to maintain proper intensity and track recovery.");
-}
-}
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
@@ -4524,7 +4724,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                   children: [
                     SizedBox(height: 16),
                     _buildHeaderSection(),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4540,9 +4739,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       },
                       child: _buildPrimaryRecommendationCard(),
                     ),
-
                     SizedBox(height: 16),
-
                     if (goalType == "High Intensity Cycling")
                       TweenAnimationBuilder(
                         tween: Tween<double>(begin: 0, end: 1),
@@ -4559,9 +4756,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                         },
                         child: _buildSubgoalSelectionCard(),
                       ),
-
                     SizedBox(height: 16),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4578,9 +4773,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       child: _buildSectionTitle("Personalized Insights",
                           Icons.lightbulb_outline_rounded),
                     ),
-
                     SizedBox(height: 12),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 900),
@@ -4596,9 +4789,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       },
                       child: _buildRecommendationCarousel(),
                     ),
-
                     SizedBox(height: 24),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4615,11 +4806,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       child: _buildSectionTitle("Your Analytics",
                           Icons.insert_chart_outlined_rounded),
                     ),
-
                     SizedBox(height: 50),
-
                     _buildWeeklySummary(),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1000),
@@ -4635,9 +4823,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       },
                       child: _buildGoalBasedGraphs(),
                     ),
-
                     SizedBox(height: 50),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 800),
@@ -4653,9 +4839,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       },
                       child: _buildActivityLogHeader(),
                     ),
-
                     SizedBox(height: 12),
-
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1100),
@@ -4671,7 +4855,6 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
                       },
                       child: _buildActivityLogs(),
                     ),
-
                     SizedBox(height: 40),
                   ],
                 ),
@@ -6857,860 +7040,884 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     );
   }
 
- Widget _buildWeeklySummary() {
-  var media = MediaQuery.of(context).size;
+  Widget _buildWeeklySummary() {
+    var media = MediaQuery.of(context).size;
 
-  double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
-  double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+    double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
 
-  // Make sure flex values are at least 1 to avoid divide by zero errors
-  int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
-  int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
-  
-  // Scale down if values are too large to prevent UI overflow
-  if (burnedFlex > 10000 || consumedFlex > 10000) {
-    int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
-    burnedFlex = burnedFlex ~/ divisor;
-    consumedFlex = consumedFlex ~/ divisor;
-  }
+    // Make sure flex values are at least 1 to avoid divide by zero errors
+    int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
+    int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
 
-  // Calculate a fixed card height that will be safe for all cards
-  double cardHeight = math.min(media.width * 0.45, 180);
+    // Scale down if values are too large to prevent UI overflow
+    if (burnedFlex > 10000 || consumedFlex > 10000) {
+      int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
+      burnedFlex = burnedFlex ~/ divisor;
+      consumedFlex = consumedFlex ~/ divisor;
+    }
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 5, bottom: 15),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Row(
-                children: [
-                  SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      "Weekly Summary",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                ),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Text(
-                "This Week",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: cardHeight,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            "Cycling\nSessions",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Color(0xffFFA500).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.directions_bike_rounded,
-                            color: Color(0xffFFA500),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Value display
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ShaderMask(
-                              blendMode: BlendMode.srcIn,
-                              shaderCallback: (bounds) {
-                                return LinearGradient(
-                                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight
-                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
-                              },
-                              child: Text(
-                                "$weeklyActivityCount",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              "of ${daysPerWeek} goal",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Progress bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: weeklyActivityCount / math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
-                        minHeight: 8,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: cardHeight,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            "Calories\nBurned",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Color(0xffFF7E00).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.local_fire_department_rounded,
-                            color: Color(0xffFF7E00),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Value display
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ShaderMask(
-                              blendMode: BlendMode.srcIn,
-                              shaderCallback: (bounds) {
-                                return LinearGradient(
-                                  colors: [Color(0xffFF7E00), Color(0xffFF5900)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight
-                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
-                              },
-                              child: Text(
-                                "${weeklyCaloriesBurned.toInt()}",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              "kcal this week",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    // Calculate a fixed card height that will be safe for all cards
+    double cardHeight = math.min(media.width * 0.45, 180);
 
-      SizedBox(height: 15),
-      Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: cardHeight,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            "Heart Rate",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Color(0xffFF5900).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.favorite_rounded,
-                            color: Color(0xffFF5900),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Value display
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ShaderMask(
-                              blendMode: BlendMode.srcIn,
-                              shaderCallback: (bounds) {
-                                return LinearGradient(
-                                  colors: [Color(0xffFF5900), Color(0xffFF3800)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight
-                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
-                              },
-                              child: Text(
-                                "${latestAverageHeartrate.toInt()}",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              "bpm avg",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Zone indicators
-                    Container(
-                      height: 30,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildHRZone(
-                              "Z1",
-                              latestAverageHeartrate <= zone1HeartRate,
-                              Colors.green,
-                            ),
-                            SizedBox(width: 3),
-                            _buildHRZone(
-                              "Z2",
-                              latestAverageHeartrate > zone1HeartRate &&
-                                  latestAverageHeartrate <= zone2HeartRate,
-                              Color(0xffFFA500),
-                            ),
-                            SizedBox(width: 3),
-                            _buildHRZone(
-                              "Z3",
-                              latestAverageHeartrate > zone2HeartRate &&
-                                  latestAverageHeartrate <= zone3HeartRate,
-                              Color(0xffFF7E00),
-                            ),
-                            SizedBox(width: 3),
-                            _buildHRZone(
-                              "Z4",
-                              latestAverageHeartrate > zone3HeartRate &&
-                                  latestAverageHeartrate <= zone4HeartRate,
-                              Color(0xffFF5900),
-                            ),
-                            SizedBox(width: 3),
-                            _buildHRZone(
-                              "Z5",
-                              latestAverageHeartrate > zone4HeartRate,
-                              Color(0xffFF3800),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Weight Card
-          Expanded(
-            child: Container(
-              height: cardHeight,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            "Weight",
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Color(0xffFF3800).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.monitor_weight_rounded,
-                            color: Color(0xffFF3800),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Value display
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ShaderMask(
-                              blendMode: BlendMode.srcIn,
-                              shaderCallback: (bounds) {
-                                return LinearGradient(
-                                  colors: [Color(0xffFF3800), Color(0xffE62200)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight
-                                ).createShader(Rect.fromLTRB(0, 0, bounds.width, bounds.height));
-                              },
-                              child: Text(
-                                "${weight}",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              "kg | ${bodyFat}% fat",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Change indicator
-                    if (previousWeight > 0 && latestWeight > 0)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: latestWeight < previousWeight
-                              ? Colors.green.withOpacity(0.1)
-                              : Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              latestWeight < previousWeight
-                                  ? Icons.arrow_downward_rounded
-                                  : Icons.arrow_upward_rounded,
-                              size: 14,
-                              color: latestWeight < previousWeight
-                                  ? Colors.green
-                                  : Colors.red,
-                            ),
-                            SizedBox(width: 5),
-                            Text(
-                              "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                color: latestWeight < previousWeight
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-
-      SizedBox(height: 15),
-
-      // Bottom Card - Caloric Balance
-      Container(
-        margin: const EdgeInsets.symmetric(horizontal: 5),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 5, bottom: 15),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      "Caloric Balance",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Color(0xffFFA500).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.equalizer_rounded,
-                      color: Color(0xffFFA500),
-                      size: 18,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 15),
-
-              // Single bar balance visualization
-              Container(
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Flexible(
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xffFFA500),
-                                    Color(0xffFF8C00)
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                            ),
-                            SizedBox(width: 5),
-                            Text(
-                              "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        "Weekly Summary",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xff4CAF50),
-                                    Color(0xff388E3C)
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                            ),
-                            SizedBox(width: 5),
-                            Text(
-                              "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    // Balance bar with safe flex values
-                    Container(
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(5),
                       ),
-                      child: Row(
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Text(
+                  "This Week",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: cardHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Flexible(
-                            flex: burnedFlex,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xffFFA500),
-                                    Color(0xffFF8C00)
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(5),
-                                  bottomLeft: Radius.circular(5),
-                                  topRight: weeklyCaloriesConsumed == 0
-                                      ? Radius.circular(5)
-                                      : Radius.zero,
-                                  bottomRight: weeklyCaloriesConsumed == 0
-                                      ? Radius.circular(5)
-                                      : Radius.zero,
-                                ),
+                            child: Text(
+                              "Cycling\nSessions",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
-                          Flexible(
-                            flex: consumedFlex,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xff4CAF50),
-                                    Color(0xff388E3C)
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(5),
-                                  bottomRight: Radius.circular(5),
-                                  topLeft: weeklyCaloriesBurned == 0
-                                      ? Radius.circular(5)
-                                      : Radius.zero,
-                                  bottomLeft: weeklyCaloriesBurned == 0
-                                      ? Radius.circular(5)
-                                      : Radius.zero,
-                                ),
-                              ),
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xffFFA500).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.directions_bike_rounded,
+                              color: Color(0xffFFA500),
+                              size: 18,
                             ),
                           ),
                         ],
                       ),
+
+                      // Value display
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                          colors: [
+                                        Color(0xffFFA500),
+                                        Color(0xffFF8C00)
+                                      ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight)
+                                      .createShader(Rect.fromLTRB(
+                                          0, 0, bounds.width, bounds.height));
+                                },
+                                child: Text(
+                                  "$weeklyActivityCount",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                "of ${daysPerWeek} goal",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: weeklyActivityCount /
+                              math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
+                          minHeight: 8,
+                          backgroundColor: Colors.grey[200],
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                height: cardHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
                     ),
                   ],
                 ),
-              ),
-
-              SizedBox(height: 15),
-              Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                          ? [Color(0xffFFA500), Color(0xffFF8C00)]
-                          : [Color(0xff4CAF50), Color(0xff388E3C)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                            ? Color(0xffFFA500).withOpacity(0.3)
-                            : Color(0xff4CAF50).withOpacity(0.3),
-                        spreadRadius: 1,
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        weeklyCaloriesBurned > weeklyCaloriesConsumed
-                            ? Icons.trending_down_rounded
-                            : Icons.trending_up_rounded,
-                        color: Colors.white,
-                        size: 18,
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              "Calories\nBurned",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xffFF7E00).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.local_fire_department_rounded,
+                              color: Color(0xffFF7E00),
+                              size: 18,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+
+                      // Value display
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                          colors: [
+                                        Color(0xffFF7E00),
+                                        Color(0xffFF5900)
+                                      ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight)
+                                      .createShader(Rect.fromLTRB(
+                                          0, 0, bounds.width, bounds.height));
+                                },
+                                child: Text(
+                                  "${weeklyCaloriesBurned.toInt()}",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                "kcal this week",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+            ),
+          ],
+        ),
 
-              if (nutritionData.isNotEmpty) ...[
-                SizedBox(height: 20),
-                Divider(),
-                SizedBox(height: 10),
+        SizedBox(height: 15),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: cardHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              "Heart Rate",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xffFF5900).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.favorite_rounded,
+                              color: Color(0xffFF5900),
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Value display
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                          colors: [
+                                        Color(0xffFF5900),
+                                        Color(0xffFF3800)
+                                      ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight)
+                                      .createShader(Rect.fromLTRB(
+                                          0, 0, bounds.width, bounds.height));
+                                },
+                                child: Text(
+                                  "${latestAverageHeartrate.toInt()}",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                "bpm avg",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Zone indicators
+                      Container(
+                        height: 30,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildHRZone(
+                                "Z1",
+                                latestAverageHeartrate <= zone1HeartRate,
+                                Colors.green,
+                              ),
+                              SizedBox(width: 3),
+                              _buildHRZone(
+                                "Z2",
+                                latestAverageHeartrate > zone1HeartRate &&
+                                    latestAverageHeartrate <= zone2HeartRate,
+                                Color(0xffFFA500),
+                              ),
+                              SizedBox(width: 3),
+                              _buildHRZone(
+                                "Z3",
+                                latestAverageHeartrate > zone2HeartRate &&
+                                    latestAverageHeartrate <= zone3HeartRate,
+                                Color(0xffFF7E00),
+                              ),
+                              SizedBox(width: 3),
+                              _buildHRZone(
+                                "Z4",
+                                latestAverageHeartrate > zone3HeartRate &&
+                                    latestAverageHeartrate <= zone4HeartRate,
+                                Color(0xffFF5900),
+                              ),
+                              SizedBox(width: 3),
+                              _buildHRZone(
+                                "Z5",
+                                latestAverageHeartrate > zone4HeartRate,
+                                Color(0xffFF3800),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Weight Card
+            Expanded(
+              child: Container(
+                height: cardHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 2,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              "Weight",
+                              style: TextStyle(
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xffFF3800).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.monitor_weight_rounded,
+                              color: Color(0xffFF3800),
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Value display
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                          colors: [
+                                        Color(0xffFF3800),
+                                        Color(0xffE62200)
+                                      ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight)
+                                      .createShader(Rect.fromLTRB(
+                                          0, 0, bounds.width, bounds.height));
+                                },
+                                child: Text(
+                                  "${weight}",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                "kg | ${bodyFat}% fat",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Change indicator
+                      if (previousWeight > 0 && latestWeight > 0)
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: latestWeight < previousWeight
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                latestWeight < previousWeight
+                                    ? Icons.arrow_downward_rounded
+                                    : Icons.arrow_upward_rounded,
+                                size: 14,
+                                color: latestWeight < previousWeight
+                                    ? Colors.green
+                                    : Colors.red,
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: latestWeight < previousWeight
+                                      ? Colors.green
+                                      : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        SizedBox(height: 15),
+
+        // Bottom Card - Caloric Balance
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Latest Meals",
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                    Flexible(
+                      child: Text(
+                        "Caloric Balance",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                        ),
-                        borderRadius: BorderRadius.circular(15),
+                        color: Color(0xffFFA500).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        "Today",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      child: Icon(
+                        Icons.equalizer_rounded,
+                        color: Color(0xffFFA500),
+                        size: 18,
                       ),
                     ),
                   ],
                 ),
                 SizedBox(height: 15),
-                Column(
-                  children: [
-                    if (nutritionData[0]['breakfast'] != "-")
-                      _buildEnhancedMealCard(
-                        "B",
-                        "Breakfast",
-                        nutritionData[0]['breakfast'],
-                        "${double.parse(nutritionData[0]['breakfast_calories'].toString()).toStringAsFixed(2)} kcal",
-                        Color(0xffFFA500),
-                        Icons.wb_sunny_outlined,
+
+                // Single bar balance visualization
+                Container(
+                  width: double.infinity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xffFFA500),
+                                      Color(0xffFF8C00)
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xff4CAF50),
+                                      Color(0xff388E3C)
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    SizedBox(
-                        height: nutritionData[0]['breakfast'] != "-" ? 10 : 0),
-                    if (nutritionData[0]['lunch'] != "-")
-                      _buildEnhancedMealCard(
-                        "L",
-                        "Lunch",
-                        nutritionData[0]['lunch'],
-                        "${double.parse(nutritionData[0]['lunch_calories'].toString()).toStringAsFixed(2)} kcal",
-                        Color(0xffFF7E00),
-                        Icons.restaurant_outlined,
+                      SizedBox(height: 10),
+                      // Balance bar with safe flex values
+                      Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              flex: burnedFlex,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xffFFA500),
+                                      Color(0xffFF8C00)
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(5),
+                                    bottomLeft: Radius.circular(5),
+                                    topRight: weeklyCaloriesConsumed == 0
+                                        ? Radius.circular(5)
+                                        : Radius.zero,
+                                    bottomRight: weeklyCaloriesConsumed == 0
+                                        ? Radius.circular(5)
+                                        : Radius.zero,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Flexible(
+                              flex: consumedFlex,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xff4CAF50),
+                                      Color(0xff388E3C)
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(5),
+                                    bottomRight: Radius.circular(5),
+                                    topLeft: weeklyCaloriesBurned == 0
+                                        ? Radius.circular(5)
+                                        : Radius.zero,
+                                    bottomLeft: weeklyCaloriesBurned == 0
+                                        ? Radius.circular(5)
+                                        : Radius.zero,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    SizedBox(height: nutritionData[0]['lunch'] != "-" ? 10 : 0),
-                    if (nutritionData[0]['dinner'] != "-")
-                      _buildEnhancedMealCard(
-                        "D",
-                        "Dinner",
-                        nutritionData[0]['dinner'],
-                        "${double.parse(nutritionData[0]['dinner_calories'].toString()).toStringAsFixed(2)} kcal",
-                        Color(0xffFF5900),
-                        Icons.nightlight_outlined,
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
+
+                SizedBox(height: 15),
+                Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                            ? [Color(0xffFFA500), Color(0xffFF8C00)]
+                            : [Color(0xff4CAF50), Color(0xff388E3C)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: weeklyCaloriesBurned > weeklyCaloriesConsumed
+                              ? Color(0xffFFA500).withOpacity(0.3)
+                              : Color(0xff4CAF50).withOpacity(0.3),
+                          spreadRadius: 1,
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          weeklyCaloriesBurned > weeklyCaloriesConsumed
+                              ? Icons.trending_down_rounded
+                              : Icons.trending_up_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                if (nutritionData.isNotEmpty) ...[
+                  SizedBox(height: 20),
+                  Divider(),
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Latest Meals",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                          ),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          "Today",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 15),
+                  Column(
+                    children: [
+                      if (nutritionData[0]['breakfast'] != "-")
+                        _buildEnhancedMealCard(
+                          "B",
+                          "Breakfast",
+                          nutritionData[0]['breakfast'],
+                          "${double.parse(nutritionData[0]['breakfast_calories'].toString()).toStringAsFixed(2)} kcal",
+                          Color(0xffFFA500),
+                          Icons.wb_sunny_outlined,
+                        ),
+                      SizedBox(
+                          height:
+                              nutritionData[0]['breakfast'] != "-" ? 10 : 0),
+                      if (nutritionData[0]['lunch'] != "-")
+                        _buildEnhancedMealCard(
+                          "L",
+                          "Lunch",
+                          nutritionData[0]['lunch'],
+                          "${double.parse(nutritionData[0]['lunch_calories'].toString()).toStringAsFixed(2)} kcal",
+                          Color(0xffFF7E00),
+                          Icons.restaurant_outlined,
+                        ),
+                      SizedBox(
+                          height: nutritionData[0]['lunch'] != "-" ? 10 : 0),
+                      if (nutritionData[0]['dinner'] != "-")
+                        _buildEnhancedMealCard(
+                          "D",
+                          "Dinner",
+                          nutritionData[0]['dinner'],
+                          "${double.parse(nutritionData[0]['dinner_calories'].toString()).toStringAsFixed(2)} kcal",
+                          Color(0xffFF5900),
+                          Icons.nightlight_outlined,
+                        ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
+
   Widget _buildEnhancedMealCard(String letter, String mealType, String mealDesc,
       String calories, Color color, IconData icon) {
     return TweenAnimationBuilder(
@@ -7721,7 +7928,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
         return Transform(
           alignment: Alignment.center,
           transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001) 
+            ..setEntry(3, 2, 0.001)
             ..translate(0.0, -4.0 * value),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -7836,8 +8043,8 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
   Widget _buildHRZone(String zone, bool isActive, Color color) {
     return Container(
-      width: 24, 
-      height: 24, 
+      width: 24,
+      height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isActive ? color : Colors.grey[200],
@@ -7857,7 +8064,7 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
           zone,
           style: TextStyle(
             fontFamily: 'Inter',
-            fontSize: 10, 
+            fontSize: 10,
             color: isActive ? Colors.white : Colors.grey[600],
             fontWeight: FontWeight.bold,
           ),

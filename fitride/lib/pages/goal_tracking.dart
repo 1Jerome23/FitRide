@@ -12,7 +12,6 @@ import 'package:confetti/confetti.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
-
 class GoalTrackingPage extends StatefulWidget {
   const GoalTrackingPage({super.key});
 
@@ -122,6 +121,11 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   double _totalWeeklyDistance = 0;
   Set<String> _uniqueDays = {};
   int? daysPerWeek;
+
+  bool usingPreviousGoal = false;
+  double referenceDistance = 0.0;
+  double referencePace = 0.0;
+  double referenceDuration = 0.0;
 
   double _currentUserWeight = 0;
   double targetWeight = 0;
@@ -317,156 +321,155 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     return weekNumber + 1;
   }
 
-Future<void> _updateWeeklyProgressData() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null || userGoal == null) return;
+  Future<void> _updateWeeklyProgressData() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
 
-  // Ensure we have the current week's data
-  if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
-    String goalId = userGoal!['id'] ?? "";
-    _initializeCurrentWeekData(uid, goalId);
-  }
+    // Ensure we have the current week's data
+    if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+      String goalId = userGoal!['id'] ?? "";
+      _initializeCurrentWeekData(uid, goalId);
+    }
 
-  // Get the current week's data
-  Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
+    // Get the current week's data
+    Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
 
-  // Update common fields
-  weekData['sessionsCompleted'] = _weeklyActivities.length;
-  weekData['totalDuration'] = _totalWeeklyDuration;
-  weekData['totalDistance'] = _totalWeeklyDistance;
-  weekData['uniqueDays'] = _uniqueDays.toList();
+    // Update common fields
+    weekData['sessionsCompleted'] = _weeklyActivities.length;
+    weekData['totalDuration'] = _totalWeeklyDuration;
+    weekData['totalDistance'] = _totalWeeklyDistance;
+    weekData['uniqueDays'] = _uniqueDays.toList();
 
-  // Update goal-specific fields
-  switch (userGoal!['goalType']) {
-    case 'Leisure':
-      weekData['dayProgress'] = _weeklyDaysProgress;
-      break;
-
-    case 'High Intensity Cycling':
-      // Only update end weight if current weight is valid
-      if (_currentUserWeight > 0) {
-        weekData['weekEndWeight'] = _currentUserWeight;
-      }
-
-      // Calculate calories burned from activities
-      double totalCalories = 0.0;
-      for (var activity in _weeklyActivities) {
-        if (activity.containsKey('calories_burned')) {
-          totalCalories += safeParseDouble(activity['calories_burned']);
-        }
-      }
-      weekData['caloriesBurned'] = totalCalories;
-
-      // Calculate weight loss progress
-      if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
-        weekData['weeklyWeightChange'] =
-            weekData['weekEndWeight'] - weekData['weekStartWeight'];
-      }
-      break;
-
-    case 'Endurance':
-      weekData['bestDistance'] = _bestDistance;
-
-      // Calculate pace if we have valid duration and distance
-      if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
-        double pace =
-            _getBestActivityDuration() / _bestDistance; // minutes per km
-        weekData['bestPace'] = pace;
-      }
-
-      if (_bestDistanceDate != null) {
-        weekData['bestDistanceDate'] = _bestDistanceDate;
-      }
-      break;
-  }
-
-  // Update subgoal progress if there's an active subgoal
-  if (hasActiveSubgoal) {
-    weekData['subgoalType'] = subgoalType;
-    weekData['subgoalTargetValue'] = subgoalTargetValue;
-
-    // Set current value based on subgoal type
-    switch (subgoalType) {
-      case "distance":
-        // Use actual average for all completed activities
-        // Important: We use the actual number of activities, not the daysPerWeek target
-        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDistance / _weeklyActivities.length;
+    // Update goal-specific fields
+    switch (userGoal!['goalType']) {
+      case 'Leisure':
+        weekData['dayProgress'] = _weeklyDaysProgress;
         break;
 
-      case "pace":
-        // Calculate average pace for all completed activities
-        if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
-          double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
-          weekData['subgoalCurrentValue'] = avgPace;
+      case 'High Intensity Cycling':
+        // Only update end weight if current weight is valid
+        if (_currentUserWeight > 0) {
+          weekData['weekEndWeight'] = _currentUserWeight;
+        }
+
+        // Calculate calories burned from activities
+        double totalCalories = 0.0;
+        for (var activity in _weeklyActivities) {
+          if (activity.containsKey('calories_burned')) {
+            totalCalories += safeParseDouble(activity['calories_burned']);
+          }
+        }
+        weekData['caloriesBurned'] = totalCalories;
+
+        // Calculate weight loss progress
+        if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
+          weekData['weeklyWeightChange'] =
+              weekData['weekEndWeight'] - weekData['weekStartWeight'];
         }
         break;
 
-      case "duration":
-        // Use actual average for all completed activities
-        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDuration / _weeklyActivities.length;
-        break;
+      case 'Endurance':
+        weekData['bestDistance'] = _bestDistance;
 
-      case "maintain":
-        // Just count the number of activities as a progress indicator
-        weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+        // Calculate pace if we have valid duration and distance
+        if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
+          double pace =
+              _getBestActivityDuration() / _bestDistance; // minutes per km
+          weekData['bestPace'] = pace;
+        }
+
+        if (_bestDistanceDate != null) {
+          weekData['bestDistanceDate'] = _bestDistanceDate;
+        }
         break;
     }
 
-    // Calculate progress percentage for the subgoal
-    if (weekData['subgoalBaseline'] != null &&
-        weekData['subgoalTargetValue'] != null &&
-        weekData['subgoalCurrentValue'] != null) {
-      double baseline = weekData['subgoalBaseline'];
-      double target = weekData['subgoalTargetValue'];
-      double current = weekData['subgoalCurrentValue'];
+    // Update subgoal progress if there's an active subgoal
+    if (hasActiveSubgoal) {
+      weekData['subgoalType'] = subgoalType;
+      weekData['subgoalTargetValue'] = subgoalTargetValue;
 
-      // Different calculation based on subgoal type
-      if (subgoalType == "pace") {
-        // For pace, lower is better (improvement is baseline → target where baseline > target)
-        if (baseline > target) {
-          double progress = (baseline - current) / (baseline - target);
-          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+      // Set current value based on subgoal type
+      switch (subgoalType) {
+        case "distance":
+          // Use actual average for all completed activities
+          // Important: We use the actual number of activities, not the daysPerWeek target
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDistance / _weeklyActivities.length;
+          break;
+
+        case "pace":
+          // Calculate average pace for all completed activities
+          if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+            double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+            weekData['subgoalCurrentValue'] = avgPace;
+          }
+          break;
+
+        case "duration":
+          // Use actual average for all completed activities
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDuration / _weeklyActivities.length;
+          break;
+
+        case "maintain":
+          // Just count the number of activities as a progress indicator
+          weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+          break;
+      }
+
+      // Calculate progress percentage for the subgoal
+      if (weekData['subgoalBaseline'] != null &&
+          weekData['subgoalTargetValue'] != null &&
+          weekData['subgoalCurrentValue'] != null) {
+        double baseline = weekData['subgoalBaseline'];
+        double target = weekData['subgoalTargetValue'];
+        double current = weekData['subgoalCurrentValue'];
+
+        // Different calculation based on subgoal type
+        if (subgoalType == "pace") {
+          // For pace, lower is better (improvement is baseline → target where baseline > target)
+          if (baseline > target) {
+            double progress = (baseline - current) / (baseline - target);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
+        } else {
+          // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
+          if (target > baseline) {
+            double progress = (current - baseline) / (target - baseline);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
         }
-      } else {
-        // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
-        if (target > baseline) {
-          double progress = (current - baseline) / (target - baseline);
-          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
-        }
+      }
+    }
+
+    // Save to Firestore
+    //await _saveWeeklyProgressToFirestore(weekData);
+
+    // Check if the subgoal has been completed
+    if (hasActiveSubgoal &&
+        weekData['subgoalProgress'] != null &&
+        weekData['subgoalProgress'] >= 1.0) {
+      // Only show completion dialog if it hasn't been shown yet for this subgoal
+
+
+      QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .where('completedSuccessfully', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (subgoalQuery.docs.isNotEmpty) {
+        _showSubgoalCompletionDialog();
       }
     }
   }
 
-  // Save to Firestore
-  await _saveWeeklyProgressToFirestore(weekData);
-
-  // Check if the subgoal has been completed
-  if (hasActiveSubgoal && weekData['subgoalProgress'] != null && weekData['subgoalProgress'] >= 1.0) {
-    // Only show completion dialog if it hasn't been shown yet for this subgoal
-    bool hasShownCompletionForCurrentSubgoal = false;
-    final prefs = await SharedPreferences.getInstance();
-    final lastCompletedSubgoalId = prefs.getString('last_completed_subgoal_id');
-    
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: uid)
-        .where('isActive', isEqualTo: true)
-        .limit(1)
-        .get();
-    
-    if (subgoalQuery.docs.isNotEmpty && lastCompletedSubgoalId != subgoalQuery.docs.first.id) {
-      _showSubgoalCompletionDialog();
-      await prefs.setString('last_completed_subgoal_id', subgoalQuery.docs.first.id);
-      await prefs.setBool('show_subgoal_selection', true);
-    }
-  }
-}
 // Save weekly progress data to Firestore
-  Future<void> _saveWeeklyProgressToFirestore(
+ /* Future<void> _saveWeeklyProgressToFirestore(
       Map<String, dynamic> weekData) async {
     try {
       // Check if this document already exists (by docId)
@@ -583,7 +586,7 @@ Future<void> _updateWeeklyProgressData() async {
 
     return _weeklySubgoalData[_currentWeekNumber]!;
   }
-
+*/
   // Method to fetch active subgoal when loading the page
   Future<void> _fetchActiveSubgoal() async {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -630,6 +633,9 @@ Future<void> _updateWeeklyProgressData() async {
           }
         });
         print("Active subgoal found and loaded: $subgoalType");
+
+        // Now check for the most recently completed subgoal to get reference values
+        await _fetchReferenceValuesFromPreviousSubgoal(uid);
       } else {
         setState(() {
           hasActiveSubgoal = false;
@@ -640,6 +646,118 @@ Future<void> _updateWeeklyProgressData() async {
       print("Error fetching active subgoal: $e");
     }
   }
+
+  Future<void> _fetchReferenceValuesFromPreviousSubgoal(String uid) async {
+  try {
+    // Query for recently completed subgoals (end date in the past)
+    QuerySnapshot completedSubgoalQuery = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: uid)
+        .where('endDate', isLessThan: DateTime.now())
+        .orderBy('endDate', descending: true)
+        .limit(1)
+        .get();
+
+    if (completedSubgoalQuery.docs.isNotEmpty) {
+      DocumentSnapshot completedSubgoal = completedSubgoalQuery.docs.first;
+      var subgoalData = completedSubgoal.data() as Map<String, dynamic>;
+
+      // Get the subgoal date range to fetch relevant activities
+      DateTime startDate = (subgoalData['startDate'] as Timestamp).toDate();
+      DateTime endDate = (subgoalData['endDate'] as Timestamp).toDate();
+      String completedType = subgoalData['subgoalType'];
+      
+      // Fetch activities within the previous subgoal's time period
+      QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: uid)
+          .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('start_date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .get();
+      
+      // Calculate actual performance metrics from these activities
+      double actualTotalDistance = 0.0;
+      double actualTotalDuration = 0.0; // in minutes
+      List<double> paces = [];
+      
+      for (var doc in activitiesSnapshot.docs) {
+        var activityData = doc.data() as Map<String, dynamic>;
+        
+        double distance = safeParseDouble(activityData['distance']);
+        double durationSeconds = safeParseDouble(activityData['elapsed_time']);
+        double durationMinutes = durationSeconds / 60.0;
+        
+        if (distance > 0) actualTotalDistance += distance;
+        if (durationMinutes > 0) actualTotalDuration += durationMinutes;
+        
+        // Calculate pace (minutes per km) for this activity
+        if (distance > 0 && durationMinutes > 0) {
+          double pace = durationMinutes / distance;
+          paces.add(pace);
+        }
+      }
+      
+      // Calculate averages if there were activities
+      int activityCount = activitiesSnapshot.docs.length;
+      double actualAvgDistance = activityCount > 0 ? actualTotalDistance / activityCount : 0.0;
+      double actualAvgDuration = activityCount > 0 ? actualTotalDuration / activityCount : 0.0;
+      double actualAvgPace = 0.0;
+      
+      if (paces.isNotEmpty) {
+        actualAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+      }
+
+      setState(() {
+        if (activityCount > 0) {
+          // Use actual performance metrics if we have activities
+          referenceDistance = actualAvgDistance;
+          referencePace = actualAvgPace;
+          referenceDuration = actualAvgDuration;
+          usingPreviousGoal = false; // We're using actual performance, not previous goal
+        } else {
+          // If no activities found, fall back to previous subgoal target values
+          if (completedType == "distance") {
+            referenceDistance = subgoalData['targetValue'];
+            referencePace = baselinePace;
+            referenceDuration = baselineDuration;
+          } else if (completedType == "pace") {
+            referenceDistance = baselineDistance;
+            referencePace = subgoalData['targetValue'];
+            referenceDuration = baselineDuration;
+          } else if (completedType == "duration") {
+            referenceDistance = baselineDistance;
+            referencePace = baselinePace;
+            referenceDuration = subgoalData['targetValue'];
+          } else if (completedType == "maintain") {
+            // For maintain goals, use the baseline values
+            referenceDistance = baselineDistance;
+            referencePace = baselinePace;
+            referenceDuration = baselineDuration;
+          }
+          usingPreviousGoal = true;
+        }
+      });
+    } else {
+      // No completed subgoal found, use baseline values
+      setState(() {
+        referenceDistance = baselineDistance;
+        referencePace = baselinePace;
+        referenceDuration = baselineDuration;
+        usingPreviousGoal = false;
+      });
+    }
+  } catch (e) {
+    print("Error fetching reference values: $e");
+    // Fallback to baseline values in case of error
+    setState(() {
+      referenceDistance = baselineDistance;
+      referencePace = baselinePace;
+      referenceDuration = baselineDuration;
+      usingPreviousGoal = false;
+    });
+  }
+}
+
 
   Map<String, dynamic>? getProgressForWeek(int weekNumber) {
     return _weeklyProgressData[weekNumber];
@@ -678,69 +796,70 @@ Future<void> _updateWeeklyProgressData() async {
         days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
   }
 
- @override
-void initState() {
-  super.initState();
-  _currentWeekNumber = 1;
-  _weekStartDate = DateTime.now();
-  _weekEndDate = DateTime.now().add(Duration(days: 7));
-  _fetchSubgoalDetails();
-  _confettiController =
-      ConfettiController(duration: const Duration(seconds: 5));
+  @override
+  void initState() {
+    super.initState();
+    _currentWeekNumber = 1;
+    _weekStartDate = DateTime.now();
+    _weekEndDate = DateTime.now().add(Duration(days: 7));
+    _fetchSubgoalDetails();
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 5));
 
-  // Check for stored dialog flags
-  _checkDialogFlags();
+    // Check for stored dialog flags
+    _checkDialogFlags();
 
-  Future.delayed(Duration(milliseconds: 500), () {
-    _loadUserGoalAndActivities();
-  });
+    Future.delayed(Duration(milliseconds: 500), () {
+      _loadUserGoalAndActivities();
+    });
 
-  // Add a timer to periodically check subgoal status
-  Timer.periodic(Duration(hours: 12), (timer) {
-    if (mounted) {
-      _checkSubgoalCompletionStatus();
-    } else {
-      timer.cancel();
-    }
-  });
+    // Add a timer to periodically check subgoal status
+    Timer.periodic(Duration(seconds: 1), (timer) {
+      if (mounted) {
+        _checkSubgoalCompletionStatus();
+      } else {
+        timer.cancel();
+      }
+    });
 
-  // Also check on init after a short delay
-  Future.delayed(Duration(seconds: 5), () {
-    if (mounted) {
-      _checkSubgoalCompletionStatus();
-    }
-  });
+    // Also check on init after a short delay
+    Future.delayed(Duration(seconds: 5), () {
+      if (mounted) {
+        _checkSubgoalCompletionStatus();
+      }
+    });
 
-  _animationController = AnimationController(
-    duration: const Duration(milliseconds: 800),
-    vsync: this,
-  );
-  _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-    CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ),
-  );
-  _animationController.forward();
-}
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
+    _animationController.forward();
+  }
 
 // Add this method to check dialog flags
-Future<void> _checkDialogFlags() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Check if we need to reset the weekly dialog flag
-    bool hasShownDialogThisWeek = prefs.getBool('has_shown_dialog_this_week') ?? false;
-    
-    // If a new week has started, reset the flag
-    if (hasActiveSubgoal && DateTime.now().isAfter(subgoalEndDate)) {
-      await prefs.setBool('has_shown_dialog_this_week', false);
-      print("Reset dialog flag for new week");
+  Future<void> _checkDialogFlags() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Check if we need to reset the weekly dialog flag
+      bool hasShownDialogThisWeek =
+          prefs.getBool('has_shown_dialog_this_week') ?? false;
+
+      // If a new week has started, reset the flag
+      if (hasActiveSubgoal && DateTime.now().isAfter(subgoalEndDate)) {
+        await prefs.setBool('has_shown_dialog_this_week', false);
+        print("Reset dialog flag for new week");
+      }
+    } catch (e) {
+      print("Error checking dialog flags: $e");
     }
-  } catch (e) {
-    print("Error checking dialog flags: $e");
   }
-}
 
   @override
   void didChangeDependencies() {
@@ -1666,9 +1785,9 @@ Future<void> _checkDialogFlags() async {
       switch (subgoalType) {
         case "distance":
           // Calculate progress using weekly averages
-          if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
-            progressPercent = (currentWeekAvgDistance - baselineDistance) /
-                (subgoalTargetValue - baselineDistance);
+          if (referenceDistance > 0 && subgoalTargetValue > referenceDistance) {
+            progressPercent = (currentWeekAvgDistance - referenceDistance) /
+                (subgoalTargetValue - referenceDistance);
 
             if (progressPercent < 0) progressPercent = 0;
             if (progressPercent > 1) progressPercent = 1;
@@ -1677,14 +1796,14 @@ Future<void> _checkDialogFlags() async {
           }
 
           currentValueText = "${currentWeekAvgDistance.toStringAsFixed(1)} km";
-          baselineValueText = "${baselineDistance.toStringAsFixed(1)} km";
+          baselineValueText = "${referenceDistance.toStringAsFixed(1)} km";
           targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} km";
           break;
 
         case "pace":
-          if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
-            progressPercent = (baselinePace - currentWeekAvgPace) /
-                (baselinePace - subgoalTargetValue);
+          if (referencePace > 0 && referencePace > subgoalTargetValue) {
+            progressPercent = (referencePace - currentWeekAvgPace) /
+                (referencePace - subgoalTargetValue);
 
             if (progressPercent < 0) progressPercent = 0;
             if (progressPercent > 1) progressPercent = 1;
@@ -1693,14 +1812,14 @@ Future<void> _checkDialogFlags() async {
           }
 
           currentValueText = "${currentWeekAvgPace.toStringAsFixed(1)} min/km";
-          baselineValueText = "${baselinePace.toStringAsFixed(1)} min/km";
+          baselineValueText = "${referencePace.toStringAsFixed(1)} min/km";
           targetValueText = "${subgoalTargetValue.toStringAsFixed(1)} min/km";
           break;
 
         case "duration":
-          if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
-            progressPercent = (currentWeekAvgDuration - baselineDuration) /
-                (subgoalTargetValue - baselineDuration);
+          if (referenceDuration > 0 && subgoalTargetValue > referenceDuration) {
+            progressPercent = (currentWeekAvgDuration - referenceDuration) /
+                (subgoalTargetValue - referenceDuration);
 
             if (progressPercent < 0) progressPercent = 0;
             if (progressPercent > 1) progressPercent = 1;
@@ -1709,7 +1828,7 @@ Future<void> _checkDialogFlags() async {
           }
 
           currentValueText = "${currentWeekAvgDuration.toStringAsFixed(0)} min";
-          baselineValueText = "${baselineDuration.toStringAsFixed(0)} min";
+          baselineValueText = "${referenceDuration.toStringAsFixed(0)} min";
           targetValueText = "${subgoalTargetValue.toStringAsFixed(0)} min";
           break;
 
@@ -2009,9 +2128,14 @@ Future<void> _checkDialogFlags() async {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "Avg Last Week",
+                                usingPreviousGoal
+                                    ? "Previous Goal"
+                                    : "Avg Last Week",
                                 style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
+                                    fontSize: 11,
+                                    color: usingPreviousGoal
+                                        ? Colors.purple[600]
+                                        : Colors.grey[600]),
                               ),
                               SizedBox(height: 2),
                               Row(
@@ -2020,7 +2144,9 @@ Future<void> _checkDialogFlags() async {
                                     width: 8,
                                     height: 8,
                                     decoration: BoxDecoration(
-                                      color: Colors.grey[400],
+                                      color: usingPreviousGoal
+                                          ? Colors.purple[400]
+                                          : Colors.grey[400],
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -2030,7 +2156,9 @@ Future<void> _checkDialogFlags() async {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
+                                      color: usingPreviousGoal
+                                          ? Colors.purple[700]
+                                          : Colors.grey[700],
                                     ),
                                   ),
                                 ],
@@ -3624,152 +3752,166 @@ Future<void> _checkDialogFlags() async {
         return 'assets/leisure.png';
     }
   }
-Future<void> _checkSubgoalCompletionStatus() async {
-  if (!hasActiveSubgoal) return;
 
-  // Get the current date
-  DateTime now = DateTime.now();
-  
-  // Check if we're at the end of the subgoal period
-  bool isSubgoalEnded = now.isAfter(subgoalEndDate) || now.isAtSameMomentAs(subgoalEndDate);
-  
-  // Calculate current progress
-  double progressPercent = 0.0;
-  
-  // Get the relevant weekly data
-  Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
-  if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
-    progressPercent = currentWeekData['subgoalProgress'];
-  } else {
-    // Calculate progress based on subgoal type if not available in weekly data
-    switch (subgoalType) {
-      case "distance":
-        double currentAvgDistance = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDistance / _weeklyActivities.length;
-        if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
-          progressPercent = (currentAvgDistance - baselineDistance) /
-              (subgoalTargetValue - baselineDistance);
-        }
-        break;
-      case "pace":
-        double currentAvgPace = 0.0;
-        if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
-          currentAvgPace = _totalWeeklyDuration / _totalWeeklyDistance;
-          if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
-            progressPercent = (baselinePace - currentAvgPace) /
-                (baselinePace - subgoalTargetValue);
+  Future<void> _checkSubgoalCompletionStatus() async {
+    if (!hasActiveSubgoal) return;
+
+    // Get the current date
+    DateTime now = DateTime.now();
+
+    // Check if we're at the end of the subgoal period
+    bool isSubgoalEnded =
+        now.isAfter(subgoalEndDate) || now.isAtSameMomentAs(subgoalEndDate);
+
+    // Calculate current progress
+    double progressPercent = 0.0;
+
+    // Get the relevant weekly data
+    Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
+    if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
+      progressPercent = currentWeekData['subgoalProgress'];
+    } else {
+      // Calculate progress based on subgoal type if not available in weekly data
+      switch (subgoalType) {
+        case "distance":
+          double currentAvgDistance = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDistance / _weeklyActivities.length;
+          if (baselineDistance > 0 && subgoalTargetValue > baselineDistance) {
+            progressPercent = (currentAvgDistance - baselineDistance) /
+                (subgoalTargetValue - baselineDistance);
           }
-        }
-        break;
-      case "duration":
-        double currentAvgDuration = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDuration / _weeklyActivities.length;
-        if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
-          progressPercent = (currentAvgDuration - baselineDuration) /
-              (subgoalTargetValue - baselineDuration);
-        }
-        break;
-      case "maintain":
-        // For maintenance goals, we consider it complete if they've done at least 3 activities
-        progressPercent = _weeklyActivities.length >= 3 ? 1.0 : _weeklyActivities.length / 3.0;
-        break;
+          break;
+        case "pace":
+          double currentAvgPace = 0.0;
+          if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+            currentAvgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+            if (baselinePace > 0 && baselinePace > subgoalTargetValue) {
+              progressPercent = (baselinePace - currentAvgPace) /
+                  (baselinePace - subgoalTargetValue);
+            }
+          }
+          break;
+        case "duration":
+          double currentAvgDuration = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDuration / _weeklyActivities.length;
+          if (baselineDuration > 0 && subgoalTargetValue > baselineDuration) {
+            progressPercent = (currentAvgDuration - baselineDuration) /
+                (subgoalTargetValue - baselineDuration);
+          }
+          break;
+        case "maintain":
+          // For maintenance goals, we consider it complete if they've done at least 3 activities
+          progressPercent = _weeklyActivities.length >= 3
+              ? 1.0
+              : _weeklyActivities.length / 3.0;
+          break;
+      }
+    }
+
+    progressPercent = progressPercent.clamp(0.0, 1.0);
+    bool isSubgoalCompleted = progressPercent >= 1.0;
+
+    // Get SharedPreferences to check if we've already shown dialogs
+    final prefs = await SharedPreferences.getInstance();
+    String? lastCompletedSubgoalId =
+        prefs.getString('last_completed_subgoal_id');
+    bool hasShownDialogThisWeek =
+        prefs.getBool('has_shown_dialog_this_week') ?? false;
+
+    // Fetch current active subgoal ID
+    String currentSubgoalId = '';
+    try {
+      QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .where('completedSuccessfully', isEqualTo: false)
+          .limit(1)
+          .get();
+
+      if (subgoalQuery.docs.isNotEmpty) {
+        currentSubgoalId = subgoalQuery.docs.first.id;
+      }
+    } catch (e) {
+      print("Error fetching subgoal ID: $e");
+    }
+
+    // Check if this is a new week (to reset the dialog shown flag)
+    if (isSubgoalEnded) {
+      // Week has ended, reset the dialog flag so it can show again next week
+      await prefs.setBool('has_shown_dialog_this_week', false);
+    }
+
+    // Check if we need to show a dialog (either completed or ended)
+    if (!hasShownDialogThisWeek &&
+        (isSubgoalCompleted || isSubgoalEnded) &&
+        lastCompletedSubgoalId != currentSubgoalId) {
+      // Deactivate current subgoal if needed
+      if (isSubgoalEnded || isSubgoalCompleted) {
+        await _deactivateCurrentSubgoal();
+      }
+
+      // Show the appropriate dialog
+      if (isSubgoalCompleted) {
+        _showSubgoalCompletionDialog();
+      } else if (isSubgoalEnded) {
+        _showSubgoalEndedDialog();
+      }
+
+      // Set flags to prevent showing dialog again
+      await prefs.setString('last_completed_subgoal_id', currentSubgoalId);
+      await prefs.setBool('has_shown_dialog_this_week', true);
+
+      // Signal the recommendation page to show new subgoal options, but only
+      // if the week has ended or the user failed
+      if (isSubgoalEnded || (isSubgoalEnded && !isSubgoalCompleted)) {
+        await prefs.setBool('show_subgoal_selection', true);
+      }
     }
   }
-  
-  progressPercent = progressPercent.clamp(0.0, 1.0);
-  bool isSubgoalCompleted = progressPercent >= 1.0;
-  
-  // Get SharedPreferences to check if we've already shown dialogs
-  final prefs = await SharedPreferences.getInstance();
-  String? lastCompletedSubgoalId = prefs.getString('last_completed_subgoal_id');
-  bool hasShownDialogThisWeek = prefs.getBool('has_shown_dialog_this_week') ?? false;
-  
-  // Fetch current active subgoal ID
-  String currentSubgoalId = '';
-  try {
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-        .where('isActive', isEqualTo: true)
-        .limit(1)
-        .get();
-    
-    if (subgoalQuery.docs.isNotEmpty) {
-      currentSubgoalId = subgoalQuery.docs.first.id;
-    }
-  } catch (e) {
-    print("Error fetching subgoal ID: $e");
-  }
-  
-  // Check if this is a new week (to reset the dialog shown flag)
-  if (isSubgoalEnded) {
-    // Week has ended, reset the dialog flag so it can show again next week
-    await prefs.setBool('has_shown_dialog_this_week', false);
-  }
-  
-  // Check if we need to show a dialog (either completed or ended)
-  if (!hasShownDialogThisWeek && 
-      (isSubgoalCompleted || isSubgoalEnded) && 
-      lastCompletedSubgoalId != currentSubgoalId) {
-    
-    // Deactivate current subgoal if needed
-    if (isSubgoalEnded || isSubgoalCompleted) {
-      await _deactivateCurrentSubgoal();
-    }
-    
-    // Show the appropriate dialog
-    if (isSubgoalCompleted) {
-      _showSubgoalCompletionDialog();
-    } else if (isSubgoalEnded) {
-      _showSubgoalEndedDialog();
-    }
-    
-    // Set flags to prevent showing dialog again
-    await prefs.setString('last_completed_subgoal_id', currentSubgoalId);
-    await prefs.setBool('has_shown_dialog_this_week', true);
-    
-    // Signal the recommendation page to show new subgoal options, but only
-    // if the week has ended or the user failed
-    if (isSubgoalEnded || (isSubgoalEnded && !isSubgoalCompleted)) {
-      await prefs.setBool('show_subgoal_selection', true);
-    }
-  }
-}
-// Method to deactivate the current subgoal
+
 // Method to deactivate the current subgoal
 Future<void> _deactivateCurrentSubgoal() async {
   try {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    
+
     QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
         .collection('cycling_subgoals')
         .where('userId', isEqualTo: uid)
-        .where('isActive', isEqualTo: true)
+        .where('completedSuccessfully', isEqualTo: false)
         .get();
-    
+
     for (var doc in subgoalQuery.docs) {
+      // Determine if the subgoal was completed successfully based on progress
+      bool wasCompleted = false;
+      
+      // Get the current week data which contains the progress information
+      Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
+      if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
+        double progress = currentWeekData['subgoalProgress'];
+        wasCompleted = progress >= 1.0;
+      }
+
       await FirebaseFirestore.instance
           .collection('cycling_subgoals')
           .doc(doc.id)
           .update({
-            'isActive': false,
-            'endedAt': FieldValue.serverTimestamp(),
-            'completedSuccessfully': DateTime.now().isBefore(subgoalEndDate), // Track if completed before end date
-          });
-      
-      print("Deactivated subgoal: ${doc.id}");
+        'completedSuccessfully': wasCompleted, // Use the actual completion status
+      });
+
+      print("Deactivated subgoal: ${doc.id} (Completed successfully: $wasCompleted)");
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     // Only set show_subgoal_selection to true if the week has ended
-    if (DateTime.now().isAfter(subgoalEndDate) || DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
+    if (DateTime.now().isAfter(subgoalEndDate) ||
+        DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
       await prefs.setBool('show_subgoal_selection', true);
       print("Set show_subgoal_selection flag to true");
     }
-    
+
     setState(() {
       hasActiveSubgoal = false;
     });
@@ -3777,366 +3919,371 @@ Future<void> _deactivateCurrentSubgoal() async {
     print("Error deactivating subgoal: $e");
   }
 }
-void _showSubgoalCompletionDialog() {
-  // Check if current time is before the end of the week
-  bool isBeforeWeekEnd = DateTime.now().isBefore(subgoalEndDate);
-  
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Success icon
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green[700],
-                  size: 64,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Heading
-              Text(
-                "Goal Achieved!",
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 22,
-                  color: Colors.green[700],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Description
-              Text(
-                "Congratulations! You've successfully completed your cycling goal. Keep up the great work!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  color: primaryBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Subgoal details
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _getSubgoalTypeTitle(),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: primaryBlack,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getSubgoalDescription(),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        color: primaryGray,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Show info about waiting until end of week
-              if (isBeforeWeekEnd) ...[
-                const SizedBox(height: 16),
+
+  void _showSubgoalCompletionDialog() {
+    // Check if current time is before the end of the week
+    bool isBeforeWeekEnd = DateTime.now().isBefore(subgoalEndDate);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success icon
                 Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green[700],
+                    size: 64,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Heading
+                Text(
+                  "Goal Achieved!",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: Colors.green[700],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Description
+                Text(
+                  "Congratulations! You've successfully completed your cycling goal. Keep up the great work!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    color: primaryBlack,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Subgoal details
+                Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: Colors.grey[50],
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue[300]!, width: 1),
+                    border: Border.all(color: Colors.grey[300]!, width: 1),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.blue[700],
-                        size: 20,
+                      Text(
+                        _getSubgoalTypeTitle(),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: primaryBlack,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "You'll be able to set new goals after this week ends on ${DateFormat('MMM d').format(subgoalEndDate)}.",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 13,
-                            color: Colors.blue[800],
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getSubgoalDescription(),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          color: primaryGray,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 24),
-              // Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        "Close",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          color: primaryGray,
-                        ),
-                      ),
+                // Show info about waiting until end of week
+                if (isBeforeWeekEnd) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue[300]!, width: 1),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: isBeforeWeekEnd 
-                        ? null // Disable button if before week end
-                        : () {
-                            Navigator.of(context).pop();
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => RecommendationPage()),
-                            );
-                          },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryOrange,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue[700],
+                          size: 20,
                         ),
-                        // Apply disabled styling when before week end
-                        disabledBackgroundColor: Colors.grey[400],
-                        disabledForegroundColor: Colors.white70,
-                      ),
-                      child: const Text(
-                        "New Goals",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          color: Colors.white,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "You'll be able to set new goals after this week ends on ${DateFormat('MMM d').format(subgoalEndDate)}.",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: Colors.blue[800],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-void _showSubgoalEndedDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Info icon
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.info_outline,
-                  color: Colors.orange[700],
-                  size: 64,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Heading
-              Text(
-                "Time's Up!",
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 22,
-                  color: Colors.orange[700],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Description
-              Text(
-                "Your cycling goal period has ended. While you didn't reach 100%, you still made progress! Ready to set a new goal?",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  color: primaryBlack,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Subgoal details
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 24),
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _getSubgoalTypeTitle(),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: primaryBlack,
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          "Close",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: primaryGray,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getSubgoalDescription(),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        color: primaryGray,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isBeforeWeekEnd
+                            ? null // Disable button if before week end
+                            : () {
+                                Navigator.of(context).pop();
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          RecommendationPage()),
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryOrange,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          // Apply disabled styling when before week end
+                          disabledBackgroundColor: Colors.grey[400],
+                          disabledForegroundColor: Colors.white70,
+                        ),
+                        child: const Text(
+                          "New Goals",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              // Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        "Close",
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSubgoalEndedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Info icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.info_outline,
+                    color: Colors.orange[700],
+                    size: 64,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Heading
+                Text(
+                  "Time's Up!",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 22,
+                    color: Colors.orange[700],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Description
+                Text(
+                  "Your cycling goal period has ended. While you didn't reach 100%, you still made progress! Ready to set a new goal?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    color: primaryBlack,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Subgoal details
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getSubgoalTypeTitle(),
                         style: TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 16,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: primaryBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getSubgoalDescription(),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
                           color: primaryGray,
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => RecommendationPage()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryOrange,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(height: 24),
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          "Close",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: primaryGray,
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        "New Goals",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          color: Colors.white,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => RecommendationPage()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryOrange,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          "New Goals",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
 // Helper methods to get descriptions for dialogs
-String _getSubgoalTypeTitle() {
-  switch (subgoalType) {
-    case "distance":
-      return "Distance Goal";
-    case "pace":
-      return "Pace Goal";
-    case "duration":
-      return "Duration Goal";
-    case "maintain":
-      return "Maintenance Goal";
-    default:
-      return "Cycling Goal";
+  String _getSubgoalTypeTitle() {
+    switch (subgoalType) {
+      case "distance":
+        return "Distance Goal";
+      case "pace":
+        return "Pace Goal";
+      case "duration":
+        return "Duration Goal";
+      case "maintain":
+        return "Maintenance Goal";
+      default:
+        return "Cycling Goal";
+    }
   }
-}
 
-String _getSubgoalDescription() {
-  switch (subgoalType) {
-    case "distance":
-      return "Average ${subgoalTargetValue.toStringAsFixed(1)} km per ride";
-    case "pace":
-      return "Average pace of ${subgoalTargetValue.toStringAsFixed(1)} min/km";
-    case "duration":
-      return "Average ${subgoalTargetValue.toStringAsFixed(0)} minutes per ride";
-    case "maintain":
-      return "Maintain consistent cycling performance";
-    default:
-      return "Complete cycling activities regularly";
+  String _getSubgoalDescription() {
+    switch (subgoalType) {
+      case "distance":
+        return "Average ${subgoalTargetValue.toStringAsFixed(1)} km per ride";
+      case "pace":
+        return "Average pace of ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+      case "duration":
+        return "Average ${subgoalTargetValue.toStringAsFixed(0)} minutes per ride";
+      case "maintain":
+        return "Maintain consistent cycling performance";
+      default:
+        return "Complete cycling activities regularly";
+    }
   }
-}
+
   Widget _buildFirstActivityPrompt() {
     final goalType = userGoal!['goalType'] ?? 'Cycling';
 
