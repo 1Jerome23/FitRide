@@ -1643,28 +1643,87 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
     double lunchProtein = safeParseDouble(latestFoodEntry['lunch_protein'].toString());
     double dinnerProtein = safeParseDouble(latestFoodEntry['dinner_protein'].toString());
   
+    // Calculate macronutrient percentages if calories > 0
+    double carbPercent = totalCalories > 0 ? (totalCarbs * 4 / totalCalories) * 100 : 0;
+    double fatPercent = totalCalories > 0 ? (totalFat * 9 / totalCalories) * 100 : 0;
+    double proteinPercent = totalCalories > 0 ? (totalProtein * 4 / totalCalories) * 100 : 0;
 
+    // Get BMR directly from user input
     double bmr = safeParseDouble(basalMetabolicRate);
-    double activityFactor = 1.2;
+    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+    double dailyCaloriesBurned = weeklyCaloriesBurned / 7.0;
+    
+    // Calculate total daily calorie needs based on BMR and actual calories burned
+    double dailyCalorieNeeds = bmr + dailyCaloriesBurned;
+    double weightInKg = safeParseDouble(weight);
+    double bodyFatPercentage = safeParseDouble(bodyFat);
+
+    // Calculate recommended protein needs based on weight, body fat and training type
+    double leanBodyMass = weightInKg * (1 - (bodyFatPercentage / 100));
+    double recommendedProteinGrams = 0;
+    
     if (goalType == "Leisure") {
-      activityFactor = 1.375;
+      recommendedProteinGrams = leanBodyMass * 1.6; // 1.6g per kg LBM for recreational
     } else if (goalType == "Endurance") {
-      activityFactor = 1.55;
+      recommendedProteinGrams = leanBodyMass * 1.8; // 1.8g per kg LBM for endurance
     } else if (goalType == "High Intensity Cycling") {
-      activityFactor = 1.725;
+      recommendedProteinGrams = leanBodyMass * 2.0; // 2.0g per kg LBM for high intensity
+    } else {
+      recommendedProteinGrams = leanBodyMass * 1.6; // Default
     }
 
-    double dailyCalorieNeeds = bmr * activityFactor;
+    // If body fat percentage is unavailable, fall back to total body weight
+    if (bodyFatPercentage <= 0) {
+      if (goalType == "Leisure") {
+        recommendedProteinGrams = weightInKg * 1.2; // 1.2g per kg for recreational
+      } else if (goalType == "Endurance") {
+        recommendedProteinGrams = weightInKg * 1.4; // 1.4g per kg for endurance
+      } else if (goalType == "High Intensity Cycling") {
+        recommendedProteinGrams = weightInKg * 1.6; // 1.6g per kg for high intensity
+      } else {
+        recommendedProteinGrams = weightInKg * 1.2; // Default
+      }
+    }
 
-    if (totalCalories < dailyCalorieNeeds * 0.7) {
+    // Determine recommended carbs based on training volume and intensity
+    double recommendedCarbPercent = 0;
+    if (goalType == "Leisure") {
+      recommendedCarbPercent = 45; // 45% for recreational
+    } else if (goalType == "Endurance") {
+      // Scale carb needs based on actual cycling volume
+      if (weeklyDistanceTotal > 100) {
+        recommendedCarbPercent = 65; // 65% for high volume endurance
+      } else if (weeklyDistanceTotal > 50) {
+        recommendedCarbPercent = 60; // 60% for moderate volume endurance
+      } else {
+        recommendedCarbPercent = 55; // 55% for lower volume endurance
+      }
+    } else if (goalType == "High Intensity Cycling") {
+      recommendedCarbPercent = 55; // 55% for high intensity
+    } else {
+      recommendedCarbPercent = 50; // Default
+    }
+    
+    // Calculate recommended carb grams based on percentage of calories
+    double recommendedCarbGrams = (recommendedCarbPercent / 100) * dailyCalorieNeeds / 4;
+
+    // Determine recommended fat based on the remaining calories
+    double recommendedFatPercent = 100 - recommendedCarbPercent - (recommendedProteinGrams * 4 * 100 / dailyCalorieNeeds);
+    // Ensure fat doesn't go below 20% for hormonal health
+    recommendedFatPercent = math.max(20, recommendedFatPercent);
+    double recommendedFatGrams = (recommendedFatPercent / 100) * dailyCalorieNeeds / 9;
+
+    // Calorie recommendations based on actual cycling data and body composition
+    if (totalCalories < dailyCalorieNeeds * 0.8) {
       nutritionRecommendations.add(
-          "Your calorie intake is significantly below your estimated needs (${dailyCalorieNeeds.toInt()} kcal). Consider increasing your intake for optimal performance.");
+          "Based on your ${bmr.toInt()} kcal BMR and ${dailyCaloriesBurned.toInt()} kcal average daily burn from cycling, your intake of ${totalCalories.toInt()} kcal is too low. Consider increasing to ${dailyCalorieNeeds.toInt()} kcal for optimal recovery and performance.");
     } else if (totalCalories > dailyCalorieNeeds * 1.2 &&
         goalType == "High Intensity Cycling") {
       nutritionRecommendations.add(
-          "Your calorie intake exceeds your calculated needs by ${(totalCalories - dailyCalorieNeeds).toInt()} kcal. Adjust portion sizes to align with your weight management goals.");
+          "Your intake of ${totalCalories.toInt()} kcal exceeds your needs (${dailyCalorieNeeds.toInt()} kcal based on your BMR and cycling data) by ${(totalCalories - dailyCalorieNeeds).toInt()} kcal. Adjust portions to align with your weight goals while maintaining performance.");
     }
 
+    // Meal timing recommendations
     double breakfastPercent =
         totalCalories > 0 ? (breakfastCalories / totalCalories) * 100 : 0;
     double lunchPercent =
@@ -1674,43 +1733,130 @@ Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
 
     if (breakfastPercent < 20 && totalCalories > 0) {
       nutritionRecommendations.add(
-          "Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than recommended. Aim for 20-25% of daily calories at breakfast for sustained energy.");
+          "Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than optimal for cyclists. Aim for 20-25% of daily calories at breakfast to fuel morning training and jumpstart metabolism.");
     }
 
-    if (goalType == "Endurance") {
-      nutritionRecommendations.add(
-          "For endurance training, include a balanced lunch with lean protein, complex carbs, and healthy fats. Good options include whole grain sandwiches with lean protein, pasta with vegetables, or grain bowls.");
-      nutritionRecommendations.add(
-          "If cycling in the afternoon, have a lunch rich in complex carbs 2-3 hours before your ride, and include easily digestible foods.");
-    } else if (goalType == "High Intensity Cycling") {
-      nutritionRecommendations.add(
-          "For high-intensity training, your lunch should include quality protein (chicken, fish, tofu, legumes) paired with complex carbs and plenty of vegetables.");
-      nutritionRecommendations.add(
-          "If training within 2 hours after lunch, keep the meal lighter and focus on easily digestible carbs with moderate protein.");
-    } else if (goalType == "Leisure") {
-      nutritionRecommendations.add(
-          "For leisure cycling, focus on balanced lunches with colorful vegetables, lean proteins, and whole grains. This supports general health and provides steady energy for casual rides.");
-    }
-    if (goalType == "Endurance") {
-      nutritionRecommendations.add(
-          "For endurance training, focus on complex carbs (50-60% of calories) like whole grains, fruits, and starchy vegetables.");
-
-      if (activityData.isNotEmpty) {
+    // Macronutrient distribution recommendations based on actual training data
+    if (totalCalories > 0) {
+      // Protein recommendations based on lean body mass or weight
+      if (totalProtein < recommendedProteinGrams * 0.8) {
         nutritionRecommendations.add(
-            "For rides longer than 90 minutes, consume 30-60g carbs/hour during your ride.");
+            "Your protein intake (${totalProtein.toInt()}g) is below the recommended ${recommendedProteinGrams.toInt()}g for your ${bodyFatPercentage > 0 ? "lean body mass" : "body weight"} and training intensity. Increase protein through foods like chicken, fish, eggs, dairy, tofu, or legumes for better recovery after your ${weeklyActivityCount} weekly rides.");
+      } else if (totalProtein > recommendedProteinGrams * 1.5) {
+        nutritionRecommendations.add(
+            "Your protein intake (${totalProtein.toInt()}g) significantly exceeds your needs. While generally safe, consider balancing your diet with more complex carbs to fuel your ${weeklyDistanceTotal.toInt()} km of weekly cycling.");
+      } else {
+        nutritionRecommendations.add(
+            "Your protein intake (${totalProtein.toInt()}g) aligns well with your needs. Continue consuming protein across all meals for optimal recovery from your ${weeklyActivityCount} weekly cycling sessions.");
+      }
+
+      // Carbohydrate recommendations based on actual training volume
+      if (carbPercent < (recommendedCarbPercent - 10)) {
+        nutritionRecommendations.add(
+            "Your carbohydrate intake (${carbPercent.toInt()}% of calories) is lower than optimal for your ${weeklyDistanceTotal.toInt()} km weekly cycling volume. Increase to ${recommendedCarbPercent.toInt()}% of calories (approximately ${recommendedCarbGrams.toInt()}g) to properly fuel rides and speed recovery.");
+      } else if (carbPercent > (recommendedCarbPercent + 10)) {
+        nutritionRecommendations.add(
+            "Your carbohydrate intake (${carbPercent.toInt()}% of calories) exceeds recommendations for your current training load. Focus on timing carbs around your rides and choosing complex carbs like whole grains, fruits, and vegetables for better energy management.");
+      } else {
+        nutritionRecommendations.add(
+            "Your carbohydrate intake (${carbPercent.toInt()}% of calories) is well-matched to your weekly cycling volume. Continue to time carbs before and during longer rides for optimal performance.");
+      }
+
+      // Fat recommendations
+      if (fatPercent < 20) {
+        nutritionRecommendations.add(
+            "Your fat intake (${fatPercent.toInt()}% of calories) is below the 20% minimum for hormone production and fat-soluble vitamin absorption. Include healthy fats like avocados, nuts, olive oil, and fatty fish even when focusing on weight management.");
+      } else if (fatPercent > 35 && goalType != "Leisure") {
+        nutritionRecommendations.add(
+            "Your fat intake (${fatPercent.toInt()}% of calories) is higher than optimal for your ${goalType} cycling. Consider shifting some calories to carbohydrates to better fuel your high-intensity or endurance sessions.");
+      } else {
+        nutritionRecommendations.add(
+            "Your fat intake (${fatPercent.toInt()}% of calories) is appropriate. Focus on unsaturated fats from plant sources and omega-3s from fish to support recovery and reduce inflammation from training.");
+      }
+    }
+
+    // Meal-specific macronutrient recommendations tied to training data
+    if (totalCalories > 0) {
+      // Breakfast macronutrient recommendations
+      if (breakfastProtein < (recommendedProteinGrams * 0.25) && breakfastCalories > 0) {
+        nutritionRecommendations.add(
+            "With only ${breakfastProtein.toInt()}g protein at breakfast, you're missing an opportunity for recovery. Aim for ${(recommendedProteinGrams * 0.25).toInt()}-${(recommendedProteinGrams * 0.33).toInt()}g protein at breakfast, especially important after morning rides.");
+      }
+
+      if (breakfastCarbs < 30 && goalType == "Endurance" && breakfastCalories > 0) {
+        nutritionRecommendations.add(
+            "Your breakfast carbohydrate intake (${breakfastCarbs.toInt()}g) is insufficient for your endurance training. Morning carbs replenish glycogen depleted overnight and prepare you for ${weeklyDistanceTotal / weeklyActivityCount} km average rides.");
+      }
+    }
+
+    // Training-specific nutrition guidance based on recorded activity data
+    if (goalType == "Endurance") {
+      nutritionRecommendations.add(
+          "For your endurance training (${weeklyDistanceTotal.toInt()} km weekly), prioritize nutrient timing: consume high-carb meals (60-100g) 2-3 hours before rides and recovery nutrition within 30 minutes after.");
+      
+      // Specific recommendations for longer rides
+      double longestRide = 0;
+      for (var activity in activityData) {
+        double distance = safeParseDouble(activity['distance']);
+        if (distance > longestRide) longestRide = distance;
+      }
+      
+      if (longestRide > 40) {
+        nutritionRecommendations.add(
+            "For your long rides (${longestRide.toInt()} km), consume 60-90g carbs/hour from multiple sources (sports drinks, gels, bananas) after the first hour to maintain performance and prevent bonking.");
       }
     } else if (goalType == "High Intensity Cycling") {
       nutritionRecommendations.add(
-          "For high-intensity training, include adequate protein (1.2-1.6g per kg of body weight) to support muscle recovery.");
-      nutritionRecommendations.add(
-          "Timing matters: consume carbs and protein within 30 minutes after intense sessions.");
-    } else if (goalType == "Leisure") {
-      nutritionRecommendations.add(
-          "For leisure cycling, maintain balanced nutrition with plenty of fruits and vegetables (5+ servings/day).");
+          "For high-intensity cycling, your protein needs are higher (${recommendedProteinGrams.toInt()}g daily based on your body composition). This supports recovery from your ${weeklyActivityCount} high-intensity sessions.");
+      
+      // Calculate average intensity from heart rate data
+      double avgHeartRate = 0;
+      int hrDataPoints = 0;
+      for (var activity in activityData) {
+        double hr = safeParseDouble(activity['average_heartrate']);
+        if (hr > 0) {
+          avgHeartRate += hr;
+          hrDataPoints++;
+        }
+      }
+      if (hrDataPoints > 0) {
+        avgHeartRate /= hrDataPoints;
+        nutritionRecommendations.add(
+            "Your average heart rate of ${avgHeartRate.toInt()} bpm during rides indicates high-intensity work. Prioritize recovery nutrition with a 3:1 carb-to-protein ratio within 30 minutes post-ride to replenish glycogen and initiate muscle repair.");
+      }
     }
 
-    nutritionRecommendations.add(
-        "Remember to stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
+    // Weight management recommendations based on body composition data
+    if (latestWeight > 0 && previousWeight > 0) {
+      double weightChange = latestWeight - previousWeight;
+      if (goalType == "High Intensity Cycling" && weightChange > 0.5) {
+        nutritionRecommendations.add(
+            "Your recent ${weightChange.toStringAsFixed(1)} kg weight increase may impact power-to-weight ratio. Consider adjusting portion sizes while maintaining nutrient quality to support your high-intensity training goals.");
+      } else if (goalType == "Endurance" && weightChange < -1.0) {
+        nutritionRecommendations.add(
+            "Your ${(-weightChange).toStringAsFixed(1)} kg weight loss, if continued, may compromise endurance performance. Ensure adequate fueling with ${recommendedCarbGrams.toInt()}g carbs daily to sustain your ${weeklyDistanceTotal.toInt()} km weekly training load.");
+      }
+    }
+
+    // Hydration advice based on actual training data
+    double avgRideTime = 0;
+    int timeDataPoints = 0;
+    for (var activity in activityData) {
+      double time = safeParseDouble(activity['elapsed_time']) / 60; // convert to minutes
+      if (time > 0) {
+        avgRideTime += time;
+        timeDataPoints++;
+      }
+    }
+    if (timeDataPoints > 0) {
+      avgRideTime /= timeDataPoints;
+      double recommendedFluidPerRide = (avgRideTime / 60) * 750; // 750ml per hour
+      nutritionRecommendations.add(
+          "For your average ${avgRideTime.toInt()}-minute rides, consume approximately ${recommendedFluidPerRide.toInt()} ml of fluid. Stay hydrated with 2-3 liters of water daily plus electrolytes when training in hot conditions.");
+    } else {
+      nutritionRecommendations.add(
+          "Stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
+    }
   }
 
   void _saveCyclingSubgoalToFirestore(String type, double targetValue,
