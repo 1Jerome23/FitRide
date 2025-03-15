@@ -118,6 +118,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   double _totalWeeklyDuration = 0;
   double _totalWeeklyDistance = 0;
   Set<String> _uniqueDays = {};
+  int? daysPerWeek;
 
   double _currentUserWeight = 0;
   double targetWeight = 0;
@@ -658,6 +659,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     _currentWeekNumber = 1;
     _weekStartDate = DateTime.now();
     _weekEndDate = DateTime.now().add(Duration(days: 7));
+    _fetchSubgoalDetails();
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 5));
 
@@ -1601,24 +1603,26 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     return weekNumber + 1;
   }
 
-  Widget _buildActiveSubgoalCard() {
-    if (!hasActiveSubgoal) return SizedBox.shrink();
+Widget _buildActiveSubgoalCard() {
+  if (!hasActiveSubgoal) return SizedBox.shrink();
 
-    // Calculate days remaining
-    int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
-    if (daysRemaining < 0) daysRemaining = 0;
+  // Calculate days remaining
+  int daysRemaining = subgoalEndDate.difference(DateTime.now()).inDays;
+  if (daysRemaining < 0) daysRemaining = 0;
 
-    // Calculate progress based on weekly averages and current activity data
-    double progressPercent = 0.0;
-    String currentValueText = "";
-    String targetValueText = "";
-    String baselineValueText = "";
+  // Calculate progress based on weekly averages and current activity data
+  double progressPercent = 0.0;
+  String currentValueText = "";
+  String targetValueText = "";
+  String baselineValueText = "";
 
-    // Calculate current week's performance metrics
-    double currentWeekAvgDistance = 0.0;
-    double currentWeekAvgPace = 0.0;
-    double currentWeekAvgDuration = 0.0;
+  // Define variables for current week's performance metrics
+  double currentWeekAvgDistance = 0.0;
+  double currentWeekAvgPace = 0.0;
+  double currentWeekAvgDuration = 0.0;
 
+  // This function will be called when activities are loaded
+  void calculateProgress() {
     if (_weeklyActivities.isNotEmpty) {
       double totalDistance = 0.0;
       double totalDuration = 0.0;
@@ -1660,14 +1664,24 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         }
       }
 
-      // Calculate averages
-      if (_weeklyActivities.isNotEmpty) {
-        currentWeekAvgDistance = totalDistance / _weeklyActivities.length;
-        currentWeekAvgDuration = totalDuration / _weeklyActivities.length;
+      // Calculate proper averages based on daysPerWeek
+      int targetActivitiesPerWeek = daysPerWeek ?? 1; // Default to 1 if not set
+      
+      // The issue is in the calculations - we need per-workout averages, not weekly totals
+      // If user cycled 2 times (15km + 18km = 33km) with daysPerWeek = 3
+      // Current average should be 33/2 = 16.5km per workout (actual average)
+      
+      // First calculate actual averages based on completed activities
+      double actualAvgDistance = _weeklyActivities.isEmpty ? 0 : totalDistance / _weeklyActivities.length;
+      double actualAvgDuration = _weeklyActivities.isEmpty ? 0 : totalDuration / _weeklyActivities.length;
+      
+      // Use the actual averages for progress calculation
+      currentWeekAvgDistance = actualAvgDistance;
+      currentWeekAvgDuration = actualAvgDuration;
 
-        if (paces.isNotEmpty) {
-          currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
-        }
+      // For pace, calculate the true average pace across actual activities
+      if (paces.isNotEmpty) {
+        currentWeekAvgPace = paces.reduce((a, b) => a + b) / paces.length;
       }
     }
 
@@ -1730,499 +1744,542 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         targetValueText = "";
         break;
     }
+  }
 
-    // Get goal title
-    String goalTitle = "";
+  // Call the calculate function with the current data
+  calculateProgress();
 
-    switch (subgoalType) {
-      case "distance":
-        goalTitle =
-            "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
-        break;
-      case "pace":
-        goalTitle =
-            "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
-        break;
-      case "duration":
-        goalTitle =
-            "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
-        break;
-      case "maintain":
-        goalTitle = "Maintain current cycling performance";
-        break;
-    }
+  // Get goal title
+  String goalTitle = "";
 
-    Color progressColor =
-        progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
+  switch (subgoalType) {
+    case "distance":
+      goalTitle =
+          "Increase weekly average distance to ${subgoalTargetValue.toStringAsFixed(1)} km";
+      break;
+    case "pace":
+      goalTitle =
+          "Improve weekly average pace to ${subgoalTargetValue.toStringAsFixed(1)} min/km";
+      break;
+    case "duration":
+      goalTitle =
+          "Extend weekly average duration to ${subgoalTargetValue.toStringAsFixed(0)} minutes";
+      break;
+    case "maintain":
+      goalTitle = "Maintain current cycling performance";
+      break;
+  }
 
-    return Container(
-      margin: EdgeInsets.only(top: 20, bottom: 20),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "This Week's Cycling Goal",
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 18,
-                  color: Colors.orangeAccent,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(2, 2),
-                      blurRadius: 6.0,
-                      color: Colors.orange.withOpacity(0.3),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.orange[300]!, width: 1),
-                ),
-                child: Text(
-                  "$daysRemaining days left",
-                  style: TextStyle(
-                    fontFamily: 'Lato',
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange[700],
+  Color progressColor =
+      progressPercent >= 1.0 ? Colors.green[500]! : Colors.orange[500]!;
+
+  return Container(
+    margin: EdgeInsets.only(top: 20, bottom: 20),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.1),
+          spreadRadius: 2,
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "This Week's Cycling Goal",
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 18,
+                color: Colors.orangeAccent,
+                shadows: [
+                  Shadow(
+                    offset: Offset(2, 2),
+                    blurRadius: 6.0,
+                    color: Colors.orange.withOpacity(0.3),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-          SizedBox(height: 12),
-
-          Text(
-            goalTitle,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
             ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[300]!, width: 1),
+              ),
+              child: Text(
+                "$daysRemaining days left",
+                style: TextStyle(
+                  fontFamily: 'Lato',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+
+        Text(
+          goalTitle,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
+        ),
 
-          SizedBox(height: 16),
+        SizedBox(height: 16),
 
-          // Progress visualization with baseline included
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (subgoalType != "maintain") ...[
-                // Progress indicators layout
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Progress status text with percentage
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Progress",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
+        // Progress visualization with baseline included
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subgoalType != "maintain") ...[
+              // Progress indicators layout
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Progress status text with percentage
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Progress",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: progressPercent >= 1.0
-                                  ? Colors.green[50]
-                                  : progressPercent >= 0.5
-                                      ? Colors.orange[50]
-                                      : Colors.blue[50],
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: progressPercent >= 1.0
-                                      ? Colors.green[300]!
-                                      : progressPercent >= 0.5
-                                          ? Colors.orange[300]!
-                                          : Colors.blue[300]!,
-                                  width: 1),
-                            ),
-                            child: Text(
-                              "${(progressPercent * 100).toInt()}%",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: progressPercent >= 1.0
+                                ? Colors.green[50]
+                                : progressPercent >= 0.5
+                                    ? Colors.orange[50]
+                                    : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
                                 color: progressPercent >= 1.0
-                                    ? Colors.green[700]
+                                    ? Colors.green[300]!
                                     : progressPercent >= 0.5
-                                        ? Colors.orange[700]
-                                        : Colors.blue[700],
-                              ),
+                                        ? Colors.orange[300]!
+                                        : Colors.blue[300]!,
+                                width: 1),
+                          ),
+                          child: Text(
+                            "${(progressPercent * 100).toInt()}%",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: progressPercent >= 1.0
+                                  ? Colors.green[700]
+                                  : progressPercent >= 0.5
+                                      ? Colors.orange[700]
+                                      : Colors.blue[700],
                             ),
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
 
-                      // Enhanced animated progress bar
-                      Stack(
-                        children: [
-                          // Markers for baseline and target
-                          Container(
-                            height: 12,
-                            width: double.infinity,
-                            child: CustomPaint(
-                              painter: ProgressMarkerPainter(
-                                baselinePosition: 0.0,
-                                targetPosition: 1.0,
-                                containerWidth:
-                                    MediaQuery.of(context).size.width -
-                                        80, // Adjust based on your padding
-                              ),
+                    // Enhanced animated progress bar
+                    Stack(
+                      children: [
+                        // Markers for baseline and target
+                        Container(
+                          height: 12,
+                          width: double.infinity,
+                          child: CustomPaint(
+                            painter: ProgressMarkerPainter(
+                              baselinePosition: 0.0,
+                              targetPosition: 1.0,
+                              containerWidth:
+                                  MediaQuery.of(context).size.width -
+                                      80, // Adjust based on your padding
                             ),
                           ),
+                        ),
 
-                          // Background track
-                          Container(
-                            height: 12,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                        // Background track
+                        Container(
+                          height: 12,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(6),
                           ),
+                        ),
 
-                          // Animated progress fill
-                          TweenAnimationBuilder<double>(
-                              tween: Tween<double>(
-                                  begin: 0.0, end: progressPercent),
-                              duration: Duration(milliseconds: 1500),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, animatedProgress, child) {
-                                return Container(
-                                  height: 12,
-                                  width:
-                                      (MediaQuery.of(context).size.width - 64) *
-                                          animatedProgress,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: progressPercent >= 1.0
-                                          ? [
-                                              Colors.green[400]!,
-                                              Colors.green[600]!
-                                            ]
-                                          : progressPercent >= 0.5
-                                              ? [
-                                                  Colors.orange[300]!,
-                                                  Colors.orange[500]!
-                                                ]
-                                              : [
-                                                  Colors.blue[300]!,
-                                                  Colors.blue[500]!
-                                                ],
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
+                        // Animated progress fill
+                        TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                                begin: 0.0, end: progressPercent),
+                            duration: Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, animatedProgress, child) {
+                              return Container(
+                                height: 12,
+                                width:
+                                    (MediaQuery.of(context).size.width - 64) *
+                                        animatedProgress,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: progressPercent >= 1.0
+                                        ? [
+                                            Colors.green[400]!,
+                                            Colors.green[600]!
+                                          ]
+                                        : progressPercent >= 0.5
+                                            ? [
+                                                Colors.orange[300]!,
+                                                Colors.orange[500]!
+                                              ]
+                                            : [
+                                                Colors.blue[300]!,
+                                                Colors.blue[500]!
+                                              ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (progressPercent >= 1.0
+                                              ? Colors.green
+                                              : progressPercent >= 0.5
+                                                  ? Colors.orange
+                                                  : Colors.blue)
+                                          .withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
                                     ),
-                                    borderRadius: BorderRadius.circular(6),
+                                  ],
+                                ),
+                              );
+                            }),
+
+                        // Current value marker
+                        TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                                begin: 0.0, end: progressPercent),
+                            duration: Duration(milliseconds: 1500),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, animatedProgress, child) {
+                              return Positioned(
+                                left:
+                                    (MediaQuery.of(context).size.width - 64) *
+                                            animatedProgress -
+                                        7,
+                                top: -3,
+                                child: Container(
+                                  width: 14,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: progressPercent >= 1.0
+                                          ? Colors.green[600]!
+                                          : progressPercent >= 0.5
+                                              ? Colors.orange[600]!
+                                              : Colors.blue[600]!,
+                                      width: 2,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: (progressPercent >= 1.0
-                                                ? Colors.green
-                                                : progressPercent >= 0.5
-                                                    ? Colors.orange
-                                                    : Colors.blue)
-                                            .withOpacity(0.3),
+                                        color: Colors.black.withOpacity(0.1),
                                         blurRadius: 4,
                                         offset: Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                );
-                              }),
-
-                          // Current value marker
-                          TweenAnimationBuilder<double>(
-                              tween: Tween<double>(
-                                  begin: 0.0, end: progressPercent),
-                              duration: Duration(milliseconds: 1500),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, animatedProgress, child) {
-                                return Positioned(
-                                  left:
-                                      (MediaQuery.of(context).size.width - 64) *
-                                              animatedProgress -
-                                          7,
-                                  top: -3,
-                                  child: Container(
-                                    width: 14,
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: progressPercent >= 1.0
-                                            ? Colors.green[600]!
-                                            : progressPercent >= 0.5
-                                                ? Colors.orange[600]!
-                                                : Colors.blue[600]!,
-                                        width: 2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 4,
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                        ],
-                      ),
-
-                      SizedBox(height: 16),
-
-                      // Value comparison section
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Last Week",
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
-                              ),
-                              SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[400],
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    baselineValueText,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Current",
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
-                              ),
-                              SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: progressPercent >= 1.0
-                                          ? Colors.green[600]
-                                          : progressPercent >= 0.5
-                                              ? Colors.orange[600]
-                                              : Colors.blue[600],
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    currentValueText,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                "Target",
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
-                              ),
-                              SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[800],
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    targetValueText,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[800],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      // Status message
-                      if (subgoalType != "maintain") ...[
-                        SizedBox(height: 12),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: progressPercent >= 1.0
-                                ? Colors.green[50]
-                                : progressPercent >= 0.75
-                                    ? Colors.lime[50]
-                                    : progressPercent >= 0.5
-                                        ? Colors.orange[50]
-                                        : Colors.blue[50],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                progressPercent >= 1.0
-                                    ? Icons.check_circle_outline
-                                    : progressPercent >= 0.75
-                                        ? Icons.thumb_up_outlined
-                                        : progressPercent >= 0.5
-                                            ? Icons.trending_up
-                                            : Icons.directions_run,
-                                size: 16,
-                                color: progressPercent >= 1.0
-                                    ? Colors.green[700]
-                                    : progressPercent >= 0.75
-                                        ? Colors.lime[700]
-                                        : progressPercent >= 0.5
-                                            ? Colors.orange[700]
-                                            : Colors.blue[700],
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  progressPercent >= 1.0
-                                      ? "Goal achieved! Great work!"
-                                      : progressPercent >= 0.75
-                                          ? "Almost there! Keep it up!"
-                                          : progressPercent >= 0.5
-                                              ? "Good progress! You're over halfway."
-                                              : "Keep going! You're making progress.",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: progressPercent >= 1.0
-                                        ? Colors.green[700]
-                                        : progressPercent >= 0.75
-                                            ? Colors.lime[700]
-                                            : progressPercent >= 0.5
-                                                ? Colors.orange[700]
-                                                : Colors.blue[700],
-                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
+                              );
+                            }),
                       ],
-                    ],
-                  ),
-                ),
-              ] else ...[
-                // For "maintain" type goals
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.teal[50],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.verified_outlined,
-                          color: Colors.teal[700], size: 24),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
+                    ),
+
+                    SizedBox(height: 16),
+
+                    // Value comparison section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "Consistency Goal",
+                              "Avg Last Week",
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal[700],
-                              ),
+                                  fontSize: 11, color: Colors.grey[600]),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[400],
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  baselineValueText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
                             Text(
-                              currentValueText,
+                              "Avg Current",
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.teal[800]),
+                                  fontSize: 11, color: Colors.grey[600]),
+                            ),
+                            SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: progressPercent >= 1.0
+                                        ? Colors.green[600]
+                                        : progressPercent >= 0.5
+                                            ? Colors.orange[600]
+                                            : Colors.blue[600],
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  currentValueText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              "Avg Target",
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[600]),
+                            ),
+                            SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green[800],
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  targetValueText,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    // Status message
+                    if (subgoalType != "maintain") ...[
+                      SizedBox(height: 12),
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: progressPercent >= 1.0
+                              ? Colors.green[50]
+                              : progressPercent >= 0.75
+                                  ? Colors.lime[50]
+                                  : progressPercent >= 0.5
+                                      ? Colors.orange[50]
+                                      : Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              progressPercent >= 1.0
+                                  ? Icons.check_circle_outline
+                                  : progressPercent >= 0.75
+                                      ? Icons.thumb_up_outlined
+                                      : progressPercent >= 0.5
+                                          ? Icons.trending_up
+                                          : Icons.directions_run,
+                              size: 16,
+                              color: progressPercent >= 1.0
+                                  ? Colors.green[700]
+                                  : progressPercent >= 0.75
+                                      ? Colors.lime[700]
+                                      : progressPercent >= 0.5
+                                          ? Colors.orange[700]
+                                          : Colors.blue[700],
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                progressPercent >= 1.0
+                                    ? "Goal achieved! Great work!"
+                                    : progressPercent >= 0.75
+                                        ? "Almost there! Keep it up!"
+                                        : progressPercent >= 0.5
+                                            ? "Good progress! You're over halfway."
+                                            : "Keep going! You're making progress.",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: progressPercent >= 1.0
+                                      ? Colors.green[700]
+                                      : progressPercent >= 0.75
+                                          ? Colors.lime[700]
+                                          : progressPercent >= 0.5
+                                              ? Colors.orange[700]
+                                              : Colors.blue[700],
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
+            ] else ...[
+              // For "maintain" type goals
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.teal[50],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_outlined,
+                        color: Colors.teal[700], size: 24),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Consistency Goal",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal[700],
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            currentValueText,
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.teal[800]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
+          ],
+        ),
+
+        SizedBox(height: 16),
+
+        Divider(),
+
+        Text(
+          "Action Plan:",
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
+        ),
 
-          SizedBox(height: 16),
+        SizedBox(height: 8),
 
-          Divider(),
+        // Suggestions list
+        Column(
+          children: subgoalSuggestions
+              .map((suggestion) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.check_circle_outline,
+                            size: 16, color: Colors.green[700]),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            suggestion,
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))
+              .toList(),
+        ),
 
+        // Warnings if available
+        if (subgoalWarnings.isNotEmpty) ...[
+          SizedBox(height: 12),
           Text(
-            "Action Plan:",
+            "Important Notes:",
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
@@ -2230,25 +2287,22 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
               color: Colors.black87,
             ),
           ),
-
           SizedBox(height: 8),
-
-          // Suggestions list
           Column(
-            children: subgoalSuggestions
-                .map((suggestion) => Padding(
+            children: subgoalWarnings
+                .map((warning) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.check_circle_outline,
-                              size: 16, color: Colors.green[700]),
+                          Icon(Icons.warning_amber_outlined,
+                              size: 16, color: Colors.orange[700]),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              suggestion,
+                              warning,
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.black87),
+                                  fontSize: 13, color: Colors.grey[800]),
                             ),
                           ),
                         ],
@@ -2256,47 +2310,101 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
                     ))
                 .toList(),
           ),
-
-          // Warnings if available
-          if (subgoalWarnings.isNotEmpty) ...[
-            SizedBox(height: 12),
-            Text(
-              "Important Notes:",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(height: 8),
-            Column(
-              children: subgoalWarnings
-                  .map((warning) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.warning_amber_outlined,
-                                size: 16, color: Colors.orange[700]),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                warning,
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.grey[800]),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ],
         ],
-      ),
-    );
+      ],
+    ),
+  );
+}
+void _fetchActivitiesForSubgoal() async {
+  if (!hasActiveSubgoal) return;
+  
+  try {
+    // Get the current user's ID
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isEmpty) return;
+    
+    // Query the activities collection for activities between start and end date
+    QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: subgoalStartDate)
+        .where('date', isLessThanOrEqualTo: subgoalEndDate)
+        .where('activityType', isEqualTo: 'cycling') // Assuming we're filtering for cycling activities
+        .get();
+    
+    // Clear the existing weekly activities
+    _weeklyActivities.clear();
+    
+    // Add the fetched activities to the list
+    for (var doc in activitiesSnapshot.docs) {
+      _weeklyActivities.add(doc.data() as Map<String, dynamic>);
+    }
+    
+    // Get days per week from goals collection to use for average calculation
+    DocumentSnapshot goalDoc = await FirebaseFirestore.instance
+        .collection('goals')
+        .doc(userId)
+        .get();
+    
+    if (goalDoc.exists) {
+      Map<String, dynamic> goalData = goalDoc.data() as Map<String, dynamic>;
+      if (goalData.containsKey('daysPerWeek')) {
+        daysPerWeek = goalData['daysPerWeek'];
+      }
+    }
+    
+    // Force UI update
+    if (mounted) setState(() {});
+  } catch (e) {
+    print('Error fetching activities for subgoal: $e');
   }
+}
+
+
+void _fetchSubgoalDetails() async {
+  try {
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isEmpty) return;
+    
+    // Get the active subgoal
+    QuerySnapshot subgoalSnapshot = await FirebaseFirestore.instance
+        .collection('cycling_subgoals')
+        .where('userId', isEqualTo: userId)
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
+    
+    if (subgoalSnapshot.docs.isEmpty) {
+      setState(() {
+        hasActiveSubgoal = false;
+      });
+      return;
+    }
+    
+    DocumentSnapshot subgoal = subgoalSnapshot.docs.first;
+    Map<String, dynamic> subgoalData = subgoal.data() as Map<String, dynamic>;
+    
+    // Set subgoal properties
+    setState(() {
+      hasActiveSubgoal = true;
+      subgoalType = subgoalData['type'] ?? '';
+      subgoalTargetValue = subgoalData['targetValue'] ?? 0.0;
+      baselineDistance = subgoalData['baselineDistance'] ?? 0.0;
+      baselinePace = subgoalData['baselinePace'] ?? 0.0;
+      baselineDuration = subgoalData['baselineDuration'] ?? 0.0;
+      subgoalStartDate = subgoalData['startDate']?.toDate() ?? DateTime.now();
+      subgoalEndDate = subgoalData['endDate']?.toDate() ?? DateTime.now().add(Duration(days: 7));
+      subgoalSuggestions = List<String>.from(subgoalData['suggestions'] ?? []);
+      subgoalWarnings = List<String>.from(subgoalData['warnings'] ?? []);
+    });
+    
+    // After fetching the subgoal details, fetch related activities
+    _fetchActivitiesForSubgoal();
+  } catch (e) {
+    print('Error fetching subgoal details: $e');
+  }
+}
+// This function needs to be added to fetch activities within the date range
 
   void _checkEnduranceGoalCompletion() {
     print("⭐ Checking endurance goal completion...");
