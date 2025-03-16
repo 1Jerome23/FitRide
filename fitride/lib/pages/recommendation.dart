@@ -1788,7 +1788,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
-  void _generateNutritionRecommendationsFromFoodDiary() {
+void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.clear();
 
     if (nutritionData.isEmpty) {
@@ -1834,9 +1834,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
         totalCalories > 0 ? (totalCarbs * 4 / totalCalories) * 100 : 0;
     double fatPercent =
         totalCalories > 0 ? (totalFat * 9 / totalCalories) * 100 : 0;
-    double proteinPercent =
-        totalCalories > 0 ? (totalProtein * 4 / totalCalories) * 100 : 0;
-
     // Get BMR directly from user input
     double bmr = safeParseDouble(basalMetabolicRate);
     double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
@@ -1934,6 +1931,18 @@ class _RecommendationPageState extends State<RecommendationPage> {
           "Your breakfast (${breakfastPercent.toInt()}% of daily calories) is smaller than optimal for cyclists. Aim for 20-25% of daily calories at breakfast to fuel morning training and jumpstart metabolism.");
     }
 
+    // Check lunch meal balance
+    if (lunchPercent < 25 && totalCalories > 0) {
+      nutritionRecommendations.add(
+          "Your lunch (${lunchPercent.toInt()}% of daily calories) could be increased to provide better midday fueling. Aim for 25-30% of daily calories at lunch to sustain energy throughout the day, especially if you ride in the afternoon.");
+    }
+
+    // Check dinner meal balance
+    if (dinnerPercent > 45 && totalCalories > 0) {
+      nutritionRecommendations.add(
+          "Your dinner (${dinnerPercent.toInt()}% of daily calories) represents a large portion of your daily intake. Consider redistributing some calories to earlier meals to support activity during the day and improve recovery.");
+    }
+
     // Macronutrient distribution recommendations based on actual training data
     if (totalCalories > 0) {
       // Protein recommendations based on lean body mass or weight
@@ -1963,13 +1972,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
       // Fat recommendations
       if (fatPercent < 20) {
         nutritionRecommendations.add(
-            "Your fat intake (${fatPercent.toInt()}% of calories) is below the 20% minimum for hormone production and fat-soluble vitamin absorption. Include healthy fats like avocados, nuts, olive oil, and fatty fish even when focusing on weight management.");
+            "Your fat intake (${fatPercent.toInt()}% of calories) is below the 20% minimum for hormone production and fat-soluble vitamin absorption. Include healthy fats like avocados, nuts, olive oil, and fatty fish even when focusing on weight management. Aim for ${recommendedFatGrams.toInt()}g of fat daily.");
       } else if (fatPercent > 35 && goalType != "Leisure") {
         nutritionRecommendations.add(
-            "Your fat intake (${fatPercent.toInt()}% of calories) is higher than optimal for your ${goalType} cycling. Consider shifting some calories to carbohydrates to better fuel your high-intensity or endurance sessions.");
+            "Your fat intake (${fatPercent.toInt()}% of calories) is higher than optimal for your ${goalType} cycling. Consider shifting some calories to carbohydrates to better fuel your high-intensity or endurance sessions. Target around ${recommendedFatGrams.toInt()}g of fat daily.");
       } else {
         nutritionRecommendations.add(
-            "Your fat intake (${fatPercent.toInt()}% of calories) is appropriate. Focus on unsaturated fats from plant sources and omega-3s from fish to support recovery and reduce inflammation from training.");
+            "Your fat intake (${fatPercent.toInt()}% of calories) is appropriate at approximately ${totalFat.toInt()}g, close to the recommended ${recommendedFatGrams.toInt()}g. Focus on unsaturated fats from plant sources and omega-3s from fish to support recovery and reduce inflammation from training.");
       }
     }
 
@@ -1987,6 +1996,46 @@ class _RecommendationPageState extends State<RecommendationPage> {
           breakfastCalories > 0) {
         nutritionRecommendations.add(
             "Your breakfast carbohydrate intake (${breakfastCarbs.toInt()}g) is insufficient for your endurance training. Morning carbs replenish glycogen depleted overnight and prepare you for ${weeklyDistanceTotal / weeklyActivityCount} km average rides.");
+      }
+
+      // Lunch macronutrient recommendations
+      if (lunchCarbs < (recommendedCarbGrams * 0.3) && lunchCalories > 0) {
+        nutritionRecommendations.add(
+            "Your lunch carbohydrate intake (${lunchCarbs.toInt()}g) is lower than optimal. Aim for ${(recommendedCarbGrams * 0.3).toInt()}-${(recommendedCarbGrams * 0.35).toInt()}g of carbs at lunch to fuel afternoon activities and support recovery.");
+      }
+
+      if (lunchProtein < (recommendedProteinGrams * 0.25) && lunchCalories > 0) {
+        nutritionRecommendations.add(
+            "Your lunch protein intake (${lunchProtein.toInt()}g) could be increased to better support muscle recovery throughout the day. Target ${(recommendedProteinGrams * 0.25).toInt()}-${(recommendedProteinGrams * 0.3).toInt()}g at lunch.");
+      }
+
+      // Dinner macronutrient recommendations
+      if (dinnerProtein < (recommendedProteinGrams * 0.3) && dinnerCalories > 0) {
+        nutritionRecommendations.add(
+            "Your dinner protein intake (${dinnerProtein.toInt()}g) is lower than recommended. Aim for ${(recommendedProteinGrams * 0.3).toInt()}-${(recommendedProteinGrams * 0.4).toInt()}g at dinner to optimize overnight muscle repair.");
+      }
+
+      if (dinnerCarbs > (recommendedCarbGrams * 0.5) && 
+          goalType == "High Intensity Cycling" && 
+          dinnerCalories > 0) {
+        nutritionRecommendations.add(
+            "Your dinner carbohydrate intake (${dinnerCarbs.toInt()}g) is relatively high. For weight management goals, consider shifting some carbs to earlier meals, especially if you don't typically ride in the evening.");
+      }
+
+      // Fat balance in meals
+      if (breakfastFat < 5 && breakfastCalories > 0) {
+        nutritionRecommendations.add(
+            "Your breakfast contains very little fat (${breakfastFat.toInt()}g). Including some healthy fats at breakfast improves satiety and absorption of fat-soluble vitamins.");
+      }
+
+      if (lunchFat > (recommendedFatGrams * 0.5) && lunchCalories > 0) {
+        nutritionRecommendations.add(
+            "Your lunch contains ${lunchFat.toInt()}g of fat, which may be higher than optimal for midday fueling. Consider reducing heavy fats at lunch if you typically ride in the afternoon.");
+      }
+
+      if (dinnerFat > (recommendedFatGrams * 0.6) && dinnerCalories > 0) {
+        nutritionRecommendations.add(
+            "Your dinner fat intake (${dinnerFat.toInt()}g) represents a large portion of your daily fat intake. High-fat evening meals can affect sleep quality and recovery. Consider a more balanced distribution across meals.");
       }
     }
 

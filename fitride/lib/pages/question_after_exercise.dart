@@ -39,6 +39,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
   bool _isCalculatingLunch = false;
   bool _isCalculatingDinner = false;
   bool _isSubmitting = false;
+  bool _showGuidelines = true;
 
   // Define the orange color from profile page
   final Color orangeColor = const Color(0xffFFA500);
@@ -74,6 +75,18 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
           icon: Icon(Icons.arrow_back_ios, color: orangeColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // Help button that toggles guidelines
+          IconButton(
+            icon: Icon(_showGuidelines ? Icons.visibility_off : Icons.help_outline, color: orangeColor),
+            onPressed: () {
+              setState(() {
+                _showGuidelines = !_showGuidelines;
+              });
+            },
+            tooltip: _showGuidelines ? "Hide Guidelines" : "Show Guidelines",
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
@@ -107,7 +120,10 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              SizedBox(height: 16),
+
+              // Guidelines section (collapsible)
+              if (_showGuidelines) _buildGuidelines(),
 
               // Breakfast Section
               _buildMealSection(
@@ -116,6 +132,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 calories: _breakfastCalories,
                 isCalculating: _isCalculatingBreakfast,
                 icon: Icons.breakfast_dining,
+                hintText: 'E.g., "2 eggs, 1 slice toast with butter, 1 cup coffee with milk"',
                 onCalculate: () async {
                   if (_breakfastController.text.isEmpty) return;
 
@@ -144,6 +161,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 calories: _lunchCalories,
                 isCalculating: _isCalculatingLunch,
                 icon: Icons.lunch_dining,
+                hintText: 'E.g., "Chicken sandwich with lettuce, tomato and mayo, apple, water"',
                 onCalculate: () async {
                   if (_lunchController.text.isEmpty) return;
 
@@ -172,6 +190,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                 calories: _dinnerCalories,
                 isCalculating: _isCalculatingDinner,
                 icon: Icons.dinner_dining,
+                hintText: 'E.g., "1 cup rice, 5oz salmon, 1 cup steamed broccoli, 1 tbsp olive oil"',
                 onCalculate: () async {
                   if (_dinnerController.text.isEmpty) return;
 
@@ -283,7 +302,35 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                   ],
                 ),
               ),
-              SizedBox(height: 32),
+              SizedBox(height: 24),
+
+              // Pre-save validation reminder
+              if (_breakfastCalories == 0 && _lunchCalories == 0 && _dinnerCalories == 0)
+                Container(
+                  padding: EdgeInsets.all(12),
+                  margin: EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Please enter and calculate all meals before saving your food diary",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               // Submit Button
               Container(
@@ -348,6 +395,150 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     );
   }
 
+  Widget _buildGuidelines() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.blue[300]!,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            spreadRadius: 1,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.blue[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "How to Use the Food Diary",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue[800],
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _showGuidelines = false;
+                  });
+                },
+                child: Icon(
+                  Icons.close,
+                  color: Colors.blue[700],
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildGuidelineItem(
+            icon: Icons.format_list_bulleted,
+            text: "Be as specific as possible with your food entries (e.g., \"2 scrambled eggs with 1 tbsp butter, 1 slice whole wheat toast\")",
+          ),
+          _buildGuidelineItem(
+            icon: Icons.calculate_outlined,
+            text: "Click the calculate button after entering each meal to analyze its nutritional content",
+          ),
+          _buildGuidelineItem(
+            icon: Icons.restaurant,
+            text: "Include portion sizes when possible (e.g., \"1 cup rice\" instead of just \"rice\")",
+          ),
+          _buildGuidelineItem(
+            icon: Icons.local_drink_outlined,
+            text: "Don't forget to include beverages, condiments, and cooking oils",
+          ),
+          _buildGuidelineItem(
+            icon: Icons.tips_and_updates_outlined,
+            text: "For mixed dishes, list major ingredients (e.g., \"chicken sandwich with lettuce, mayo, and tomato\")",
+          ),
+          const SizedBox(height: 8),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            title: Text(
+              "Tips for Better Results",
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.blue[700],
+              ),
+            ),
+            children: [
+              _buildGuidelineItem(
+                icon: Icons.text_fields,
+                text: "Use brand names when relevant (e.g., \"Chobani Greek yogurt\" vs \"yogurt\")",
+              ),
+              _buildGuidelineItem(
+                icon: Icons.lightbulb_outline,
+                text: "Specify cooking methods (e.g., \"grilled chicken\" vs \"fried chicken\")",
+              ),
+              _buildGuidelineItem(
+                icon: Icons.no_meals_outlined,
+                text: "If you skipped a meal, enter \"none\" and calculate (will show 0 calories)",
+              ),
+              _buildGuidelineItem(
+                icon: Icons.watch_later_outlined,
+                text: "Complete your diary daily for the most accurate nutrition recommendations",
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuidelineItem({required IconData icon, required String text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: Colors.blue[400],
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMealSection({
     required String mealTitle,
     required TextEditingController controller,
@@ -355,6 +546,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     required bool isCalculating,
     required VoidCallback onCalculate,
     required IconData icon,
+    required String hintText,
   }) {
     return Container(
       padding: EdgeInsets.all(16),
@@ -401,6 +593,28 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                   color: Colors.black,
                 ),
               ),
+              if (calories == 0) 
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Colors.amber[700],
+                        size: 16,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        "Needs calculation",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: Colors.amber[700],
+                        ),
+                      )
+                    ],
+                  ),
+                ),
             ],
           ),
           SizedBox(height: 12),
@@ -425,7 +639,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                       fontSize: 15,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'What did you eat?',
+                      hintText: hintText,
                       hintStyle: TextStyle(
                         fontFamily: 'Inter',
                         color: Colors.grey[600],
@@ -441,6 +655,8 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                       }
                       return null;
                     },
+                    maxLines: 3,
+                    minLines: 1,
                   ),
                 ),
               ),
@@ -480,10 +696,13 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : Icon(
-                              Icons.calculate,
-                              color: Colors.white,
-                              size: 20,
+                          : Tooltip(
+                              message: "Calculate nutrition",
+                              child: Icon(
+                                Icons.calculate,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                     ),
                   ),
@@ -537,7 +756,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
                     'P: ${mealTitle == 'Breakfast' ? _breakfastProtein.toStringAsFixed(1) : 
                         mealTitle == 'Lunch' ? _lunchProtein.toStringAsFixed(1) : 
                         _dinnerProtein.toStringAsFixed(1)}g',
-                    style: TextStyle(
+                        style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -573,6 +792,13 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
     };
     
     if (foodInput.isEmpty) return nutritionData;
+    
+    // Handle "none" or "skipped" entries
+    if (foodInput.toLowerCase().trim() == "none" || 
+        foodInput.toLowerCase().trim() == "skipped" ||
+        foodInput.toLowerCase().trim() == "skip") {
+      return nutritionData; // Return all zeros
+    }
 
     final url = Uri.parse('https://api.calorieninjas.com/v1/nutrition?query=$foodInput');
     
@@ -609,12 +835,39 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
           }
         } else {
           print("No food items found for '$foodInput'");
+          // Show a warning to the user
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("No nutrition data found for '$foodInput'. Try being more specific or check spelling."),
+              backgroundColor: Colors.amber[700],
+              duration: Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ),
+            ),
+          );
         }
       } else {
         print("CaloriesNinja API Error: ${response.statusCode} - ${response.body}");
+        // Show an error message to the user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error calculating nutrition data. Please try again."),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       print("Error fetching nutrition data: $e");
+      // Show an error message to the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Connection error. Please check your internet and try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
     
     return nutritionData;
@@ -622,6 +875,26 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
 
   Future<void> _saveToFirestore() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    // Check if all meals have been calculated
+    if (_breakfastController.text.isNotEmpty && _breakfastCalories == 0 ||
+        _lunchController.text.isNotEmpty && _lunchCalories == 0 ||
+        _dinnerController.text.isNotEmpty && _dinnerCalories == 0) {
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please calculate nutrition for all meals before saving'),
+          backgroundColor: Colors.amber[700],
+          duration: Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
       return;
     }
 
@@ -647,6 +920,50 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
       // Get the current date (without time)
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
+
+      // Check if an entry for today already exists
+      final existingEntries = await FirebaseFirestore.instance
+          .collection('food_entries')
+          .where('userId', isEqualTo: user.uid)
+          .where('date', isEqualTo: Timestamp.fromDate(today))
+          .get();
+
+      if (existingEntries.docs.isNotEmpty) {
+        // Show confirmation dialog for overwriting
+        bool shouldOverwrite = await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text("Entry Already Exists"),
+              content: Text("You already have a food diary entry for today. Do you want to replace it?"),
+              actions: [
+                TextButton(
+                  child: Text("Cancel", style: TextStyle(color: Colors.grey[700])),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: orangeColor),
+                  child: Text("Replace", style: TextStyle(color: Colors.white)),
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ],
+            );
+          },
+        ) ?? false;
+
+        if (!shouldOverwrite) {
+          setState(() {
+            _isSubmitting = false;
+          });
+          return;
+        }
+
+        // Delete the existing entry
+        await FirebaseFirestore.instance
+            .collection('food_entries')
+            .doc(existingEntries.docs.first.id)
+            .delete();
+      }
 
       // Calculate totals
       final totalCalories = _breakfastCalories + _lunchCalories + _dinnerCalories;
