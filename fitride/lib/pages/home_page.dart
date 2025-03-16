@@ -73,6 +73,8 @@ class _HomePageState extends State<HomePage>
   bool _showAllMeals = false;
   int _currentMealCardIndex = 0;
   final PageController _mealPageController = PageController();
+  List<Map<String, dynamic>> bodyMetricsData = [];
+  bool _showAllMetrics = false;
 
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
@@ -131,6 +133,7 @@ class _HomePageState extends State<HomePage>
     // Sequentially load data
     _loadUserData();
     _fetchFoodDiaryData();
+    _fetchBodyMetricsData(); 
   }
 
   // Sequentially load data to ensure dependencies are respected
@@ -159,6 +162,49 @@ class _HomePageState extends State<HomePage>
     _pageController.dispose();
     super.dispose();
   }
+
+  Future<void> _fetchBodyMetricsData() async {
+  if (userId == null) return;
+
+  try {
+    QuerySnapshot metricsSnapshot = await FirebaseFirestore.instance
+        .collection('userData')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(10)
+        .get();
+
+    if (metricsSnapshot.docs.isNotEmpty) {
+      List<Map<String, dynamic>> newMetricsData = [];
+
+      for (var doc in metricsSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+
+        // Only add entries that have at least one metric
+        if (data.containsKey('weight') || 
+            data.containsKey('bodyFat') || 
+            data.containsKey('basalMetabolicRate')) {
+          
+          newMetricsData.add({
+            "documentId": doc.id,
+            "weight": data['weight'] ?? "-",
+            "bodyFat": data['bodyFat'] ?? "-",
+            "basalMetabolicRate": data['basalMetabolicRate'] ?? "-",
+            "timestamp": data['timestamp'],
+          });
+        }
+      }
+
+      setState(() {
+        bodyMetricsData = newMetricsData;
+      });
+      
+      print("Fetched ${bodyMetricsData.length} body metrics entries");
+    }
+  } catch (e) {
+    print("Error fetching body metrics data: $e");
+  }
+}
 
   Future<void> fetchUserGoal() async {
     if (userId != null) {
@@ -487,6 +533,320 @@ class _HomePageState extends State<HomePage>
         return Colors.grey;
     }
   }
+
+  Widget _buildBodyMetricsHistory() {
+  if (bodyMetricsData.isEmpty) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "No body metrics data found. Update your profile to track your progress.",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.07),
+          blurRadius: 20,
+          spreadRadius: 5,
+          offset: Offset(0, 10),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Latest metrics always visible
+        if (bodyMetricsData.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            child: _buildBodyMetricsCard(
+              bodyMetricsData[0], 
+              _formatMetricsDate(bodyMetricsData[0]['timestamp']), 
+              true
+            ),
+          ),
+        
+        // Past metrics (conditionally visible)
+        if (_showAllMetrics && bodyMetricsData.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+            child: Column(
+              children: [
+                for (int i = 1; i < bodyMetricsData.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: _buildBodyMetricsCard(
+                      bodyMetricsData[i], 
+                      _formatMetricsDate(bodyMetricsData[i]['timestamp']), 
+                      false
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+String _formatMetricsDate(dynamic timestamp) {
+  if (timestamp == null) return "Unknown";
+  
+  DateTime date;
+  try {
+    date = timestamp.toDate();
+  } catch (e) {
+    print("Error parsing date: $e");
+    return "Unknown";
+  }
+  
+  DateTime now = DateTime.now();
+  DateTime yesterday = DateTime(now.year, now.month, now.day - 1);
+  
+  if (date.year == now.year && date.month == now.month && date.day == now.day) {
+    return "Today";
+  } else if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
+    return "Yesterday";
+  } else {
+    return DateFormat('EEEE, MMM d').format(date);
+  }
+}
+
+Widget _buildBodyMetricsCard(Map<String, dynamic> metricsData, String dateLabel, bool isLatest) {
+  // Get metrics values
+  String weightValue = metricsData['weight'].toString();
+  String bodyFatValue = metricsData['bodyFat'].toString();
+  String bmrValue = metricsData['basalMetabolicRate'].toString();
+  
+  // Check if metrics exist
+  bool hasWeight = weightValue != "-";
+  bool hasBodyFat = bodyFatValue != "-";
+  bool hasBMR = bmrValue != "-";
+  bool hasMetrics = hasWeight || hasBodyFat || hasBMR;
+  
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: isLatest 
+              ? Colors.blue.withOpacity(0.2) 
+              : Colors.grey.withOpacity(0.15),
+          blurRadius: 15,
+          spreadRadius: 1,
+          offset: Offset(0, 5),
+        ),
+      ],
+      border: Border.all(
+        color: isLatest 
+            ? Colors.blue.withOpacity(0.3) 
+            : Colors.grey.withOpacity(0.1),
+        width: 1.5,
+      ),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          // Date header
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isLatest 
+                    ? [Colors.blue[400]!, Colors.blue[600]!]
+                    : [Colors.grey[600]!, Colors.grey[700]!],
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isLatest ? Icons.today_rounded : Icons.calendar_today_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      dateLabel,
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black.withOpacity(0.2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // No metrics message
+          if (!hasMetrics)
+            Container(
+              padding: EdgeInsets.all(16),
+              color: Colors.grey[50],
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded, 
+                    size: 20, 
+                    color: Colors.grey[400]
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "No body metrics recorded for this day",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Metrics
+          if (hasMetrics)
+            Container(
+              color: Colors.grey[50],
+              padding: EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  if (hasWeight)
+                    _buildMetricItem(
+                      "Weight",
+                      weightValue,
+                      "kg",
+                      Icons.monitor_weight_rounded,
+                      Colors.green[600]!,
+                    ),
+                  if (hasBodyFat)
+                    _buildMetricItem(
+                      "Body Fat",
+                      bodyFatValue,
+                      "%",
+                      Icons.pie_chart_rounded,
+                      Colors.orange[600]!,
+                    ),
+                  if (hasBMR)
+                    _buildMetricItem(
+                      "BMR",
+                      bmrValue,
+                      "kcal",
+                      Icons.local_fire_department_rounded,
+                      Colors.red[600]!,
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildMetricItem(String label, String value, String unit, IconData icon, Color color) {
+  return Expanded(
+    child: Column(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              color: color,
+              size: 22,
+            ),
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          "$value $unit",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[900],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildActivityLogHeader() {
   return Row(
@@ -1809,7 +2169,114 @@ String _formatMealDate(dynamic timestamp) {
                     child: _buildMealsHistory(),
                   ),
 
-                  SizedBox(height: 30),
+                  SizedBox(height: 25),
+
+                  // Body Metrics History Section Header
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(-30 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 5, bottom: 15),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Title section
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.fitness_center_rounded,
+                                size: 22,
+                                color: Colors.blue[600],
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Body Metrics",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          // Show All Metrics button
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _showAllMetrics = !_showAllMetrics;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[500]!.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.blue[500]!.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _showAllMetrics
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    size: 16,
+                                    color: Colors.blue[600],
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    _showAllMetrics ? "Hide" : "Show History",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.blue[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 8),
+
+                  // Body Metrics History Content
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 1000),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 30 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildBodyMetricsHistory(),
+                  ),
+
+                  SizedBox(height: 40),
 
                 ],
               ),
