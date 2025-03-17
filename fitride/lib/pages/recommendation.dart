@@ -11,6 +11,27 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
+class _AnimatedFullscreenOverlay extends StatefulWidget {
+  final VoidCallback onDismiss;
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<String> recommendations;
+
+  const _AnimatedFullscreenOverlay({
+    required this.onDismiss,
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.recommendations,
+  });
+
+  @override
+  _AnimatedFullscreenOverlayState createState() => _AnimatedFullscreenOverlayState();
+}
+
 class PieEfficiencyData {
   final String sessionLabel;
   final double efficiency;
@@ -100,6 +121,7 @@ class RecommendationPage extends StatefulWidget {
   @override
   _RecommendationPageState createState() => _RecommendationPageState();
 }
+
 
 class TemperatureActivityData {
   final double temperature;
@@ -691,6 +713,205 @@ class _RecommendationPageState extends State<RecommendationPage> {
       },
     );
   }
+
+Widget _buildRecommendationCard(
+  BuildContext context,
+  String title,
+  IconData icon,
+  Color color,
+  List<Color> gradientColors,
+  List<String> recommendations, {
+  required VoidCallback onTap,
+}) {
+  return InkWell( // InkWell provides better touch response than GestureDetector
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            spreadRadius: 1,
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gradientColors,
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 20),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // List view (scrollable)
+          Expanded(
+            child: NotificationListener<OverscrollIndicatorNotification>(
+              onNotification: (overscroll) {
+                overscroll.disallowIndicator();
+                return true;
+              },
+              child: ListView.builder(
+                physics: BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                itemCount: recommendations.length > 3 ? 3 : recommendations.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color.withOpacity(0.1), width: 1),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: 18,
+                            color: color,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            recommendations[index],
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // Tap indicator
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(vertical: 8),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.05),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              border: Border(
+                top: BorderSide(color: color.withOpacity(0.1), width: 1),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.touch_app_rounded,
+                  size: 16,
+                  color: color,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  recommendations.length > 3 
+                      ? "Tap to view all ${recommendations.length} tips"
+                      : "Tap to expand",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+void _showFullscreenOverlay(
+  BuildContext context,
+  String title,
+  IconData icon,
+  Color color,
+  List<Color> gradientColors,
+  List<String> recommendations,
+) {
+  // Declare the overlayEntry as late - it will be initialized before use
+  late OverlayEntry overlayEntry;
+  
+  // Define the builder function separately
+  overlayEntry = OverlayEntry(
+    builder: (context) => Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: _AnimatedFullscreenOverlay(
+        onDismiss: () {
+          overlayEntry.remove();
+        },
+        title: title,
+        icon: icon,
+        color: color,
+        gradientColors: gradientColors,
+        recommendations: recommendations,
+      ),
+    ),
+  );
+  
+  // Show the overlay
+  Overlay.of(context).insert(overlayEntry);
+}
 
 // Helper widget for zone indicators
   Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
@@ -5152,257 +5373,324 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     return days.toString();
   }
 
-  Widget _buildRecommendationCarousel() {
-    List<Map<String, dynamic>> recommendationCategories = [];
-    int currentPage = 0;
-
-    if (trainingRecommendations.isNotEmpty) {
-      recommendationCategories.add({
-        "title": "Training Tips",
-        "icon": Icons.directions_bike_rounded,
-        "color": Color(0xFF1E88E5),
-        "gradientColors": [Color(0xFF1E88E5), Color(0xFF0D47A1)],
-        "recommendations": trainingRecommendations,
-      });
-    }
-
-    if (nutritionRecommendations.isNotEmpty) {
-      recommendationCategories.add({
-        "title": "Nutrition & Hydration",
-        "icon": Icons.restaurant_rounded,
-        "color": Color(0xFF43A047),
-        "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)],
-        "recommendations": nutritionRecommendations,
-      });
-    }
-
-    if (healthRecommendations.isNotEmpty) {
-      recommendationCategories.add({
-        "title": "Health & Recovery",
-        "icon": Icons.favorite_rounded,
-        "color": Color(0xFFEC407A),
-        "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)],
-        "recommendations": healthRecommendations,
-      });
-    }
-
-    if (equipmentRecommendations.isNotEmpty) {
-      recommendationCategories.add({
-        "title": "Equipment & Gear",
-        "icon": Icons.handyman_rounded,
-        "color": Color(0xFF546E7A),
-        "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)],
-        "recommendations": equipmentRecommendations,
-      });
-    }
-
-    if (progressRecommendations.isNotEmpty) {
-      recommendationCategories.add({
-        "title": "Progress Insights",
-        "icon": Icons.insights_rounded,
-        "color": Color(0xFF8E24AA),
-        "gradientColors": [Color(0xFF8E24AA), Color(0xFF5E35B1)],
-        "recommendations": progressRecommendations,
-      });
-    }
-
-    if (recommendationCategories.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!, width: 1),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                "Track more cycling activities to receive personalized recommendations.",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 15,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    PageController pageController = PageController(
-      initialPage: 0,
-      viewportFraction: 0.92,
-    );
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return Column(
-          children: [
-            Container(
-              height: 350,
-              child: PageView.builder(
-                controller: pageController,
-                itemCount: recommendationCategories.length,
-                itemBuilder: (context, index) {
-                  var category = recommendationCategories[index];
-                  return _buildRecommendationCard(
-                    category["title"],
-                    category["icon"],
-                    category["color"],
-                    category["gradientColors"],
-                    category["recommendations"],
-                  );
-                },
-                onPageChanged: (index) {
-                  setState(() {
-                    currentPage = index;
-                  });
-                },
-              ),
-            ),
-            SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                recommendationCategories.length,
-                (index) => AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
-                  margin: EdgeInsets.symmetric(horizontal: 4),
-                  width: currentPage == index ? 16 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: currentPage == index
-                        ? (recommendationCategories[index]["color"] as Color)
-                        : Colors.orange.withOpacity(0.2),
-                  ),
-                ),
-              ),
-            ),
-          ],
+  Widget _buildExpandedPopup(
+  BuildContext context,
+  String title,
+  IconData icon,
+  Color color,
+  List<Color> gradientColors,
+  List<String> recommendations,
+  {required VoidCallback onClose}
+) {
+  return GestureDetector(
+    onTap: () {}, // Prevent taps from closing the popup
+    child: TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOutBack,
+      tween: Tween<double>(begin: 0.8, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: value,
+          child: child,
         );
       },
-    );
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 15,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with close button
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: Colors.white, size: 22),
+                        ),
+                        SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: onClose,
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Recommendations list
+            Expanded(
+              child: NotificationListener<OverscrollIndicatorNotification>(
+                onNotification: (overscroll) {
+                  overscroll.disallowIndicator();
+                  return true;
+                },
+                child: ListView.builder(
+                  physics: BouncingScrollPhysics(),
+                  padding: EdgeInsets.all(16),
+                  itemCount: recommendations.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 14),
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: color.withOpacity(0.2), width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.05),
+                            spreadRadius: 0,
+                            blurRadius: 5,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 20,
+                              color: color,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              recommendations[index],
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 15,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _buildRecommendationCarousel() {
+  List<Map<String, dynamic>> recommendationCategories = [];
+  int currentPage = 0;
+
+  if (trainingRecommendations.isNotEmpty) {
+    recommendationCategories.add({
+      "title": "Training Tips",
+      "icon": Icons.directions_bike_rounded,
+      "color": Color(0xFF1E88E5),
+      "gradientColors": [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+      "recommendations": trainingRecommendations,
+    });
   }
 
-  Widget _buildRecommendationCard(String title, IconData icon, Color color,
-      List<Color> gradientColors, List<String> recommendations) {
+  if (nutritionRecommendations.isNotEmpty) {
+    recommendationCategories.add({
+      "title": "Nutrition & Hydration",
+      "icon": Icons.restaurant_rounded,
+      "color": Color(0xFF43A047),
+      "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)],
+      "recommendations": nutritionRecommendations,
+    });
+  }
+
+  if (healthRecommendations.isNotEmpty) {
+    recommendationCategories.add({
+      "title": "Health & Recovery",
+      "icon": Icons.favorite_rounded,
+      "color": Color(0xFFEC407A),
+      "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)],
+      "recommendations": healthRecommendations,
+    });
+  }
+
+  if (equipmentRecommendations.isNotEmpty) {
+    recommendationCategories.add({
+      "title": "Equipment & Gear",
+      "icon": Icons.handyman_rounded,
+      "color": Color(0xFF546E7A),
+      "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)],
+      "recommendations": equipmentRecommendations,
+    });
+  }
+
+  if (progressRecommendations.isNotEmpty) {
+    recommendationCategories.add({
+      "title": "Progress Insights",
+      "icon": Icons.insights_rounded,
+      "color": Color(0xFF8E24AA),
+      "gradientColors": [Color(0xFF8E24AA), Color(0xFF5E35B1)],
+      "recommendations": progressRecommendations,
+    });
+  }
+
+  if (recommendationCategories.isEmpty) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            spreadRadius: 1,
-            blurRadius: 12,
-            offset: Offset(0, 6),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "Track more cycling activities to receive personalized recommendations.",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                color: Colors.grey[700],
+              ),
+            ),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  PageController pageController = PageController(
+    initialPage: 0,
+    viewportFraction: 0.92,
+  );
+  
+  // Reference to store the current overlay entry
+  OverlayEntry? overlayEntry;
+
+  return StatefulBuilder(
+    builder: (context, setState) {
+      return Column(
         children: [
           Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: gradientColors,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 20),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: ListView.builder(
-              physics: BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              itemCount: recommendations.length,
+            height: 350,
+            child: PageView.builder(
+              controller: pageController,
+              itemCount: recommendationCategories.length,
               itemBuilder: (context, index) {
-                return Container(
-                  margin: EdgeInsets.only(bottom: 12),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: color.withOpacity(0.1), width: 1),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        margin: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: color,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          recommendations[index],
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Colors.black87,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                var category = recommendationCategories[index];
+                return _buildRecommendationCard(
+                  context,
+                  category["title"],
+                  category["icon"],
+                  category["color"],
+                  category["gradientColors"],
+                  category["recommendations"],
+                  onTap: () {
+                    // Show fullscreen overlay when card is tapped
+                    _showFullscreenOverlay(
+                      context,
+                      category["title"],
+                      category["icon"],
+                      category["color"],
+                      category["gradientColors"],
+                      category["recommendations"],
+                    );
+                  },
                 );
+              },
+              onPageChanged: (index) {
+                setState(() {
+                  currentPage = index;
+                });
               },
             ),
           ),
-
-          // Scroll indicator
-          Container(
-            alignment: Alignment.center,
-            padding: EdgeInsets.only(bottom: 12),
-            child: Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 24,
-              color: Colors.grey[400],
+          SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              recommendationCategories.length,
+              (index) => AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                margin: EdgeInsets.symmetric(horizontal: 4),
+                width: currentPage == index ? 16 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: currentPage == index
+                      ? (recommendationCategories[index]["color"] as Color)
+                      : Colors.orange.withOpacity(0.2),
+                ),
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
+}
+
 
   IconData _getRecommendationIcon(String recommendation) {
     if (recommendation.contains("✅") ||
@@ -7645,6 +7933,220 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => LoginPage()),
+    );
+  }
+}
+
+class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Create animation controller
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    // Create animations
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+    
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
+    
+    // Start the animation
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    // Reverse the animation and then dismiss
+    _animationController.reverse().then((_) {
+      widget.onDismiss();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Material(
+          color: Colors.black.withOpacity(0.7 * _opacityAnimation.value),
+          child: InkWell(
+            onTap: _dismiss,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            child: SafeArea(
+              child: Center(
+                child: Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        // Header with close button
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: widget.gradientColors,
+                            ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                          ),
+                          padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(widget.icon, color: Colors.white, size: 24),
+                                    ),
+                                    SizedBox(width: 14),
+                                    Flexible(
+                                      child: Text(
+                                        widget.title,
+                                        style: TextStyle(
+                                          fontFamily: 'Fredoka-SemiBold',
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _dismiss,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Content area - takes all available space
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              // Prevent taps inside content from closing
+                            },
+                            splashColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.only(
+                                  bottomLeft: Radius.circular(20),
+                                  bottomRight: Radius.circular(20),
+                                ),
+                              ),
+                              child: ListView.builder(
+                                physics: BouncingScrollPhysics(),
+                                padding: EdgeInsets.all(16),
+                                itemCount: widget.recommendations.length,
+                                itemBuilder: (context, index) {
+                                  return Container(
+                                    margin: EdgeInsets.only(bottom: 14),
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: widget.color.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: widget.color.withOpacity(0.2), width: 1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: widget.color.withOpacity(0.05),
+                                          spreadRadius: 0,
+                                          blurRadius: 5,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          margin: EdgeInsets.only(top: 2),
+                                          child: Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 22,
+                                            color: widget.color,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            widget.recommendations[index],
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 16,
+                                              color: Colors.black87,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
