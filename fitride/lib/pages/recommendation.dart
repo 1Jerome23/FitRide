@@ -262,6 +262,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String targetDuration = "0";
 
   int age = 0;
+   String gender = "-"; 
   String healthCondition = "-";
   String respiratoryCondition = "No";
   String cardiovascularCondition = "No";
@@ -3726,38 +3727,40 @@ void _generateNutritionRecommendationsFromFoodDiary() {
         var data = userDataDoc.data() as Map<String, dynamic>;
 
         setState(() {
-          age = int.tryParse(data['age']?.toString() ?? '30') ?? 30;
-          healthCondition = data['healthCondition'] ?? "-";
+        age = int.tryParse(data['age']?.toString() ?? '30') ?? 30;
+        healthCondition = data['healthCondition'] ?? "-";
+        // Add gender to the fetched data
+        gender = data['gender'] ?? "Male"; // Default to Male if not specified
 
-          // Parse health conditions into specific types
-          if (healthCondition.toLowerCase().contains('respiratory')) {
-            respiratoryCondition = "Yes";
-          }
-          if (healthCondition.toLowerCase().contains('cardiovascular')) {
-            cardiovascularCondition = "Yes";
-          }
+        // Parse health conditions into specific types
+        if (healthCondition.toLowerCase().contains('respiratory')) {
+          respiratoryCondition = "Yes";
+        }
+        if (healthCondition.toLowerCase().contains('cardiovascular')) {
+          cardiovascularCondition = "Yes";
+        }
 
-          height = data['height']?.toString() ?? "0";
-          weight = data.containsKey('weight')
-              ? data['weight']?.toString() ?? "0"
-              : "0";
-          bodyFat = data.containsKey('bodyFat')
-              ? data['bodyFat']?.toString() ?? "0"
-              : "0";
-          basalMetabolicRate = data.containsKey('basalMetabolicRate')
-              ? data['basalMetabolicRate']?.toString() ?? "0"
-              : "0";
+        height = data['height']?.toString() ?? "0";
+        weight = data.containsKey('weight')
+            ? data['weight']?.toString() ?? "0"
+            : "0";
+        bodyFat = data.containsKey('bodyFat')
+            ? data['bodyFat']?.toString() ?? "0"
+            : "0";
+        basalMetabolicRate = data.containsKey('basalMetabolicRate')
+            ? data['basalMetabolicRate']?.toString() ?? "0"
+            : "0";
 
-          // Calculate heart rate zones
-          maxHeartRateCalculated = 220 - age;
-          zone1HeartRate = (maxHeartRateCalculated * 0.6).round();
-          zone2HeartRate = (maxHeartRateCalculated * 0.7).round();
-          zone3HeartRate = (maxHeartRateCalculated * 0.8).round();
-          zone4HeartRate = (maxHeartRateCalculated * 0.9).round();
-          zone5HeartRate = (maxHeartRateCalculated * 0.95).round();
-          recommendedHeartRate = maxHeartRateCalculated;
-        });
-      }
+        // Calculate heart rate zones
+        maxHeartRateCalculated = 220 - age;
+        zone1HeartRate = (maxHeartRateCalculated * 0.6).round();
+        zone2HeartRate = (maxHeartRateCalculated * 0.7).round();
+        zone3HeartRate = (maxHeartRateCalculated * 0.8).round();
+        zone4HeartRate = (maxHeartRateCalculated * 0.9).round();
+        zone5HeartRate = (maxHeartRateCalculated * 0.95).round();
+        recommendedHeartRate = maxHeartRateCalculated;
+      });
+    }
 
       if (goalType != "Leisure") {
         print("Attempting to fetch user data...");
@@ -4422,10 +4425,10 @@ void _generateNutritionRecommendationsFromFoodDiary() {
 
     // Updated heart rate zones based on research (Fletcher, 2023)
     double maxHeartRate = 220 - age.toDouble();
-    // Updated fat burning zone based on research (60-80% of max HR)
-    double fatBurningZoneLower = maxHeartRate * 0.6;
-    double fatBurningZoneUpper = maxHeartRate * 0.8;
-    double zone2HeartRate = maxHeartRate * 0.65;
+    // Updated fat burning zone based on research (50-70% of max HR)
+    double fatBurningZoneLower = maxHeartRate * 0.5;
+    double fatBurningZoneUpper = maxHeartRate * 0.7;
+    double zone2HeartRate = maxHeartRate * 0.6;
 
     double latestHeartRate = safeParseDouble(averageHeartrate);
 
@@ -4530,54 +4533,80 @@ void _generateNutritionRecommendationsFromFoodDiary() {
       } else if (totalCaloriesBurned > dailyDeficitNeeded) {
         // Updated based on recovery science (Dupuy et al.)
         trainingRecommendations.add(
-            "Great calorie burn! Focus on recovery with compression garments, cold therapy, and protein intake after sessions to reduce muscle damage and inflammation.");
+            "Great calorie burn! Focus on recovery with compression garments and possibly cold therapy after sessions to reduce muscle damage and inflammation.");
       }
     }
 
+    
     // Body fat percentage recommendations
     if (bodyFatPercentage > 0) {
-      String bodyFatCategory = "";
+       String bodyFatCategory = "";
+    
+    if (gender == "Female") {
+      // Female body fat categories according to American Council on Exercise
       if (bodyFatPercentage < 10) {
+        bodyFatCategory = "below essential fat";
+      } else if (bodyFatPercentage <= 12) {
         bodyFatCategory = "essential fat";
-      } else if (bodyFatPercentage < 19) {
+      } else if (bodyFatPercentage <= 20) {
         bodyFatCategory = "athletic";
-      } else if (bodyFatPercentage < 25) {
+      } else if (bodyFatPercentage <= 24) {
         bodyFatCategory = "fitness";
-      } else if (bodyFatPercentage < 32) {
-        bodyFatCategory = "average";
+      } else if (bodyFatPercentage <= 31) {
+        bodyFatCategory = "acceptable";
       } else {
         bodyFatCategory = "obesity";
       }
-
-      healthRecommendations.add(
-          "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range.");
-
-      if (bodyFatCategory == "obesity") {
-        int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
-        // Updated based on Weegu et al. (2023) research
-        healthRecommendations.add(
-            "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
-      } else if (bodyFatCategory == "average") {
-        // Updated based on HIIT research
-        healthRecommendations.add(
-            "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
-      } else if (bodyFatCategory == "fitness") {
-        // Updated based on nutrition timing research
-        healthRecommendations.add(
-            "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
-      } else if (bodyFatCategory == "athletic") {
-        // Updated based on carbohydrate research
-        healthRecommendations.add(
-            "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
-      } else if (bodyFatCategory == "essential fat") {
-        healthRecommendations.add(
-            "Maintain current level through consistent performance rather than further reduction.");
-      }
     } else {
-      // Updated based on Myles C's advice on BMI vs body fat
-      healthRecommendations.add(
-          "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
+      // Male body fat categories according to American Council on Exercise
+      if (bodyFatPercentage < 2) {
+        bodyFatCategory = "below essential fat";
+      } else if (bodyFatPercentage <= 4) {
+        bodyFatCategory = "essential fat";
+      } else if (bodyFatPercentage <= 13) {
+        bodyFatCategory = "athletic";
+      } else if (bodyFatPercentage <= 17) {
+        bodyFatCategory = "fitness";
+      } else if (bodyFatPercentage <= 25) {
+        bodyFatCategory = "acceptable";
+      } else {
+        bodyFatCategory = "obesity";
+      }
     }
+
+    healthRecommendations.add(
+        "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range for ${gender}.");
+
+    // Gender-specific recommendations based on body fat category
+    if (bodyFatCategory == "below essential fat") {
+      healthRecommendations.add(
+          "Your body fat percentage is below essential levels. This can be dangerous for health. Consider consulting a healthcare professional about healthy body composition.");
+    } else if (bodyFatCategory == "obesity") {
+      int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
+      // Updated based on Weegu et al. (2023) research
+      healthRecommendations.add(
+          "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
+    } else if (bodyFatCategory == "acceptable") {
+      // Updated based on HIIT research
+      healthRecommendations.add(
+          "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
+    } else if (bodyFatCategory == "fitness") {
+      // Updated based on nutrition timing research
+      healthRecommendations.add(
+          "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
+    } else if (bodyFatCategory == "athletic") {
+      // Updated based on carbohydrate research
+      healthRecommendations.add(
+          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
+    } else if (bodyFatCategory == "essential fat") {
+      healthRecommendations.add(
+          "Maintain current level through consistent performance rather than further reduction.");
+    }
+  } else {
+    // Updated based on Myles C's advice on BMI vs body fat
+    healthRecommendations.add(
+        "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
+  }
 
     // BMR-based recommendations
     if (bmr > 0) {
@@ -4690,7 +4719,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     double zone2HeartRateLower = maxHeartRate * 0.6;
     double zone2HeartRateUpper = maxHeartRate * 0.7;
     double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
-
+   
     double latestHeartRate = safeParseDouble(averageHeartrate);
 
     // Tracking progress and providing feedback
@@ -4909,7 +4938,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
       if (respiratoryCondition == "Yes") {
         // Updated based on air quality research
         healthRecommendations.add(
-            "With your respiratory condition, build endurance gradually (max 10%/week) and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
+            "With your respiratory condition, build endurance gradually and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
         healthRecommendations.add(
             "Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
       }
@@ -4963,9 +4992,9 @@ void _generateNutritionRecommendationsFromFoodDiary() {
 
       // Equipment recommendations - added HRM based on research
       equipmentRecommendations.add(
-          "Proper bike fit is crucial for endurance - small discomforts become major issues on long rides.");
+          "Proper bike fit is crucial for endurance - small discomforts may become major issues on long rides.");
       equipmentRecommendations.add(
-          "For longer rides, invest in quality padded shorts and use a heart rate monitor to maintain proper intensity and track recovery.");
+          "Especially for longer rides,  use a heart rate monitor to maintain proper intensity and track recovery.");
     }
   }
 

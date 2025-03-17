@@ -33,6 +33,8 @@ class _QuestionPageState extends State<QuestionPage>
   String? _heartRateLimit;
   String? _maxDuration;
 
+  String? _selectedGender;
+
   final TextEditingController weightController = TextEditingController();
   final TextEditingController basalMetabolicRateController =
       TextEditingController();
@@ -194,6 +196,7 @@ class _QuestionPageState extends State<QuestionPage>
   // Validate required fields
   if (ageController.text.isEmpty ||
       heightController.text.isEmpty ||
+      _selectedGender == null ||
       _healthCondition == null ||
       _selectedGoal == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -218,6 +221,7 @@ class _QuestionPageState extends State<QuestionPage>
       'timestamp': FieldValue.serverTimestamp(),
       'age': ageController.text,
       'height': heightController.text,
+      'gender': _selectedGender, 
       'healthCondition': _healthCondition,
     };
 
@@ -628,6 +632,104 @@ class _QuestionPageState extends State<QuestionPage>
                             ),
                           ),
                         ],
+                      ),
+                      SizedBox(height: 15),
+
+                      // Gender Dropdown
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 5,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Gender",
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: primaryBlack,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            DropdownButtonFormField<String>(
+                              value: _selectedGender,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: _selectedGender != null
+                                        ? primaryOrange
+                                        : Colors.grey.shade300,
+                                    width: _selectedGender != null ? 2 : 1,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: _selectedGender != null
+                                        ? primaryOrange
+                                        : Colors.grey.shade300,
+                                    width: _selectedGender != null ? 2 : 1,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: primaryOrange,
+                                    width: 2,
+                                  ),
+                                ),
+                                filled: _selectedGender != null,
+                                fillColor: _selectedGender != null
+                                    ? primaryOrange.withOpacity(0.1)
+                                    : Colors.transparent,
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 10),
+                              ),
+                              style: TextStyle(
+                                fontFamily: "Inter",
+                                color: primaryBlack,
+                                fontSize: 14,
+                              ),
+                              dropdownColor: Colors.white,
+                              items: ['Male', 'Female'].map((String gender) {
+                                return DropdownMenuItem<String>(
+                                  value: gender,
+                                  child: Text(gender),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _selectedGender = newValue;
+                                });
+                              },
+                              hint: Text(
+                                "Select your gender",
+                                style: TextStyle(
+                                  fontFamily: "Inter",
+                                  color: primaryGray,
+                                ),
+                              ),
+                              icon: Icon(
+                                Icons.arrow_drop_down,
+                                color: _selectedGender != null
+                                    ? primaryOrange
+                                    : primaryGray,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       SizedBox(height: 15),
 
