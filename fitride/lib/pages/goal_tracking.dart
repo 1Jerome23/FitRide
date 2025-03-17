@@ -1,3 +1,4 @@
+import 'package:fitride/pages/question_after_exercise.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5267,6 +5268,35 @@ Future<void> _deactivateCurrentSubgoal() async {
                 icon: const Icon(Icons.update, color: Colors.white),
                 label: const Text(
                   "Update Weight & Body Fat",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
+            Container(
+              margin: const EdgeInsets.only(bottom: 5, top: 15),
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (context) => const FoodQuestionnairePage()),
+  );
+},
+                icon: const Icon(Icons.update, color: Colors.white),
+                label: const Text(
+                  "Update Food Intake",
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,

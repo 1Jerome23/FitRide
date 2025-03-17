@@ -29,7 +29,8 @@ class _AnimatedAutoSizingOverlay extends StatefulWidget {
   });
 
   @override
-  _AnimatedAutoSizingOverlayState createState() => _AnimatedAutoSizingOverlayState();
+  _AnimatedAutoSizingOverlayState createState() =>
+      _AnimatedAutoSizingOverlayState();
 }
 
 class _AnimatedFullscreenOverlay extends StatefulWidget {
@@ -50,7 +51,8 @@ class _AnimatedFullscreenOverlay extends StatefulWidget {
   });
 
   @override
-  _AnimatedFullscreenOverlayState createState() => _AnimatedFullscreenOverlayState();
+  _AnimatedFullscreenOverlayState createState() =>
+      _AnimatedFullscreenOverlayState();
 }
 
 class PieEfficiencyData {
@@ -143,7 +145,6 @@ class RecommendationPage extends StatefulWidget {
   _RecommendationPageState createState() => _RecommendationPageState();
 }
 
-
 class TemperatureActivityData {
   final double temperature;
   final double speed;
@@ -219,6 +220,8 @@ class ErrorBoundary extends StatelessWidget {
 class _RecommendationPageState extends State<RecommendationPage> {
   int _selectedIndex = 1;
 
+  DateTime baselineStartDate = DateTime.now();
+  DateTime baselineEndDate = DateTime.now();
   String? userId = FirebaseAuth.instance.currentUser?.uid;
   List<Map<String, dynamic>> recentData = [];
   List<Map<String, dynamic>> activityData = [];
@@ -735,203 +738,206 @@ class _RecommendationPageState extends State<RecommendationPage> {
     );
   }
 
-Widget _buildRecommendationCard(
-  BuildContext context,
-  String title,
-  IconData icon,
-  Color color,
-  List<Color> gradientColors,
-  List<String> recommendations, {
-  required VoidCallback onTap,
-}) {
-  return InkWell( // InkWell provides better touch response than GestureDetector
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            spreadRadius: 1,
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: gradientColors,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
+  Widget _buildRecommendationCard(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    List<Color> gradientColors,
+    List<String> recommendations, {
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      // InkWell provides better touch response than GestureDetector
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.15),
+              spreadRadius: 1,
+              blurRadius: 12,
+              offset: Offset(0, 6),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 20),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: 'Fredoka-SemiBold',
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
-              ],
-            ),
-          ),
-
-          // List view (scrollable)
-          Expanded(
-            child: NotificationListener<OverscrollIndicatorNotification>(
-              onNotification: (overscroll) {
-                overscroll.disallowIndicator();
-                return true;
-              },
-              child: ListView.builder(
-                physics: BouncingScrollPhysics(),
-                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                itemCount: recommendations.length > 3 ? 3 : recommendations.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    padding: EdgeInsets.all(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color.withOpacity(0.1), width: 1),
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: EdgeInsets.only(top: 2),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            size: 18,
-                            color: color,
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            recommendations[index],
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black87,
-                              height: 1.4,
+                    child: Icon(icon, color: Colors.white, size: 20),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // List view (scrollable)
+            Expanded(
+              child: NotificationListener<OverscrollIndicatorNotification>(
+                onNotification: (overscroll) {
+                  overscroll.disallowIndicator();
+                  return true;
+                },
+                child: ListView.builder(
+                  physics: BouncingScrollPhysics(),
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  itemCount:
+                      recommendations.length > 3 ? 3 : recommendations.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 12),
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: color.withOpacity(0.1), width: 1),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 18,
+                              color: color,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // Tap indicator
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 8),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.05),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-              border: Border(
-                top: BorderSide(color: color.withOpacity(0.1), width: 1),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.touch_app_rounded,
-                  size: 16,
-                  color: color,
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              recommendations[index],
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                SizedBox(width: 6),
-                Text(
-                  recommendations.length > 3 
-                      ? "Tap to view all ${recommendations.length} tips"
-                      : "Tap to expand",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+              ),
+            ),
+
+            // Tap indicator
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.05),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+                border: Border(
+                  top: BorderSide(color: color.withOpacity(0.1), width: 1),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.touch_app_rounded,
+                    size: 16,
                     color: color,
                   ),
-                ),
-              ],
+                  SizedBox(width: 6),
+                  Text(
+                    recommendations.length > 3
+                        ? "Tap to view all ${recommendations.length} tips"
+                        : "Tap to expand",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-void _showFullscreenOverlay(
-  BuildContext context,
-  String title,
-  IconData icon,
-  Color color,
-  List<Color> gradientColors,
-  List<String> recommendations,
-) {
-  // Declare the overlayEntry as late - it will be initialized before use
-  late OverlayEntry overlayEntry;
-  
-  // Define the builder function separately
-  overlayEntry = OverlayEntry(
-    builder: (context) => Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: _AnimatedAutoSizingOverlay(
-        onDismiss: () {
-          overlayEntry.remove();
-        },
-        title: title,
-        icon: icon,
-        color: color,
-        gradientColors: gradientColors,
-        recommendations: recommendations,
+  void _showFullscreenOverlay(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    List<Color> gradientColors,
+    List<String> recommendations,
+  ) {
+    // Declare the overlayEntry as late - it will be initialized before use
+    late OverlayEntry overlayEntry;
+
+    // Define the builder function separately
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: _AnimatedAutoSizingOverlay(
+          onDismiss: () {
+            overlayEntry.remove();
+          },
+          title: title,
+          icon: icon,
+          color: color,
+          gradientColors: gradientColors,
+          recommendations: recommendations,
+        ),
       ),
-    ),
-  );
-  
-  // Show the overlay
-  Overlay.of(context).insert(overlayEntry);
-}
+    );
+
+    // Show the overlay
+    Overlay.of(context).insert(overlayEntry);
+  }
 
 // Helper widget for zone indicators
   Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
@@ -1713,6 +1719,8 @@ void _showFullscreenOverlay(
           .limit(1)
           .get();
 
+      print("SubGoal Query is Empty?: ");
+      print(subgoalQuery.docs.isNotEmpty);
       if (subgoalQuery.docs.isNotEmpty) {
         DocumentSnapshot subgoalDoc = subgoalQuery.docs.first;
         var data = subgoalDoc.data() as Map<String, dynamic>;
@@ -1869,102 +1877,102 @@ void _showFullscreenOverlay(
 
 // Method to set a new cycling subgoal
   void _setCyclingSubgoal(String type, double targetValue) {
-  if (baselineDistance == 0.0) {
-    _calculateBaselines();
+    if (baselineDistance == 0.0) {
+      _calculateBaselines();
+    }
+
+    String title = "";
+    List<String> suggestions = [];
+    List<String> warnings = [];
+    String dataSource = usingPreviousGoal
+        ? "previous goal target"
+        : "your actual cycling performance";
+
+    switch (type) {
+      case "distance":
+        title =
+            "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
+
+        // Generate suggestions
+        suggestions.add(
+            "Start with a proper warm-up to prepare for the longer distance");
+        suggestions.add("Increase your hydration for longer rides");
+        suggestions.add("Plan a route with the target distance in advance");
+
+        if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
+          warnings.add(
+              "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
+        }
+
+        if (respiratoryCondition == "Yes" &&
+            targetValue > referenceDistance * 1.2) {
+          warnings.add(
+              "With your respiratory condition, consider a more moderate increase in distance.");
+        }
+        break;
+
+      case "pace":
+        double currentPaceMinPerKm = referencePace;
+        title =
+            "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
+
+        suggestions.add("Include interval training in your routine");
+        suggestions.add("Focus on consistent pedaling cadence");
+        suggestions.add(
+            "Make sure your bike is properly maintained for optimal efficiency");
+
+        if (currentPaceMinPerKm > 0 &&
+            targetValue < currentPaceMinPerKm * 0.8) {
+          warnings.add(
+              "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
+        }
+
+        if (cardiovascularCondition == "Yes") {
+          warnings.add(
+              "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
+        }
+        break;
+
+      case "duration":
+        title =
+            "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
+
+        suggestions.add("Build endurance with a steady pace");
+        suggestions.add("Ensure proper nutrition before longer sessions");
+        suggestions.add("Take small breaks if needed during the extended ride");
+
+        if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
+          warnings.add(
+              "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
+        }
+
+        break;
+
+      case "maintain":
+        title = "Maintain current cycling performance";
+
+        suggestions.add("Focus on consistency in your current routine");
+        suggestions.add("Work on technique refinement");
+        suggestions.add("Use this period to establish a sustainable rhythm");
+        break;
+    }
+
+    // Add a note about the data source to the suggestions
+    suggestions.add(
+        "This goal is based on $dataSource from your previous training period.");
+
+    setState(() {
+      hasActiveSubgoal = true;
+      subgoalType = type;
+      subgoalTargetValue = targetValue;
+      subgoalStartDate = DateTime.now();
+      subgoalEndDate = DateTime.now().add(Duration(days: 7));
+      subgoalSuggestions = suggestions;
+      subgoalWarnings = warnings;
+    });
+
+    _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
   }
-
-  String title = "";
-  List<String> suggestions = [];
-  List<String> warnings = [];
-  String dataSource = usingPreviousGoal ? 
-      "previous goal target" : 
-      "your actual cycling performance";
-
-  switch (type) {
-    case "distance":
-      title =
-          "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
-
-      // Generate suggestions
-      suggestions.add(
-          "Start with a proper warm-up to prepare for the longer distance");
-      suggestions.add("Increase your hydration for longer rides");
-      suggestions.add("Plan a route with the target distance in advance");
-
-      if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
-        warnings.add(
-            "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
-      }
-
-      if (respiratoryCondition == "Yes" &&
-          targetValue > referenceDistance * 1.2) {
-        warnings.add(
-            "With your respiratory condition, consider a more moderate increase in distance.");
-      }
-      break;
-
-    case "pace":
-      double currentPaceMinPerKm = referencePace;
-      title =
-          "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
-
-      suggestions.add("Include interval training in your routine");
-      suggestions.add("Focus on consistent pedaling cadence");
-      suggestions.add(
-          "Make sure your bike is properly maintained for optimal efficiency");
-
-      if (currentPaceMinPerKm > 0 &&
-          targetValue < currentPaceMinPerKm * 0.8) {
-        warnings.add(
-            "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
-      }
-
-      if (cardiovascularCondition == "Yes") {
-        warnings.add(
-            "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
-      }
-      break;
-
-    case "duration":
-      title =
-          "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
-
-      suggestions.add("Build endurance with a steady pace");
-      suggestions.add("Ensure proper nutrition before longer sessions");
-      suggestions.add("Take small breaks if needed during the extended ride");
-
-      if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
-        warnings.add(
-            "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
-      }
-
-      break;
-
-    case "maintain":
-      title = "Maintain current cycling performance";
-
-      suggestions.add("Focus on consistency in your current routine");
-      suggestions.add("Work on technique refinement");
-      suggestions.add("Use this period to establish a sustainable rhythm");
-      break;
-  }
-
-  // Add a note about the data source to the suggestions
-  suggestions.add("This goal is based on $dataSource from your previous training period.");
-
-  setState(() {
-    hasActiveSubgoal = true;
-    subgoalType = type;
-    subgoalTargetValue = targetValue;
-    subgoalStartDate = DateTime.now();
-    subgoalEndDate = DateTime.now().add(Duration(days: 7));
-    subgoalSuggestions = suggestions;
-    subgoalWarnings = warnings;
-  });
-
-  _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
-}
-
 
   Future<void> _fetchFoodDiaryData() async {
     if (userId == null) return;
@@ -2029,7 +2037,7 @@ void _showFullscreenOverlay(
     }
   }
 
-void _generateNutritionRecommendationsFromFoodDiary() {
+  void _generateNutritionRecommendationsFromFoodDiary() {
     nutritionRecommendations.clear();
 
     if (nutritionData.isEmpty) {
@@ -2245,19 +2253,21 @@ void _generateNutritionRecommendationsFromFoodDiary() {
             "Your lunch carbohydrate intake (${lunchCarbs.toInt()}g) is lower than optimal. Aim for ${(recommendedCarbGrams * 0.3).toInt()}-${(recommendedCarbGrams * 0.35).toInt()}g of carbs at lunch to fuel afternoon activities and support recovery.");
       }
 
-      if (lunchProtein < (recommendedProteinGrams * 0.25) && lunchCalories > 0) {
+      if (lunchProtein < (recommendedProteinGrams * 0.25) &&
+          lunchCalories > 0) {
         nutritionRecommendations.add(
             "Your lunch protein intake (${lunchProtein.toInt()}g) could be increased to better support muscle recovery throughout the day. Target ${(recommendedProteinGrams * 0.25).toInt()}-${(recommendedProteinGrams * 0.3).toInt()}g at lunch.");
       }
 
       // Dinner macronutrient recommendations
-      if (dinnerProtein < (recommendedProteinGrams * 0.3) && dinnerCalories > 0) {
+      if (dinnerProtein < (recommendedProteinGrams * 0.3) &&
+          dinnerCalories > 0) {
         nutritionRecommendations.add(
             "Your dinner protein intake (${dinnerProtein.toInt()}g) is lower than recommended. Aim for ${(recommendedProteinGrams * 0.3).toInt()}-${(recommendedProteinGrams * 0.4).toInt()}g at dinner to optimize overnight muscle repair.");
       }
 
-      if (dinnerCarbs > (recommendedCarbGrams * 0.5) && 
-          goalType == "High Intensity Cycling" && 
+      if (dinnerCarbs > (recommendedCarbGrams * 0.5) &&
+          goalType == "High Intensity Cycling" &&
           dinnerCalories > 0) {
         nutritionRecommendations.add(
             "Your dinner carbohydrate intake (${dinnerCarbs.toInt()}g) is relatively high. For weight management goals, consider shifting some carbs to earlier meals, especially if you don't typically ride in the evening.");
@@ -3072,114 +3082,114 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     }
 
     return Container(
-    padding: EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: usingPreviousGoal ? Colors.purple[50] : Colors.blue[50],
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-        color: usingPreviousGoal ? Colors.purple[200]! : Colors.blue[100]!, 
-        width: 1
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: usingPreviousGoal ? Colors.purple[50] : Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: usingPreviousGoal ? Colors.purple[200]! : Colors.blue[100]!,
+            width: 1),
       ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              usingPreviousGoal 
-                ? Icons.emoji_events_outlined  // Trophy icon for previous goals
-                : Icons.analytics_outlined,    // Analytics icon for performance data
-              size: 16,
-              color: usingPreviousGoal ? Colors.purple[800] : Colors.blue[800],
-            ),
-            SizedBox(width: 6),
-            Text(
-              usingPreviousGoal 
-                ? "Your Previous Goal Target:" 
-                : "Your Actual Performance:",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: usingPreviousGoal ? Colors.purple[800] : Colors.blue[800]
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                usingPreviousGoal
+                    ? Icons
+                        .emoji_events_outlined // Trophy icon for previous goals
+                    : Icons
+                        .analytics_outlined, // Analytics icon for performance data
+                size: 16,
+                color:
+                    usingPreviousGoal ? Colors.purple[800] : Colors.blue[800],
               ),
-            ),
-          ],
-        ),
-        SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Column(
-              children: [
-                Text(
-                  "${referenceDistance.toStringAsFixed(1)} km",
-                  style: TextStyle(
-                    fontSize: 16,
+              SizedBox(width: 6),
+              Text(
+                usingPreviousGoal
+                    ? "Your Previous Goal Target:"
+                    : "Your Actual Performance:",
+                style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87
+                    color: usingPreviousGoal
+                        ? Colors.purple[800]
+                        : Colors.blue[800]),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              Column(
+                children: [
+                  Text(
+                    "${referenceDistance.toStringAsFixed(1)} km",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
                   ),
-                ),
-                Text(
-                  "Distance",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                Text(
-                  "${referencePace > 0 ? referencePace.toStringAsFixed(1) : '-'} min/km",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87
+                  Text(
+                    "Distance",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                   ),
-                ),
-                Text(
-                  "Pace",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                Text(
-                  "${referenceDuration.toStringAsFixed(0)} min",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87
+                ],
+              ),
+              Column(
+                children: [
+                  Text(
+                    "${referencePace > 0 ? referencePace.toStringAsFixed(1) : '-'} min/km",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
                   ),
-                ),
-                Text(
-                  "Duration",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                ),
-              ],
-            ),
-          ],
-        ),
-        SizedBox(height: 6),
-        Center(
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: usingPreviousGoal 
-                ? Colors.purple[100]!.withOpacity(0.4) 
-                : Colors.blue[100]!.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              usingPreviousGoal
-                ? "Based on previous goal target value"
-                : "Based on your actual cycling performance",
-              style: TextStyle(
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-                color: usingPreviousGoal ? Colors.purple[900] : Colors.blue[900],
-                fontWeight: FontWeight.w500,
-
+                  Text(
+                    "Pace",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+              Column(
+                children: [
+                  Text(
+                    "${referenceDuration.toStringAsFixed(0)} min",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
+                  ),
+                  Text(
+                    "Duration",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+          Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: usingPreviousGoal
+                    ? Colors.purple[100]!.withOpacity(0.4)
+                    : Colors.blue[100]!.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                usingPreviousGoal
+                    ? "Based on previous goal target value"
+                    : "Based on your actual cycling performance",
+                style: TextStyle(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color:
+                      usingPreviousGoal ? Colors.purple[900] : Colors.blue[900],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -3624,6 +3634,8 @@ void _generateNutritionRecommendationsFromFoodDiary() {
             daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
             sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
             targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
+            baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
+            baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
           } else if (goalType == 'Endurance') {
             targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
             targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
@@ -3680,32 +3692,108 @@ void _generateNutritionRecommendationsFromFoodDiary() {
             "uid": data['uid'],
           });
         }
+        // await _fetchActiveSubgoal();
 
         setState(() {
           activityData = newActivityData;
           totalActivities = activityData.length;
 
+          weeklyActivityCount = 0;
+          weeklyDistanceTotal = 0.0;
+
+          print("what: $hasActiveSubgoal");
+
+          if (hasActiveSubgoal == true) {
+            for (var activity in activityData) {
+              if (activity['start_date'] != null) {
+                print(activity);
+                DateTime activityDate = activity['start_date'].toDate();
+                if (activityDate.isAfter(subgoalStartDate)) {
+                  weeklyActivityCount++;
+                  weeklyDistanceTotal += safeParseDouble(activity['distance']);
+                }
+              }
+            }
+          } else {
+            DateTime now = DateTime.now();
+            if (now.isBefore(baselineEndDate) &&
+                now.isAfter(
+                    baselineEndDate.subtract(const Duration(days: 7)))) {
+              for (var activity in activityData) {
+                if (activity['start_date'] != null) {
+                  print(activity);
+                  DateTime activityDate = activity['start_date'].toDate();
+                  if (activityDate.isBefore(baselineEndDate) &&
+                      activityDate.isAfter(
+                          baselineEndDate.subtract(const Duration(days: 7)))) {
+                    weeklyActivityCount++;
+                    weeklyDistanceTotal +=
+                        safeParseDouble(activity['distance']);
+                  }
+                }
+              }
+            } else if (now.isBefore(
+                    baselineEndDate.subtract(const Duration(days: 7))) &&
+                now.isAfter(
+                    baselineEndDate.subtract(const Duration(days: 14)))) {
+              for (var activity in activityData) {
+                if (activity['start_date'] != null) {
+                  print(activity);
+                  DateTime activityDate = activity['start_date'].toDate();
+                  if (activityDate.isBefore(
+                          baselineEndDate.subtract(const Duration(days: 7))) &&
+                      activityDate.isAfter(
+                          baselineEndDate.subtract(const Duration(days: 14)))) {
+                    weeklyActivityCount++;
+                    weeklyDistanceTotal +=
+                        safeParseDouble(activity['distance']);
+                  }
+                }
+              }
+            } else if (now.isBefore(
+                    baselineEndDate.subtract(const Duration(days: 14))) &&
+                now.isAfter(
+                    baselineEndDate.subtract(const Duration(days: 21)))) {
+              for (var activity in activityData) {
+                if (activity['start_date'] != null) {
+                  print(activity);
+                  DateTime activityDate = activity['start_date'].toDate();
+                  if (activityDate.isBefore(
+                          baselineEndDate.subtract(const Duration(days: 14))) &&
+                      activityDate.isAfter(
+                          baselineEndDate.subtract(const Duration(days: 21)))) {
+                    weeklyActivityCount++;
+                    weeklyDistanceTotal +=
+                        safeParseDouble(activity['distance']);
+                  }
+                }
+              }
+            } else if (now.isBefore(
+                    baselineEndDate.subtract(const Duration(days: 21))) &&
+                now.isAfter(
+                    baselineEndDate.subtract(const Duration(days: 28)))) {
+              for (var activity in activityData) {
+                if (activity['start_date'] != null) {
+                  print(activity);
+                  DateTime activityDate = activity['start_date'].toDate();
+                  if (activityDate.isBefore(
+                          baselineEndDate.subtract(const Duration(days: 21))) &&
+                      activityDate.isAfter(
+                          baselineEndDate.subtract(const Duration(days: 28)))) {
+                    weeklyActivityCount++;
+                    weeklyDistanceTotal +=
+                        safeParseDouble(activity['distance']);
+                  }
+                }
+              }
+            }
+          }
           if (activityData.isNotEmpty) {
             if (activityData[0]['start_date'] != null) {
               lastActivityDate = activityData[0]['start_date'].toDate();
               daysSinceLastActivity =
                   DateTime.now().difference(lastActivityDate).inDays;
             }
-
-            weeklyActivityCount = 0;
-            weeklyDistanceTotal = 0.0;
-            DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
-
-            for (var activity in activityData) {
-              if (activity['start_date'] != null) {
-                DateTime activityDate = activity['start_date'].toDate();
-                if (activityDate.isAfter(oneWeekAgo)) {
-                  weeklyActivityCount++;
-                  weeklyDistanceTotal += safeParseDouble(activity['distance']);
-                }
-              }
-            }
-
             _analyzeHistoricalTrends();
           }
         });
@@ -3870,6 +3958,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
       if (goalType == "High Intensity Cycling") {
         _calculateBaselines();
         await _fetchActiveSubgoal();
+        print('huh: $hasActiveSubgoal');
       }
       setState(() {
         _isLoadingGraphs = false;
@@ -5393,324 +5482,318 @@ void _generateNutritionRecommendationsFromFoodDiary() {
     return days.toString();
   }
 
-  Widget _buildExpandedPopup(
-  BuildContext context,
-  String title,
-  IconData icon,
-  Color color,
-  List<Color> gradientColors,
-  List<String> recommendations,
-  {required VoidCallback onClose}
-) {
-  return GestureDetector(
-    onTap: () {}, // Prevent taps from closing the popup
-    child: TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 300),
-      curve: Curves.easeOutBack,
-      tween: Tween<double>(begin: 0.8, end: 1.0),
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: value,
-          child: child,
-        );
-      },
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 15,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with close button
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
+  Widget _buildExpandedPopup(BuildContext context, String title, IconData icon,
+      Color color, List<Color> gradientColors, List<String> recommendations,
+      {required VoidCallback onClose}) {
+    return GestureDetector(
+      onTap: () {}, // Prevent taps from closing the popup
+      child: TweenAnimationBuilder<double>(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOutBack,
+        tween: Tween<double>(begin: 0.8, end: 1.0),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: value,
+            child: child,
+          );
+        },
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                spreadRadius: 2,
+                blurRadius: 15,
+                offset: Offset(0, 10),
               ),
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(icon, color: Colors.white, size: 22),
-                        ),
-                        SizedBox(width: 12),
-                        Flexible(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              fontFamily: 'Fredoka-SemiBold',
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with close button
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: gradientColors,
                   ),
-                  GestureDetector(
-                    onTap: onClose,
-                    child: Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
-                ],
-              ),
-            ),
-
-            // Recommendations list
-            Expanded(
-              child: NotificationListener<OverscrollIndicatorNotification>(
-                onNotification: (overscroll) {
-                  overscroll.disallowIndicator();
-                  return true;
-                },
-                child: ListView.builder(
-                  physics: BouncingScrollPhysics(),
-                  padding: EdgeInsets.all(16),
-                  itemCount: recommendations.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 14),
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: color.withOpacity(0.2), width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.05),
-                            spreadRadius: 0,
-                            blurRadius: 5,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            margin: EdgeInsets.only(top: 2),
-                            child: Icon(
-                              Icons.check_circle_rounded,
-                              size: 20,
-                              color: color,
+                            padding: EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
                             ),
+                            child: Icon(icon, color: Colors.white, size: 22),
                           ),
                           SizedBox(width: 12),
-                          Expanded(
+                          Flexible(
                             child: Text(
-                              recommendations[index],
+                              title,
                               style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 15,
-                                color: Colors.black87,
-                                height: 1.4,
+                                fontFamily: 'Fredoka-SemiBold',
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                           ),
                         ],
                       ),
-                    );
+                    ),
+                    GestureDetector(
+                      onTap: onClose,
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Recommendations list
+              Expanded(
+                child: NotificationListener<OverscrollIndicatorNotification>(
+                  onNotification: (overscroll) {
+                    overscroll.disallowIndicator();
+                    return true;
                   },
+                  child: ListView.builder(
+                    physics: BouncingScrollPhysics(),
+                    padding: EdgeInsets.all(16),
+                    itemCount: recommendations.length,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 14),
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: color.withOpacity(0.2), width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withOpacity(0.05),
+                              spreadRadius: 0,
+                              blurRadius: 5,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                size: 20,
+                                color: color,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                recommendations[index],
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecommendationCarousel() {
+    List<Map<String, dynamic>> recommendationCategories = [];
+    int currentPage = 0;
+
+    if (trainingRecommendations.isNotEmpty) {
+      recommendationCategories.add({
+        "title": "Training Tips",
+        "icon": Icons.directions_bike_rounded,
+        "color": Color(0xFF1E88E5),
+        "gradientColors": [Color(0xFF1E88E5), Color(0xFF0D47A1)],
+        "recommendations": trainingRecommendations,
+      });
+    }
+
+    if (nutritionRecommendations.isNotEmpty) {
+      recommendationCategories.add({
+        "title": "Nutrition & Hydration",
+        "icon": Icons.restaurant_rounded,
+        "color": Color(0xFF43A047),
+        "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)],
+        "recommendations": nutritionRecommendations,
+      });
+    }
+
+    if (healthRecommendations.isNotEmpty) {
+      recommendationCategories.add({
+        "title": "Health & Recovery",
+        "icon": Icons.favorite_rounded,
+        "color": Color(0xFFEC407A),
+        "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)],
+        "recommendations": healthRecommendations,
+      });
+    }
+
+    if (equipmentRecommendations.isNotEmpty) {
+      recommendationCategories.add({
+        "title": "Equipment & Gear",
+        "icon": Icons.handyman_rounded,
+        "color": Color(0xFF546E7A),
+        "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)],
+        "recommendations": equipmentRecommendations,
+      });
+    }
+
+    if (progressRecommendations.isNotEmpty) {
+      recommendationCategories.add({
+        "title": "Progress Insights",
+        "icon": Icons.insights_rounded,
+        "color": Color(0xFF8E24AA),
+        "gradientColors": [Color(0xFF8E24AA), Color(0xFF5E35B1)],
+        "recommendations": progressRecommendations,
+      });
+    }
+
+    if (recommendationCategories.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Track more cycling activities to receive personalized recommendations.",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  color: Colors.grey[700],
                 ),
               ),
             ),
           ],
         ),
-      ),
-    ),
-  );
-}
+      );
+    }
 
-  Widget _buildRecommendationCarousel() {
-  List<Map<String, dynamic>> recommendationCategories = [];
-  int currentPage = 0;
+    PageController pageController = PageController(
+      initialPage: 0,
+      viewportFraction: 0.92,
+    );
 
-  if (trainingRecommendations.isNotEmpty) {
-    recommendationCategories.add({
-      "title": "Training Tips",
-      "icon": Icons.directions_bike_rounded,
-      "color": Color(0xFF1E88E5),
-      "gradientColors": [Color(0xFF1E88E5), Color(0xFF0D47A1)],
-      "recommendations": trainingRecommendations,
-    });
-  }
+    // Reference to store the current overlay entry
+    OverlayEntry? overlayEntry;
 
-  if (nutritionRecommendations.isNotEmpty) {
-    recommendationCategories.add({
-      "title": "Nutrition & Hydration",
-      "icon": Icons.restaurant_rounded,
-      "color": Color(0xFF43A047),
-      "gradientColors": [Color(0xFF43A047), Color(0xFF2E7D32)],
-      "recommendations": nutritionRecommendations,
-    });
-  }
-
-  if (healthRecommendations.isNotEmpty) {
-    recommendationCategories.add({
-      "title": "Health & Recovery",
-      "icon": Icons.favorite_rounded,
-      "color": Color(0xFFEC407A),
-      "gradientColors": [Color(0xFFEC407A), Color(0xFFC2185B)],
-      "recommendations": healthRecommendations,
-    });
-  }
-
-  if (equipmentRecommendations.isNotEmpty) {
-    recommendationCategories.add({
-      "title": "Equipment & Gear",
-      "icon": Icons.handyman_rounded,
-      "color": Color(0xFF546E7A),
-      "gradientColors": [Color(0xFF546E7A), Color(0xFF37474F)],
-      "recommendations": equipmentRecommendations,
-    });
-  }
-
-  if (progressRecommendations.isNotEmpty) {
-    recommendationCategories.add({
-      "title": "Progress Insights",
-      "icon": Icons.insights_rounded,
-      "color": Color(0xFF8E24AA),
-      "gradientColors": [Color(0xFF8E24AA), Color(0xFF5E35B1)],
-      "recommendations": progressRecommendations,
-    });
-  }
-
-  if (recommendationCategories.isEmpty) {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: Colors.grey[500], size: 24),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              "Track more cycling activities to receive personalized recommendations.",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 15,
-                color: Colors.grey[700],
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Column(
+          children: [
+            Container(
+              height: 350,
+              child: PageView.builder(
+                controller: pageController,
+                itemCount: recommendationCategories.length,
+                itemBuilder: (context, index) {
+                  var category = recommendationCategories[index];
+                  return _buildRecommendationCard(
+                    context,
+                    category["title"],
+                    category["icon"],
+                    category["color"],
+                    category["gradientColors"],
+                    category["recommendations"],
+                    onTap: () {
+                      // Show fullscreen overlay when card is tapped
+                      _showFullscreenOverlay(
+                        context,
+                        category["title"],
+                        category["icon"],
+                        category["color"],
+                        category["gradientColors"],
+                        category["recommendations"],
+                      );
+                    },
+                  );
+                },
+                onPageChanged: (index) {
+                  setState(() {
+                    currentPage = index;
+                  });
+                },
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  PageController pageController = PageController(
-    initialPage: 0,
-    viewportFraction: 0.92,
-  );
-  
-  // Reference to store the current overlay entry
-  OverlayEntry? overlayEntry;
-
-  return StatefulBuilder(
-    builder: (context, setState) {
-      return Column(
-        children: [
-          Container(
-            height: 350,
-            child: PageView.builder(
-              controller: pageController,
-              itemCount: recommendationCategories.length,
-              itemBuilder: (context, index) {
-                var category = recommendationCategories[index];
-                return _buildRecommendationCard(
-                  context,
-                  category["title"],
-                  category["icon"],
-                  category["color"],
-                  category["gradientColors"],
-                  category["recommendations"],
-                  onTap: () {
-                    // Show fullscreen overlay when card is tapped
-                    _showFullscreenOverlay(
-                      context,
-                      category["title"],
-                      category["icon"],
-                      category["color"],
-                      category["gradientColors"],
-                      category["recommendations"],
-                    );
-                  },
-                );
-              },
-              onPageChanged: (index) {
-                setState(() {
-                  currentPage = index;
-                });
-              },
-            ),
-          ),
-          SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              recommendationCategories.length,
-              (index) => AnimatedContainer(
-                duration: Duration(milliseconds: 300),
-                margin: EdgeInsets.symmetric(horizontal: 4),
-                width: currentPage == index ? 16 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: currentPage == index
-                      ? (recommendationCategories[index]["color"] as Color)
-                      : Colors.orange.withOpacity(0.2),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                recommendationCategories.length,
+                (index) => AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  margin: EdgeInsets.symmetric(horizontal: 4),
+                  width: currentPage == index ? 16 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: currentPage == index
+                        ? (recommendationCategories[index]["color"] as Color)
+                        : Colors.orange.withOpacity(0.2),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
+          ],
+        );
+      },
+    );
+  }
 
   IconData _getRecommendationIcon(String recommendation) {
     if (recommendation.contains("✅") ||
@@ -7957,7 +8040,8 @@ void _generateNutritionRecommendationsFromFoodDiary() {
   }
 }
 
-class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> with SingleTickerProviderStateMixin {
+class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -7965,13 +8049,13 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
   @override
   void initState() {
     super.initState();
-    
+
     // Create animation controller
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Create animations
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
@@ -7979,14 +8063,14 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
         curve: Curves.easeOutBack,
       ),
     );
-    
+
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOut,
       ),
     );
-    
+
     // Start the animation
     _animationController.forward();
   }
@@ -8052,7 +8136,8 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
                                         color: Colors.white.withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(widget.icon, color: Colors.white, size: 24),
+                                      child: Icon(widget.icon,
+                                          color: Colors.white, size: 24),
                                     ),
                                     SizedBox(width: 14),
                                     Flexible(
@@ -8088,7 +8173,7 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
                             ],
                           ),
                         ),
-                        
+
                         // Content area - takes all available space
                         Expanded(
                           child: InkWell(
@@ -8117,7 +8202,9 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
                                     decoration: BoxDecoration(
                                       color: widget.color.withOpacity(0.05),
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: widget.color.withOpacity(0.2), width: 1),
+                                      border: Border.all(
+                                          color: widget.color.withOpacity(0.2),
+                                          width: 1),
                                       boxShadow: [
                                         BoxShadow(
                                           color: widget.color.withOpacity(0.05),
@@ -8128,7 +8215,8 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
                                       ],
                                     ),
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Container(
                                           margin: EdgeInsets.only(top: 2),
@@ -8171,7 +8259,8 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
   }
 }
 
-class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> with SingleTickerProviderStateMixin {
+class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -8179,13 +8268,13 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
   @override
   void initState() {
     super.initState();
-    
+
     // Create animation controller
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Create animations
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
@@ -8193,14 +8282,14 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
         curve: Curves.easeOutBack,
       ),
     );
-    
+
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOut,
       ),
     );
-    
+
     // Start the animation
     _animationController.forward();
   }
@@ -8221,7 +8310,7 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
   // Calculate font size based on recommendation count
   double _calculateFontSize() {
     int count = widget.recommendations.length;
-    
+
     // Base font size that decreases as recommendation count increases
     if (count <= 3) return 16.0;
     if (count <= 5) return 15.0;
@@ -8234,7 +8323,7 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
   // Calculate icon size based on recommendation count
   double _calculateIconSize() {
     int count = widget.recommendations.length;
-    
+
     if (count <= 3) return 22.0;
     if (count <= 5) return 20.0;
     if (count <= 8) return 18.0;
@@ -8245,7 +8334,7 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
   // Calculate item padding based on recommendation count
   EdgeInsets _calculateItemPadding() {
     int count = widget.recommendations.length;
-    
+
     if (count <= 3) return EdgeInsets.all(16.0);
     if (count <= 5) return EdgeInsets.all(14.0);
     if (count <= 8) return EdgeInsets.all(12.0);
@@ -8257,7 +8346,7 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
   // Calculate item margin based on recommendation count
   double _calculateItemMargin() {
     int count = widget.recommendations.length;
-    
+
     if (count <= 3) return 14.0;
     if (count <= 5) return 12.0;
     if (count <= 8) return 10.0;
@@ -8273,7 +8362,7 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
     final iconSize = _calculateIconSize();
     final itemPadding = _calculateItemPadding();
     final itemMargin = _calculateItemMargin();
-    
+
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -8320,7 +8409,8 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
                                         color: Colors.white.withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(widget.icon, color: Colors.white, size: 24),
+                                      child: Icon(widget.icon,
+                                          color: Colors.white, size: 24),
                                     ),
                                     SizedBox(width: 14),
                                     Flexible(
@@ -8356,11 +8446,10 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
                             ],
                           ),
                         ),
-                        
+
                         Expanded(
                           child: InkWell(
-                            onTap: () {
-                            },
+                            onTap: () {},
                             splashColor: Colors.transparent,
                             highlightColor: Colors.transparent,
                             child: Container(
@@ -8378,17 +8467,24 @@ class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> 
                                   padding: EdgeInsets.all(12),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    children: widget.recommendations.map((recommendation) {
+                                    children: widget.recommendations
+                                        .map((recommendation) {
                                       return Container(
-                                        margin: EdgeInsets.only(bottom: itemMargin),
+                                        margin:
+                                            EdgeInsets.only(bottom: itemMargin),
                                         padding: itemPadding,
                                         decoration: BoxDecoration(
                                           color: widget.color.withOpacity(0.05),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: widget.color.withOpacity(0.2), width: 1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color:
+                                                  widget.color.withOpacity(0.2),
+                                              width: 1),
                                         ),
                                         child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Container(
                                               margin: EdgeInsets.only(top: 2),
