@@ -11,6 +11,27 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
+class _AnimatedAutoSizingOverlay extends StatefulWidget {
+  final VoidCallback onDismiss;
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<Color> gradientColors;
+  final List<String> recommendations;
+
+  const _AnimatedAutoSizingOverlay({
+    required this.onDismiss,
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.gradientColors,
+    required this.recommendations,
+  });
+
+  @override
+  _AnimatedAutoSizingOverlayState createState() => _AnimatedAutoSizingOverlayState();
+}
+
 class _AnimatedFullscreenOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
   final String title;
@@ -877,7 +898,6 @@ Widget _buildRecommendationCard(
   );
 }
 
-
 void _showFullscreenOverlay(
   BuildContext context,
   String title,
@@ -896,7 +916,7 @@ void _showFullscreenOverlay(
       left: 0,
       right: 0,
       bottom: 0,
-      child: _AnimatedFullscreenOverlay(
+      child: _AnimatedAutoSizingOverlay(
         onDismiss: () {
           overlayEntry.remove();
         },
@@ -6106,7 +6126,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
         }
 
         return _buildGraphContainer(
-          title: "Calories &\nWeight Correlation",
+          title: "Calories and\nWeight Correlation",
           subtitle: isInSurplus ? "Caloric Surplus" : "Caloric Deficit",
           height: 650,
           child: Column(
@@ -6307,7 +6327,7 @@ void _generateNutritionRecommendationsFromFoodDiary() {
               ),
               Padding(
                 padding: const EdgeInsets.only(
-                    top: 4, bottom: 4, left: 16, right: 16),
+                    top: 20, bottom: 4, left: 16, right: 16),
                 child: Container(
                   padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   decoration: BoxDecoration(
@@ -8134,6 +8154,268 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay> 
                                     ),
                                   );
                                 },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Create animation controller
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    // Create animations
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+    
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
+    
+    // Start the animation
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    // Reverse the animation and then dismiss
+    _animationController.reverse().then((_) {
+      widget.onDismiss();
+    });
+  }
+
+  // Calculate font size based on recommendation count
+  double _calculateFontSize() {
+    int count = widget.recommendations.length;
+    
+    // Base font size that decreases as recommendation count increases
+    if (count <= 3) return 16.0;
+    if (count <= 5) return 15.0;
+    if (count <= 8) return 14.0;
+    if (count <= 12) return 13.0;
+    if (count <= 16) return 12.0;
+    return 11.0; // Minimum font size for readability
+  }
+
+  // Calculate icon size based on recommendation count
+  double _calculateIconSize() {
+    int count = widget.recommendations.length;
+    
+    if (count <= 3) return 22.0;
+    if (count <= 5) return 20.0;
+    if (count <= 8) return 18.0;
+    if (count <= 12) return 16.0;
+    return 14.0;
+  }
+
+  // Calculate item padding based on recommendation count
+  EdgeInsets _calculateItemPadding() {
+    int count = widget.recommendations.length;
+    
+    if (count <= 3) return EdgeInsets.all(16.0);
+    if (count <= 5) return EdgeInsets.all(14.0);
+    if (count <= 8) return EdgeInsets.all(12.0);
+    if (count <= 12) return EdgeInsets.all(10.0);
+    if (count <= 16) return EdgeInsets.all(8.0);
+    return EdgeInsets.all(6.0);
+  }
+
+  // Calculate item margin based on recommendation count
+  double _calculateItemMargin() {
+    int count = widget.recommendations.length;
+    
+    if (count <= 3) return 14.0;
+    if (count <= 5) return 12.0;
+    if (count <= 8) return 10.0;
+    if (count <= 12) return 8.0;
+    if (count <= 16) return 6.0;
+    return 4.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Auto-size calculations
+    final fontSize = _calculateFontSize();
+    final iconSize = _calculateIconSize();
+    final itemPadding = _calculateItemPadding();
+    final itemMargin = _calculateItemMargin();
+    
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Material(
+          color: Colors.black.withOpacity(0.7 * _opacityAnimation.value),
+          child: InkWell(
+            onTap: _dismiss,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            child: SafeArea(
+              child: Center(
+                child: Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        // Header with close button
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: widget.gradientColors,
+                            ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                          ),
+                          padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(widget.icon, color: Colors.white, size: 24),
+                                    ),
+                                    SizedBox(width: 14),
+                                    Flexible(
+                                      child: Text(
+                                        widget.title,
+                                        style: TextStyle(
+                                          fontFamily: 'Fredoka-SemiBold',
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _dismiss,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                            },
+                            splashColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.only(
+                                  bottomLeft: Radius.circular(20),
+                                  bottomRight: Radius.circular(20),
+                                ),
+                              ),
+                              child: SingleChildScrollView(
+                                physics: BouncingScrollPhysics(),
+                                child: Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: widget.recommendations.map((recommendation) {
+                                      return Container(
+                                        margin: EdgeInsets.only(bottom: itemMargin),
+                                        padding: itemPadding,
+                                        decoration: BoxDecoration(
+                                          color: widget.color.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: widget.color.withOpacity(0.2), width: 1),
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              margin: EdgeInsets.only(top: 2),
+                                              child: Icon(
+                                                Icons.check_circle_rounded,
+                                                size: iconSize,
+                                                color: widget.color,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                recommendation,
+                                                style: TextStyle(
+                                                  fontFamily: 'Inter',
+                                                  fontSize: fontSize,
+                                                  color: Colors.black87,
+                                                  height: 1.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
