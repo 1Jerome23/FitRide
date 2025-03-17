@@ -65,19 +65,9 @@ class _QuestionPageState extends State<QuestionPage>
       'description': 'No pre-existing conditions'
     },
     {
-      'image': 'assets/heart.png',
-      'label': 'Cardiovascular',
-      'description': 'Heart-related conditions'
-    },
-    {
-      'image': 'assets/lungs.png',
-      'label': 'Respiratory',
-      'description': 'Breathing-related conditions'
-    },
-    {
-      'image': 'assets/both.png',
-      'label': 'Both',
-      'description': 'Both cardiovascular and respiratory conditions'
+      'image': 'assets/disease.png',
+      'label': 'Cardiovascular or Respiratory',
+      'description': 'Heart or breathing-related conditions'
     },
   ];
 
