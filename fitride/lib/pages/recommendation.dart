@@ -68,8 +68,11 @@ class PaceCaloriesData {
   final double pace;
   final double calories;
   final String activityName;
+  final double? weight;
 
-  PaceCaloriesData(this.date, this.pace, this.calories, this.activityName);
+  PaceCaloriesData(
+      this.date, this.pace, this.calories, this.activityName, this.weight);
+
 }
 
 class WeightCalorieData {
@@ -5818,271 +5821,360 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
-  Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
-    if (userId == null) {
-      return [];
-    }
+ Future<List<PaceCaloriesData>> _fetchAllPaceCaloriesData() async {
+  if (userId == null) {
+    return [];
+  }
 
-    try {
-      List<PaceCaloriesData> chartData = [];
+  try {
+    List<PaceCaloriesData> chartData = [];
 
-      if (activityData.isNotEmpty) {
-        for (var activity in activityData) {
-          double elapsedTime = safeParseDouble(activity['elapsed_time']);
-          double distance = safeParseDouble(activity['distance']);
-          double calories = safeParseDouble(activity['calories_burned']);
-          String activityName = activity['name'] ?? 'Cycling Activity';
+    if (activityData.isNotEmpty) {
+      for (var activity in activityData) {
+        double elapsedTime = safeParseDouble(activity['elapsed_time']);
+        double distance = safeParseDouble(activity['distance']);
+        double calories = safeParseDouble(activity['calories_burned']);
+        String activityName = activity['name'] ?? 'Cycling Activity';
 
-          if (activity['start_date'] != null) {
-            DateTime date = activity['start_date'].toDate();
-
-            if (elapsedTime > 0 && distance > 0 && calories > 0) {
-              double paceMinPerKm = (elapsedTime / 60) / distance;
-              paceMinPerKm = double.parse(paceMinPerKm.toStringAsFixed(2));
-              calories = double.parse(calories.toStringAsFixed(2));
-
-              chartData.add(
-                  PaceCaloriesData(date, paceMinPerKm, calories, activityName));
-            }
-          }
-        }
-      } else {
-        QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
-            .collection('activities')
-            .where('uid', isEqualTo: userId)
-            .orderBy('start_date', descending: true)
-            .limit(30)
-            .get();
-
-        for (var doc in activitySnapshot.docs) {
-          var data = doc.data() as Map<String, dynamic>;
-
-          double elapsedTime = safeParseDouble(data['elapsed_time']);
-          double distance = safeParseDouble(data['distance']);
-          double calories = safeParseDouble(data['calories_burned']);
-          String activityName = data['name'] ?? 'Cycling Activity';
+        if (activity['start_date'] != null) {
+          DateTime date = activity['start_date'].toDate();
 
           if (elapsedTime > 0 && distance > 0 && calories > 0) {
             double paceMinPerKm = (elapsedTime / 60) / distance;
             paceMinPerKm = double.parse(paceMinPerKm.toStringAsFixed(2));
             calories = double.parse(calories.toStringAsFixed(2));
 
-            DateTime date = data['start_date'].toDate();
-
+            // Pass null for weight as the fifth parameter
             chartData.add(
-                PaceCaloriesData(date, paceMinPerKm, calories, activityName));
+                PaceCaloriesData(date, paceMinPerKm, calories, activityName, null));
           }
         }
       }
+    } else {
+      QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: userId)
+          .orderBy('start_date', descending: true)
+          .limit(30)
+          .get();
 
-      return chartData;
-    } catch (e) {
-      print("Error fetching pace-calories data: $e");
-      return [];
+      for (var doc in activitySnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+
+        double elapsedTime = safeParseDouble(data['elapsed_time']);
+        double distance = safeParseDouble(data['distance']);
+        double calories = safeParseDouble(data['calories_burned']);
+        String activityName = data['name'] ?? 'Cycling Activity';
+
+        if (elapsedTime > 0 && distance > 0 && calories > 0) {
+          double paceMinPerKm = (elapsedTime / 60) / distance;
+          paceMinPerKm = double.parse(paceMinPerKm.toStringAsFixed(2));
+          calories = double.parse(calories.toStringAsFixed(2));
+
+          DateTime date = data['start_date'].toDate();
+
+          // Pass null for weight as the fifth parameter
+          chartData.add(
+              PaceCaloriesData(date, paceMinPerKm, calories, activityName, null));
+        }
+      }
     }
+
+    return chartData;
+  } catch (e) {
+    print("Error fetching pace-calories data: $e");
+    return [];
   }
+}
 
-  Widget _buildPaceCaloriesCorrelationGraph() {
-    return FutureBuilder<List<PaceCaloriesData>>(
-      future: _fetchAllPaceCaloriesData(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingGraph();
-        }
+Widget _buildPaceCaloriesCorrelationGraph() {
+  return FutureBuilder<List<PaceCaloriesData>>(
+    future: _fetchAllPaceCaloriesData(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return _buildEmptyGraph("Error loading pace and calories data");
-        }
+      if (snapshot.hasError || !snapshot.hasData) {
+        return _buildEmptyGraph("Error loading pace and calories data");
+      }
 
-        List<PaceCaloriesData> chartData = snapshot.data!;
+      List<PaceCaloriesData> chartData = snapshot.data!;
 
-        if (chartData.isEmpty) {
-          return _buildEmptyGraph("No activities found");
-        }
+      if (chartData.isEmpty) {
+        return _buildEmptyGraph("No activities found");
+      }
 
-        chartData.sort((a, b) => b.date.compareTo(a.date));
+      // Sort data by date (oldest first)
+      chartData.sort((a, b) => a.date.compareTo(b.date));
 
-        if (chartData.length > 7) {
-          chartData = chartData.sublist(0, 7);
-        }
+      // Get the date range - first day to first day + 28 days
+      DateTime startDate = chartData.first.date;
+      DateTime endDate = startDate.add(Duration(days: 28));
+      
+      // Filter data to only include points within the 28-day range
+      chartData = chartData.where((data) => 
+        data.date.isAfter(startDate.subtract(Duration(days: 1))) && 
+        data.date.isBefore(endDate.add(Duration(days: 1)))
+      ).toList();
 
-        chartData = chartData.reversed.toList();
+      if (chartData.isEmpty) {
+        return _buildEmptyGraph("No activities found in the 28-day period");
+      }
 
-        List<String> sessionDates =
-            chartData.map((e) => DateFormat('MM/dd').format(e.date)).toList();
+      double avgPace = chartData.map((e) => e.pace).reduce((a, b) => a + b) /
+          chartData.length;
+      double avgCalories =
+          chartData.map((e) => e.calories).reduce((a, b) => a + b) /
+              chartData.length;
 
-        double avgPace = chartData.map((e) => e.pace).reduce((a, b) => a + b) /
-            chartData.length;
-        double avgCalories =
-            chartData.map((e) => e.calories).reduce((a, b) => a + b) /
-                chartData.length;
+      PaceCaloriesData fastestSession =
+          chartData.reduce((a, b) => a.pace < b.pace ? a : b);
+      PaceCaloriesData highestCalorieSession =
+          chartData.reduce((a, b) => a.calories > b.calories ? a : b);
 
-        PaceCaloriesData fastestSession =
-            chartData.reduce((a, b) => a.pace < b.pace ? a : b);
-        PaceCaloriesData highestCalorieSession =
-            chartData.reduce((a, b) => a.calories > b.calories ? a : b);
+      // For weight data, create data points
+      double userWeight = safeParseDouble(weight);
+      double previousUserWeight = previousWeight > 0 ? previousWeight : userWeight * 0.98;
+      
+      // Create weight data points at the start and end of the range
+      List<Map<String, dynamic>> weightDataPoints = [];
+      if (userWeight > 0) {
+        weightDataPoints.add({
+          'date': startDate,
+          'weight': previousUserWeight
+        });
+        weightDataPoints.add({
+          'date': endDate,
+          'weight': userWeight
+        });
+      }
 
-        return _buildGraphContainer(
-          title: "Pace & Calories\nAnalysis",
-          subtitle: "Recent Activities",
-          height: 650,
-          child: Column(
-            children: [
-              Expanded(
-                child: SfCartesianChart(
-                  margin: EdgeInsets.all(10),
-                  primaryXAxis: CategoryAxis(
-                    majorGridLines: MajorGridLines(width: 0),
-                    labelStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: Colors.grey[700],
-                    ),
+      // Set min/max weight values with some padding
+      double minWeight = userWeight > 0 ? math.min(userWeight, previousUserWeight) * 0.95 : 50;
+      double maxWeight = userWeight > 0 ? math.max(userWeight, previousUserWeight) * 1.05 : 100;
+
+      return _buildGraphContainer(
+        title: "Pace & Calories\nAnalysis",
+        subtitle: "28-Day Period",
+        height: 650,
+        child: Column(
+          children: [
+            Expanded(
+              child: SfCartesianChart(
+                margin: EdgeInsets.all(10),
+                primaryXAxis: DateTimeAxis(
+                  minimum: startDate,
+                  maximum: endDate,
+                  majorGridLines: MajorGridLines(width: 0),
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.grey[700],
                   ),
-                  primaryYAxis: NumericAxis(
-                    name: 'Calories',
-                    labelFormat: '{value} kcal',
+                  dateFormat: DateFormat('MM/dd'),
+                  intervalType: DateTimeIntervalType.days,
+                ),
+                primaryYAxis: NumericAxis(
+                  name: 'Calories',
+                  labelFormat: '{value} kcal',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.orange[700],
+                  ),
+                  majorGridLines: MajorGridLines(
+                    width: 0.5,
+                    color: Colors.grey[200],
+                    dashArray: <double>[3, 3],
+                  ),
+                  plotBands: [
+                    PlotBand(
+                      isVisible: true,
+                      start: avgCalories,
+                      end: avgCalories,
+                      borderColor: Colors.orange,
+                      borderWidth: 1,
+                      dashArray: <double>[3, 3],
+                    )
+                  ],
+                ),
+                axes: <ChartAxis>[
+                  NumericAxis(
+                    name: 'Pace',
+                    opposedPosition: true,
+                    labelFormat: '{value} min/km',
                     labelStyle: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 10,
-                      color: Colors.orange[700],
+                      color: Colors.blue[700],
                     ),
-                    majorGridLines: MajorGridLines(
-                      width: 0.5,
-                      color: Colors.grey[200],
-                      dashArray: <double>[3, 3],
-                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    isInversed: true,
                     plotBands: [
                       PlotBand(
                         isVisible: true,
-                        start: avgCalories,
-                        end: avgCalories,
-                        borderColor: Colors.orange,
+                        start: avgPace,
+                        end: avgPace,
+                        borderColor: Colors.blue,
                         borderWidth: 1,
                         dashArray: <double>[3, 3],
                       )
                     ],
                   ),
-                  axes: <ChartAxis>[
+                  if (userWeight > 0)
                     NumericAxis(
-                      name: 'Pace',
+                      name: 'Weight',
                       opposedPosition: true,
-                      labelFormat: '{value} min/km',
                       labelStyle: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 10,
-                        color: Colors.blue[700],
+                        color: Colors.green[700],
                       ),
+                      minimum: minWeight,
+                      maximum: maxWeight,
                       majorGridLines: MajorGridLines(width: 0),
-                      isInversed: true,
-                      plotBands: [
-                        PlotBand(
-                          isVisible: true,
-                          start: avgPace,
-                          end: avgPace,
-                          borderColor: Colors.blue,
-                          borderWidth: 1,
-                          dashArray: <double>[3, 3],
-                        )
+                      axisLine: AxisLine(width: 0),
+                    ),
+                ],
+                series: <ChartSeries>[
+                  ColumnSeries<PaceCaloriesData, DateTime>(
+                    name: 'Calories',
+                    dataSource: chartData,
+                    xValueMapper: (PaceCaloriesData data, _) => data.date,
+                    yValueMapper: (PaceCaloriesData data, _) => data.calories,
+                    width: 0.6,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(4)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange[300]!,
+                        Colors.orange[500]!,
                       ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
                     ),
-                  ],
-                  series: <ChartSeries>[
-                    ColumnSeries<PaceCaloriesData, String>(
-                      name: 'Calories',
-                      dataSource: chartData,
-                      xValueMapper: (PaceCaloriesData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (PaceCaloriesData data, _) => data.calories,
-                      width: 0.6,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(4)),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.orange[300]!,
-                          Colors.orange[500]!,
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
-                      dataLabelSettings: DataLabelSettings(
-                        isVisible: false,
-                      ),
-                      pointColorMapper: (PaceCaloriesData data, _) =>
-                          data == highestCalorieSession
-                              ? Colors.orange[700]
-                              : null,
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
                     ),
-                    SplineSeries<PaceCaloriesData, String>(
-                      name: 'Pace',
-                      dataSource: chartData,
-                      xValueMapper: (PaceCaloriesData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (PaceCaloriesData data, _) => data.pace,
-                      yAxisName: 'Pace',
-                      color: Colors.blue[600],
-                      width: 2.5,
+                    pointColorMapper: (PaceCaloriesData data, _) =>
+                        data == highestCalorieSession
+                            ? Colors.orange[700]
+                            : null,
+                  ),
+                  SplineSeries<PaceCaloriesData, DateTime>(
+                    name: 'Pace',
+                    dataSource: chartData,
+                    xValueMapper: (PaceCaloriesData data, _) => data.date,
+                    yValueMapper: (PaceCaloriesData data, _) => data.pace,
+                    yAxisName: 'Pace',
+                    color: Colors.blue[600],
+                    width: 2.5,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.circle,
+                      width: 8,
+                      height: 8,
+                      borderWidth: 2,
+                      borderColor: Colors.white,
+                    ),
+                    pointColorMapper: (PaceCaloriesData data, _) =>
+                        data == fastestSession
+                            ? Colors.green[600]
+                            : Colors.blue[600],
+                  ),
+                  // Weight series
+                  if (weightDataPoints.isNotEmpty)
+                    ScatterSeries<Map<String, dynamic>, DateTime>(
+                      name: 'Weight',
+                      dataSource: weightDataPoints,
+                      xValueMapper: (Map<String, dynamic> data, _) => data['date'],
+                      yValueMapper: (Map<String, dynamic> data, _) => data['weight'],
+                      yAxisName: 'Weight',
+                      color: Colors.green[700],
                       markerSettings: MarkerSettings(
-                        isVisible: true,
-                        shape: DataMarkerType.circle,
-                        width: 8,
-                        height: 4,
+                        height: 10,
+                        width: 10,
+                        shape: DataMarkerType.diamond,
                         borderWidth: 2,
                         borderColor: Colors.white,
                       ),
-                      pointColorMapper: (PaceCaloriesData data, _) =>
-                          data == fastestSession
-                              ? Colors.green[600]
-                              : Colors.blue[600],
-                    ),
-                  ],
-                  tooltipBehavior: TooltipBehavior(
-                    enable: true,
-                    color: Colors.grey[800],
-                    textStyle: TextStyle(color: Colors.white, fontSize: 12),
-                    header: '',
-                  ),
-                  legend: Legend(
-                    isVisible: true,
-                    position: LegendPosition.bottom,
-                    overflowMode: LegendItemOverflowMode.wrap,
-                  ),
-                ),
-              ),
-              Container(
-                margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                padding: EdgeInsets.fromLTRB(10, 8, 10, 0),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
-                ),
-                child: Column(
-                  children: [
-                    Divider(height: 1, thickness: 5, color: Colors.grey[200]),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        _generateEnhancedInsightText(chartData, avgPace,
-                            avgCalories, fastestSession, highestCalorieSession),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        textStyle: TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[800],
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
                         ),
+                        builder: (dynamic data, dynamic point, dynamic series, int pointIndex, int seriesIndex) {
+                          return Container(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.green[700]!, width: 1),
+                            ),
+                            child: Text(
+                              '${data['weight'].toStringAsFixed(1)} kg',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  ],
+                ],
+                tooltipBehavior: TooltipBehavior(
+                  enable: true,
+                  color: Colors.grey[800],
+                  textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                  header: '',
+                ),
+                legend: Legend(
+                  isVisible: true,
+                  position: LegendPosition.bottom,
+                  overflowMode: LegendItemOverflowMode.wrap,
                 ),
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: EdgeInsets.fromLTRB(10, 8, 10, 0),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!, width: 1),
+              ),
+              child: Column(
+                children: [
+                  Divider(height: 1, thickness: 5, color: Colors.grey[200]),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      _generateEnhancedInsightText(chartData, avgPace,
+                          avgCalories, fastestSession, highestCalorieSession),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   String _generateEnhancedInsightText(
       List<PaceCaloriesData> data,
