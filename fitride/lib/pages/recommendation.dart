@@ -268,14 +268,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String targetDuration = "0";
 
   int age = 0;
-   String gender = "-"; 
+  String gender = "-"; 
   String healthCondition = "-";
-  String respiratoryCondition = "No";
-  String cardiovascularCondition = "No";
   String height = "0";
   String weight = "0";
   String bodyFat = "0";
   String basalMetabolicRate = "0";
+  String heartRateLimit = "0";
 
   String levelOfExertion = "0";
   String averageHeartrate = "0";
@@ -1908,7 +1907,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
               "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
         }
 
-        if (respiratoryCondition == "Yes" &&
+        if (healthCondition == "Cardiovascular or Respiratory" &&
             targetValue > referenceDistance * 1.2) {
           warnings.add(
               "With your respiratory condition, consider a more moderate increase in distance.");
@@ -1931,7 +1930,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
               "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
         }
 
-        if (cardiovascularCondition == "Yes") {
+        if (healthCondition == "Cardiovascular or Respiratory") {
           warnings.add(
               "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
         }
@@ -3822,15 +3821,8 @@ class _RecommendationPageState extends State<RecommendationPage> {
         healthCondition = data['healthCondition'] ?? "-";
         // Add gender to the fetched data
         gender = data['gender'] ?? "Male"; // Default to Male if not specified
-
+        heartRateLimit = data['heartRateLimit']?.toString() ?? "0";
         // Parse health conditions into specific types
-        if (healthCondition.toLowerCase().contains('respiratory')) {
-          respiratoryCondition = "Yes";
-        }
-        if (healthCondition.toLowerCase().contains('cardiovascular')) {
-          cardiovascularCondition = "Yes";
-        }
-
         height = data['height']?.toString() ?? "0";
         weight = data.containsKey('weight')
             ? data['weight']?.toString() ?? "0"
@@ -4481,14 +4473,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
 
     // Health condition recommendations
-    if (respiratoryCondition == "Yes") {
+    if (healthCondition == "Cardiovascular or Respiratory") {
       healthRecommendations
           .add("Monitor breathing with 'talk test' during rides.");
       healthRecommendations
           .add("Check air quality before rides (aim for AQI < 100).");
     }
 
-    if (cardiovascularCondition == "Yes") {
+    if (healthCondition == "Cardiovascular or Respiratory") {
       healthRecommendations.add(
           "Stay in ${targetHeartRateLower.toInt()}-${targetHeartRateUpper.toInt()} bpm zone.");
       healthRecommendations
@@ -4514,9 +4506,20 @@ class _RecommendationPageState extends State<RecommendationPage> {
     double bmr = safeParseDouble(basalMetabolicRate);
     double bodyFatPercentage = safeParseDouble(bodyFat);
     double totalCaloriesBurned = safeParseDouble(caloriesBurned);
+    double heartRateLimitValue = safeParseDouble(heartRateLimit);
 
     // Updated heart rate zones based on research (Fletcher, 2023)
-    double maxHeartRate = 220 - age.toDouble();
+    double maxHeartRate = 0;
+    
+    // Check if user has health condition and a heart rate limit is specified
+    if (healthCondition == "Cardiovascular or Respiratory" && heartRateLimitValue > 0) {
+      maxHeartRate = heartRateLimitValue;
+      healthRecommendations.add("Based on your health condition, we're using your physician-recommended heart rate limit of ${heartRateLimitValue.toInt()} bpm for training zones.");
+    } else {
+      // Standard calculation for healthy individuals
+      maxHeartRate = 220 - age.toDouble();
+    }
+    
     // Updated fat burning zone based on research (50-70% of max HR)
     double fatBurningZoneLower = maxHeartRate * 0.5;
     double fatBurningZoneUpper = maxHeartRate * 0.7;
@@ -4629,6 +4632,26 @@ class _RecommendationPageState extends State<RecommendationPage> {
       }
     }
 
+    // Health condition-specific heart rate recommendations
+    if (healthCondition == "Cardiovascular or Respiratory") {
+      if (heartRateLimitValue > 0) {
+        // Use the physician-recommended heart rate limit
+        double safeTrainingZoneUpper = heartRateLimitValue * 0.9; // 90% of limit
+        double moderateTrainingZone = heartRateLimitValue * 0.7; // 70% of limit
+        
+        healthRecommendations.add(
+            "Monitor heart rate closely during workouts. Keep most of your training at ${moderateTrainingZone.toInt()} bpm (70% of your limit) and never exceed ${safeTrainingZoneUpper.toInt()} bpm.");
+        
+        if (latestHeartRate > safeTrainingZoneUpper && latestHeartRate > 0) {
+          healthRecommendations.add(
+              "⚠️ Your recent average heart rate (${latestHeartRate.toInt()} bpm) exceeds your safe training zone. Reduce intensity immediately to stay below ${safeTrainingZoneUpper.toInt()} bpm.");
+        }
+      } else {
+        // No specific limit provided, use conservative approach
+        healthRecommendations.add(
+            "With your health condition, consult your physician about establishing a safe heart rate training zone. Meanwhile, use perceived exertion (moderate effort, able to hold a conversation) to guide intensity.");
+      }
+    }
     
     // Body fat percentage recommendations
     if (bodyFatPercentage > 0) {
@@ -4724,15 +4747,18 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
     // Heart rate recommendations - updated based on fat burning zone research
     if (latestHeartRate > 0) {
-      if (latestHeartRate < fatBurningZoneLower) {
-        trainingRecommendations.add(
-            "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning. This zone varies by individual fitness level.");
-      } else if (latestHeartRate > fatBurningZoneUpper) {
-        trainingRecommendations.add(
-            "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better lactate clearance and fat oxidation.");
-      } else {
-        trainingRecommendations.add(
-            "Perfect fat-burning zone! Maintain this intensity for optimal results, but remember fat can be burned at various heart rates.");
+      if (healthCondition != "Cardiovascular or Respiratory") {
+        // Only provide these recommendations for people without health conditions
+        if (latestHeartRate < fatBurningZoneLower) {
+          trainingRecommendations.add(
+              "Increase intensity to ${fatBurningZoneLower.toInt()}-${fatBurningZoneUpper.toInt()} bpm for optimal fat burning. This zone varies by individual fitness level.");
+        } else if (latestHeartRate > fatBurningZoneUpper) {
+          trainingRecommendations.add(
+              "Use intervals: high intensity and active recovery (${zone2HeartRate.toInt()} bpm) for better lactate clearance and fat oxidation.");
+        } else {
+          trainingRecommendations.add(
+              "Perfect fat-burning zone! Maintain this intensity for optimal results, but remember fat can be burned at various heart rates.");
+        }
       }
     }
 
@@ -4774,12 +4800,12 @@ class _RecommendationPageState extends State<RecommendationPage> {
           "For optimal recovery: 1) active recovery with light cycling, 2) compression garments to reduce fatigue, 3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
 
       // Health condition recommendations - updated based on chronic disease management research
-      if (respiratoryCondition == "Yes") {
+      if (healthCondition == "Cardiovascular or Respiratory") {
         healthRecommendations.add(
             "With respiratory conditions, use shorter intervals (30s-1min) with longer recovery (2-3min). Avoid highly polluted areas as they can reduce lung function and performance.");
       }
 
-      if (cardiovascularCondition == "Yes") {
+      if (healthCondition == "Cardiovascular or Respiratory") {
         // Updated based on AHA recommendations
         healthRecommendations.add(
             "With cardiovascular conditions, maintain moderate intensity (${(maxHeartRate * 0.6).toInt()}-${(maxHeartRate * 0.7).toInt()} bpm) and aim for 150 minutes weekly. Always get checked by a doctor first.");
@@ -5027,7 +5053,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       }
 
       // Health condition recommendations - updated based on research
-      if (respiratoryCondition == "Yes") {
+      if (healthCondition == "Cardiovascular or Respiratory") {
         // Updated based on air quality research
         healthRecommendations.add(
             "With your respiratory condition, build endurance gradually and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
@@ -5035,7 +5061,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
             "Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
       }
 
-      if (cardiovascularCondition == "Yes") {
+      if (healthCondition == "Cardiovascular or Respiratory") {
         // Updated based on AHA research and Myles C's advice
         healthRecommendations.add(
             "Focus on Zone 2 training (${zone2HeartRateLower.toInt()}-${zone2HeartRateUpper.toInt()} bpm) for cardiovascular health. The AHA recommends 150 minutes of moderate-intensity exercise weekly. Always get checked by a doctor first.");
