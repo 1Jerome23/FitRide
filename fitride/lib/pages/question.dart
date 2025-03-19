@@ -29,9 +29,7 @@ class _QuestionPageState extends State<QuestionPage>
   final TextEditingController heightController = TextEditingController();
   String? _healthCondition;
 
-  String? _weatherCondition;
   String? _heartRateLimit;
-  String? _maxDuration;
 
   String? _selectedGender;
 
@@ -67,29 +65,10 @@ class _QuestionPageState extends State<QuestionPage>
       'description': 'No pre-existing conditions'
     },
     {
-      'image': 'assets/heart.png',
-      'label': 'Cardiovascular',
-      'description': 'Heart-related conditions'
+      'image': 'assets/disease.png',
+      'label': 'Cardiovascular or Respiratory',
+      'description': 'Heart or breathing-related conditions'
     },
-    {
-      'image': 'assets/lungs.png',
-      'label': 'Respiratory',
-      'description': 'Breathing-related conditions'
-    },
-    {
-      'image': 'assets/both.png',
-      'label': 'Both',
-      'description': 'Both cardiovascular and respiratory conditions'
-    },
-  ];
-
-  final List<String> _weatherOptions = [
-    'No limitations',
-    'High temperatures affect me',
-    'Cold temperatures affect me',
-    'High humidity affects me',
-    'Poor air quality affects me',
-    'Rain or strong winds affect me'
   ];
 
   final List<String> _heartRateOptions = [
@@ -101,14 +80,6 @@ class _QuestionPageState extends State<QuestionPage>
     'Other (consult with doctor)'
   ];
 
-  final List<String> _durationOptions = [
-    'No limitations',
-    '15 minutes maximum',
-    '30 minutes maximum',
-    '45 minutes maximum',
-    '60 minutes maximum',
-    'Other (consult with doctor)'
-  ];
 
   final List<Map<String, dynamic>> _goalOptions = [
     {
@@ -227,9 +198,7 @@ class _QuestionPageState extends State<QuestionPage>
 
     // Add additional fields based on health condition
     if (_healthCondition != 'None') {
-      userData['weatherCondition'] = _weatherCondition;
       userData['heartRateLimit'] = _heartRateLimit;
-      userData['maxDuration'] = _maxDuration;
     }
     DateTime baseLineStartDate = DateTime.now();
     DateTime baseLineEndDate = baseLineStartDate.add(const Duration(days: 28));
@@ -807,7 +776,7 @@ class _QuestionPageState extends State<QuestionPage>
                         ),
                         SizedBox(height: 10),
 
-                        // Weather conditions dropdown
+                        // Heart rate limitations 
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -820,265 +789,101 @@ class _QuestionPageState extends State<QuestionPage>
                               ),
                             ],
                           ),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "Do you have any weather conditions that affect your ability to cycle?",
+                                "What is your heart rate limitation while cycling?",
                                 style: TextStyle(
                                   fontFamily: "Inter",
                                   fontSize: 14,
                                   color: primaryBlack,
                                 ),
                               ),
-                              SizedBox(height: 5),
-                              DropdownButtonFormField<String>(
-                                value: _weatherCondition,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _weatherCondition != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _weatherCondition != null ? 2 : 1,
+                              SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: TextEditingController(text: _heartRateLimit),
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _heartRateLimit = value;
+                                        });
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: "Enter heart rate limit",
+                                        hintStyle: TextStyle(
+                                          fontFamily: "Inter",
+                                          color: primaryGray,
+                                          fontSize: 14,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                          borderSide: BorderSide(
+                                            color: _heartRateLimit != null
+                                                ? primaryOrange
+                                                : Colors.grey.shade300,
+                                            width: _heartRateLimit != null ? 2 : 1,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                          borderSide: BorderSide(
+                                            color: _heartRateLimit != null
+                                                ? primaryOrange
+                                                : Colors.grey.shade300,
+                                            width: _heartRateLimit != null ? 2 : 1,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                          borderSide: BorderSide(
+                                            color: primaryOrange,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 10,
+                                        ),
+                                      ),
+                                      style: TextStyle(
+                                        fontFamily: "Inter",
+                                        color: primaryBlack,
+                                        fontSize: 14,
+                                      ),
                                     ),
                                   ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _weatherCondition != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _weatherCondition != null ? 2 : 1,
+                                  SizedBox(width: 8),
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [primaryOrange, primaryOrange.withOpacity(0.7)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: Text(
+                                      "BPM",
+                                      style: TextStyle(
+                                        fontFamily: "Inter",
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: primaryOrange,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: _weatherCondition != null,
-                                  fillColor: _weatherCondition != null
-                                      ? primaryOrange.withOpacity(0.1)
-                                      : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 10),
-                                ),
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryBlack,
-                                  fontSize: 14,
-                                ),
-                                dropdownColor: Colors.white,
-                                items: _weatherOptions.map((String option) {
-                                  return DropdownMenuItem<String>(
-                                    value: option,
-                                    child: Text(option),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _weatherCondition = newValue;
-                                  });
-                                },
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: _weatherCondition != null
-                                      ? primaryOrange
-                                      : primaryGray,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 15),
-
-                        // Heart rate limitations dropdown
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 5,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Do you have any heart rate limitations while cycling?",
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  fontSize: 14,
-                                  color: primaryBlack,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              DropdownButtonFormField<String>(
-                                value: _heartRateLimit,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _heartRateLimit != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _heartRateLimit != null ? 2 : 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _heartRateLimit != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _heartRateLimit != null ? 2 : 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: primaryOrange,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: _heartRateLimit != null,
-                                  fillColor: _heartRateLimit != null
-                                      ? primaryOrange.withOpacity(0.1)
-                                      : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 10),
-                                ),
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryBlack,
-                                  fontSize: 14,
-                                ),
-                                dropdownColor: Colors.white,
-                                items: _heartRateOptions.map((String option) {
-                                  return DropdownMenuItem<String>(
-                                    value: option,
-                                    child: Text(option),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _heartRateLimit = newValue;
-                                  });
-                                },
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: _heartRateLimit != null
-                                      ? primaryOrange
-                                      : primaryGray,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 15),
-
-                        // Maximum exercise duration dropdown
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 5,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Do you have a maximum exercise duration recommended by your doctor?",
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  fontSize: 14,
-                                  color: primaryBlack,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              DropdownButtonFormField<String>(
-                                value: _maxDuration,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _maxDuration != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _maxDuration != null ? 2 : 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: _maxDuration != null
-                                          ? primaryOrange
-                                          : Colors.grey.shade300,
-                                      width: _maxDuration != null ? 2 : 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: primaryOrange,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: _maxDuration != null,
-                                  fillColor: _maxDuration != null
-                                      ? primaryOrange.withOpacity(0.1)
-                                      : Colors.transparent,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 10),
-                                ),
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryBlack,
-                                  fontSize: 14,
-                                ),
-                                dropdownColor: Colors.white,
-                                items: _durationOptions.map((String option) {
-                                  return DropdownMenuItem<String>(
-                                    value: option,
-                                    child: Text(option),
-                                  );
-                                }).toList(),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _maxDuration = newValue;
-                                  });
-                                },
-                                icon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: _maxDuration != null
-                                      ? primaryOrange
-                                      : primaryGray,
-                                ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       ],
+                        SizedBox(height: 15),
 
                       SizedBox(height: media.width * 0.07),
 

@@ -12,6 +12,8 @@ import 'recommendation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
+import 'dart:math' as math;
 
 class HomePage extends StatefulWidget {
   @override
@@ -46,14 +48,12 @@ class MetricData {
   MetricData(this.date, this.value);
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String _userGoal = 'Unknown'; // Default value
   PageController _pageController = PageController();
   int _currentPage = 0;
   List<Map<String, dynamic>> activityData = [];
   bool _isLoadingGraphs = true;
-  int? _streakCount;
   int _selectedIndex = 0;
   double? temperature;
   double? humidity;
@@ -75,6 +75,19 @@ class _HomePageState extends State<HomePage>
   final PageController _mealPageController = PageController();
   List<Map<String, dynamic>> bodyMetricsData = [];
   bool _showAllMetrics = false;
+
+  int? _streakCount;
+  DateTime? _lastStreakUpdate;
+  int? _lastCompletedWeek;
+  bool _isStreakLoading = true;
+  bool _streakAnimationPlaying = false;
+  late AnimationController _streakAnimationController;
+  final List<String> _streakMilestoneMessages = [
+    "Keep it up! Your fitness journey is just beginning.",
+    "Fantastic consistency! You're building strong habits.",
+    "Impressive dedication! You're now in elite territory.",
+    "Legendary status! Your commitment is truly inspiring.",
+  ];
 
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
@@ -130,6 +143,11 @@ class _HomePageState extends State<HomePage>
     fetchWeatherData();
     _getUserName();
 
+    _streakAnimationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 1500),
+    );
+
     // Sequentially load data
     _loadUserData();
     _fetchFoodDiaryData();
@@ -138,28 +156,25 @@ class _HomePageState extends State<HomePage>
 
   // Sequentially load data to ensure dependencies are respected
   Future<void> _loadUserData() async {
-    // First load streak data
-    String? userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      await _fetchStreakData(userId).then((streakData) {
-        setState(() {
-          _streakCount = streakData?['streak'] ?? 0;
-        });
-      });
-    }
-
-    // Then load Strava ID
-    await loadStravaUserId();
-
-    // Then load goal and finally activity data
-    await fetchUserGoal();
-    await fetchActivityData();
+  // First load streak data
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
+  if (userId != null) {
+    await _fetchStreakData(userId);
   }
+
+  // Then load Strava ID
+  await loadStravaUserId();
+
+  // Then load goal and finally activity data
+  await fetchUserGoal();
+  await fetchActivityData();
+}
 
   @override
   void dispose() {
     _animationController.dispose();
     _pageController.dispose();
+    _streakAnimationController.dispose();
     super.dispose();
   }
 
@@ -315,22 +330,235 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchStreakData(String userId) async {
-    try {
-      DocumentSnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore
-          .instance
-          .collection('Streak')
-          .doc(userId)
-          .get();
-
-      if (snapshot.exists) {
-        return snapshot.data()!;
-      }
-    } catch (e) {
-      print('Error fetching streak data: $e');
+  Future<void> _fetchStreakData(String userId) async {
+  setState(() {
+    _isStreakLoading = true;
+  });
+  
+  try {
+    print('Fetching streak data for user: $userId');
+    
+    // 1. First get the goal document to determine goal creation date
+    QuerySnapshot goalsSnapshot = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+    
+    if (goalsSnapshot.docs.isEmpty) {
+      print('No goals found for user');
+      setState(() {
+        _streakCount = 0;
+        _isStreakLoading = false;
+      });
+      return;
     }
-    return {'streak': 0};
+    
+    DocumentSnapshot goalDoc = goalsSnapshot.docs.first;
+    String goalId = goalDoc.id;
+    Map<String, dynamic> goalData = goalDoc.data() as Map<String, dynamic>;
+    
+    // Get goal creation date
+    Timestamp goalCreationTimestamp = goalData['timestamp'] as Timestamp;
+    DateTime goalCreationDate = goalCreationTimestamp.toDate();
+    print('Goal creation date: $goalCreationDate');
+    
+    // 2. Calculate the CURRENT week number based on days since goal creation
+    DateTime now = DateTime.now();
+    int daysSinceCreation = now.difference(goalCreationDate).inDays;
+    int currentWeekNumber = (daysSinceCreation ~/ 7) + 1;
+    print('Current week number: $currentWeekNumber');
+    
+    // 3. Get the streak document to see what's stored
+    DocumentSnapshot<Map<String, dynamic>> streakSnapshot = await FirebaseFirestore
+        .instance
+        .collection('Streak')
+        .doc(userId)
+        .get();
+    
+    Map<String, dynamic>? streakData;
+    int? storedStreakCount;
+    int? lastCompletedWeek;
+    
+    if (streakSnapshot.exists) {
+      streakData = streakSnapshot.data()!;
+      storedStreakCount = streakData['streak'] ?? 0;
+      lastCompletedWeek = streakData['lastCompletedWeek'] ?? 0;
+      print('Stored streak: $storedStreakCount, Last completed week: $lastCompletedWeek');
+    } else {
+      print('No streak document exists yet');
+      storedStreakCount = 0;
+      lastCompletedWeek = 0;
+    }
+    
+    // 4. Explicitly get the CURRENT week's progress
+    QuerySnapshot currentWeekSnapshot = await FirebaseFirestore.instance
+        .collection('weekly_progress')
+        .where('uid', isEqualTo: userId)
+        .where('goalId', isEqualTo: goalId)
+        .where('weekNumber', isEqualTo: currentWeekNumber)
+        .limit(1)
+        .get();
+    
+    bool currentWeekCompleted = false;
+    Map<String, dynamic>? currentWeekData;
+    
+    if (currentWeekSnapshot.docs.isNotEmpty) {
+      currentWeekData = currentWeekSnapshot.docs.first.data() as Map<String, dynamic>;
+      print('Current week data found: $currentWeekData');
+      
+      // Calculate current week completion
+      double daysProgress = 0.0;
+      double daysTarget = 7.0;
+      
+      if (currentWeekData.containsKey('dayProgress')) {
+        daysProgress = (currentWeekData['dayProgress'] as num).toDouble();
+      } else if (currentWeekData.containsKey('uniqueDays')) {
+        List<dynamic> uniqueDays = currentWeekData['uniqueDays'] ?? [];
+        daysProgress = uniqueDays.length.toDouble();
+      }
+      
+      if (currentWeekData.containsKey('targetDaysPerWeek')) {
+        daysTarget = (currentWeekData['targetDaysPerWeek'] as num).toDouble();
+      } else if (goalData.containsKey('daysPerWeek')) {
+        daysTarget = (goalData['daysPerWeek'] as num).toDouble();
+      }
+      
+      // Calculate completion percentage
+      double completionPercentage = daysTarget > 0 ? (daysProgress / daysTarget) : 0.0;
+      currentWeekCompleted = completionPercentage >= 1.0;
+      
+      print('Current week progress: $daysProgress/$daysTarget (${(completionPercentage * 100).toStringAsFixed(1)}%)');
+      print('Current week is completed: $currentWeekCompleted');
+    } else {
+      print('No data found for current week $currentWeekNumber');
+    }
+    
+    // 5. Get the PREVIOUS week's progress
+    QuerySnapshot previousWeekSnapshot = await FirebaseFirestore.instance
+        .collection('weekly_progress')
+        .where('uid', isEqualTo: userId)
+        .where('goalId', isEqualTo: goalId)
+        .where('weekNumber', isEqualTo: currentWeekNumber - 1)
+        .limit(1)
+        .get();
+    
+    bool previousWeekCompleted = false;
+    
+    if (previousWeekSnapshot.docs.isNotEmpty) {
+      Map<String, dynamic> previousWeekData = previousWeekSnapshot.docs.first.data() as Map<String, dynamic>;
+      print('Previous week data found');
+      
+      // Calculate previous week completion
+      double daysProgress = 0.0;
+      double daysTarget = 7.0;
+      
+      if (previousWeekData.containsKey('dayProgress')) {
+        daysProgress = (previousWeekData['dayProgress'] as num).toDouble();
+      } else if (previousWeekData.containsKey('uniqueDays')) {
+        List<dynamic> uniqueDays = previousWeekData['uniqueDays'] ?? [];
+        daysProgress = uniqueDays.length.toDouble();
+      }
+      
+      if (previousWeekData.containsKey('targetDaysPerWeek')) {
+        daysTarget = (previousWeekData['targetDaysPerWeek'] as num).toDouble();
+      } else if (goalData.containsKey('daysPerWeek')) {
+        daysTarget = (goalData['daysPerWeek'] as num).toDouble();
+      }
+      
+      // Calculate completion percentage
+      double completionPercentage = daysTarget > 0 ? (daysProgress / daysTarget) : 0.0;
+      previousWeekCompleted = completionPercentage >= 1.0;
+      
+      print('Previous week completed: $previousWeekCompleted');
+    } else {
+      print('No data found for previous week ${currentWeekNumber - 1}');
+    }
+    
+    // 6. Determine new streak value based on completion status
+    int newStreakCount = storedStreakCount ?? 0;
+    int? newLastCompletedWeek = lastCompletedWeek;
+    bool shouldPlayAnimation = false;
+    
+    // CASE 1: Current week is complete and hasn't been counted yet
+    if (currentWeekCompleted && lastCompletedWeek != currentWeekNumber) {
+      newStreakCount = (storedStreakCount ?? 0) + 1;
+      newLastCompletedWeek = currentWeekNumber;
+      shouldPlayAnimation = true;
+      print('INCREMENTING STREAK: Current week complete and not yet counted');
+    }
+    // CASE 2: Current week is incomplete, but previous week was complete and hasn't been counted
+    else if (!currentWeekCompleted && previousWeekCompleted && lastCompletedWeek != currentWeekNumber - 1) {
+      newStreakCount = (storedStreakCount ?? 0) + 1;
+      newLastCompletedWeek = currentWeekNumber - 1;
+      shouldPlayAnimation = true;
+      print('INCREMENTING STREAK: Previous week complete and not yet counted');
+    }
+    // CASE 3: Streak broken (missed a week)
+    else if (currentWeekNumber > (lastCompletedWeek ?? 0) + 1 && 
+             !previousWeekCompleted && 
+             !currentWeekCompleted) {
+      newStreakCount = 0; // Reset streak
+      print('RESETTING STREAK: Missed a week, streak broken');
+    }
+    // CASE 4: First time user with completed current week
+    else if (lastCompletedWeek == 0 && currentWeekCompleted) {
+      newStreakCount = 1;
+      newLastCompletedWeek = currentWeekNumber;
+      shouldPlayAnimation = true;
+      print('NEW STREAK: First-time user with completed current week');
+    }
+    
+    print('Final streak calculation: $storedStreakCount -> $newStreakCount');
+    
+    // 7. Update streak in Firestore if needed
+    if (newStreakCount != storedStreakCount || newLastCompletedWeek != lastCompletedWeek) {
+      if (streakSnapshot.exists) {
+        await FirebaseFirestore.instance
+            .collection('Streak')
+            .doc(userId)
+            .update({
+              'streak': newStreakCount,
+              'lastCompletedWeek': newLastCompletedWeek,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+        print('Updated streak document: streak=$newStreakCount, lastCompletedWeek=$newLastCompletedWeek');
+      } else {
+        await FirebaseFirestore.instance
+            .collection('Streak')
+            .doc(userId)
+            .set({
+              'streak': newStreakCount,
+              'lastCompletedWeek': newLastCompletedWeek,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+        print('Created new streak document: streak=$newStreakCount, lastCompletedWeek=$newLastCompletedWeek');
+      }
+    }
+    
+    // 8. Update UI state
+    setState(() {
+      _streakCount = newStreakCount;
+      _lastCompletedWeek = newLastCompletedWeek;
+      
+      if (shouldPlayAnimation) {
+        _streakAnimationPlaying = true;
+        _streakAnimationController.forward(from: 0.0);
+      }
+    });
+    
+  } catch (e) {
+    print('Error fetching or updating streak data: $e');
+    setState(() {
+      _streakCount = 0;
+    });
+  } finally {
+    setState(() {
+      _isStreakLoading = false;
+    });
   }
+}
 
   Future<void> loadStravaUserId() async {
     try {
@@ -497,6 +725,105 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<Map<String, dynamic>> _fetchCurrentWeekProgress() async {
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
+  Map<String, dynamic> result = {
+    'progress': 0.0,
+    'daysCompleted': 0,
+    'daysTarget': 7,
+    'isCompleted': false,
+    'weekNumber': 0,
+  };
+  
+  if (userId == null) return result;
+  
+  try {
+    // Get the most recent goal
+    QuerySnapshot goalsSnapshot = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+    
+    if (goalsSnapshot.docs.isEmpty) return result;
+    
+    DocumentSnapshot goalDoc = goalsSnapshot.docs.first;
+    String goalId = goalDoc.id;
+    Map<String, dynamic> goalData = goalDoc.data() as Map<String, dynamic>;
+    
+    // Calculate the current week number
+    Timestamp goalCreationTimestamp = goalData['timestamp'] as Timestamp;
+    DateTime goalCreationDate = goalCreationTimestamp.toDate();
+    DateTime now = DateTime.now();
+    int daysSinceCreation = now.difference(goalCreationDate).inDays;
+    int currentWeekNumber = (daysSinceCreation ~/ 7) + 1;
+    
+    // Get the current week's progress
+    QuerySnapshot weeklyProgressSnapshot = await FirebaseFirestore.instance
+        .collection('weekly_progress')
+        .where('uid', isEqualTo: userId)
+        .where('goalId', isEqualTo: goalId)
+        .where('weekNumber', isEqualTo: currentWeekNumber)
+        .limit(1)
+        .get();
+    
+    if (weeklyProgressSnapshot.docs.isEmpty) {
+      result['weekNumber'] = currentWeekNumber;
+      return result;
+    }
+    
+    Map<String, dynamic> weekData = weeklyProgressSnapshot.docs.first.data() as Map<String, dynamic>;
+    
+    // Parse the days progress
+    double daysProgress = 0.0;
+    if (weekData.containsKey('dayProgress')) {
+      daysProgress = (weekData['dayProgress'] as num).toDouble();
+    } else if (weekData.containsKey('uniqueDays')) {
+      List<dynamic> uniqueDays = weekData['uniqueDays'] ?? [];
+      daysProgress = uniqueDays.length.toDouble();
+    }
+    
+    // Parse the days target
+    double daysTarget = 7.0;
+    if (weekData.containsKey('targetDaysPerWeek')) {
+      daysTarget = (weekData['targetDaysPerWeek'] as num).toDouble();
+    } else if (goalData.containsKey('daysPerWeek')) {
+      daysTarget = (goalData['daysPerWeek'] as num).toDouble();
+    }
+    
+    // Calculate progress percentage
+    double progress = daysTarget > 0 ? (daysProgress / daysTarget).clamp(0.0, 1.0) : 0.0;
+    bool isCompleted = progress >= 1.0;
+    
+    return {
+      'progress': progress,
+      'daysCompleted': daysProgress.toInt(),
+      'daysTarget': daysTarget.toInt(),
+      'isCompleted': isCompleted,
+      'weekNumber': currentWeekNumber,
+      'weekData': weekData,
+    };
+  } catch (e) {
+    print('Error fetching current week progress: $e');
+    return result;
+  }
+}
+
+  String _getProgressMotivationalText(double progress) {
+    if (progress >= 1.0) {
+      return "Amazing! You've completed this week's goal. Keep the streak alive!";
+    } else if (progress >= 0.75) {
+      return "Almost there! Just a few more cycling days to reach your goal.";
+    } else if (progress >= 0.5) {
+      return "You're making great progress. Keep pushing!";
+    } else if (progress > 0) {
+      return "Good start! Keep up the consistency to build your streak.";
+    } else {
+      return "Time to hit the road! Start cycling to build your streak.";
+    }
+  }
+
   String _getWeatherImage(String? condition) {
     switch (condition) {
       case "0":
@@ -532,6 +859,299 @@ class _HomePageState extends State<HomePage>
       default:
         return Colors.grey;
     }
+  }
+
+ Widget _buildEnhancedStreakWidget() {
+  // Determine streak level (for UI purposes)
+  int streakLevel = 0;
+  if (_streakCount != null) {
+    if (_streakCount! >= 12) streakLevel = 3;
+    else if (_streakCount! >= 8) streakLevel = 2;
+    else if (_streakCount! >= 4) streakLevel = 1;
+  }
+  
+  String streakMessage = _streakCount == 0 || _streakCount == null
+      ? "Start your streak by completing your weekly cycling goal!"
+      : _streakMilestoneMessages[streakLevel];
+  
+  Color primaryColor = Color(0xffFFA500); // Orange primary color
+  
+  return Card(
+    elevation: 8,
+    shadowColor: primaryColor.withOpacity(0.4),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xffFFA500), // Orange background
+            Color(0xffFF8C00), // Darker orange
+          ],
+        ),
+      ),
+      child: _isStreakLoading 
+          ? Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Background gradient
+                      Container(
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2), 
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      
+                      // Always show the GIF background if streak count > 0
+                      if (_streakCount != null && _streakCount! > 0)
+                        Positioned.fill(
+                          child: Image.asset(
+                            'assets/flame_background.gif',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      
+                      // Streak counter & animation
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(height: 15),
+                          // Streak counter with black circle
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0, end: 1),
+                            duration: Duration(milliseconds: 1000),
+                            curve: Curves.elasticOut,
+                            builder: (context, value, child) {
+                              return Transform.scale(
+                                scale: _streakAnimationPlaying 
+                                    ? 1 + math.sin(value * math.pi) * 0.3
+                                    : 1,
+                                child: child,
+                              );
+                            },
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black, // Black circle background
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.6),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "${_streakCount ?? 0}",
+                                  style: TextStyle(
+                                    fontFamily: 'Fredoka-Bold',
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: primaryColor.withOpacity(0.8),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Streak message
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _streakCount == 0 || _streakCount == null
+                            ? Icons.emoji_events_outlined
+                            : Icons.emoji_events,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          streakMessage,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Weekly progress indicator
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 16.0, 
+                    right: 16.0, 
+                    bottom: 16.0,
+                  ),
+                  child: _buildStreakWeekProgress(),
+                ),
+              ],
+            ),
+    ),
+  );
+}
+
+  Widget _buildStreakWeekProgress() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _fetchCurrentWeekProgress(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: 40,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+        
+        if (snapshot.hasError || !snapshot.hasData) {
+          return SizedBox(height: 40);
+        }
+        
+        Map<String, dynamic> progressData = snapshot.data!;
+        double progress = progressData['progress'] ?? 0.0;
+        int daysCompleted = progressData['daysCompleted'] ?? 0;
+        int daysTarget = progressData['daysTarget'] ?? 7;
+        
+        // Create a more engaging progress indicator
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "This Week's Progress",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+                Text(
+                  "$daysCompleted/$daysTarget days",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xffFFA500),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            // Custom progress bar
+            Stack(
+              children: [
+                // Background
+                Container(
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                
+                // Filled portion
+                 AnimatedContainer(
+                  duration: Duration(milliseconds: 500),
+                  curve: Curves.easeOut,
+                  height: 12,
+                  width: MediaQuery.of(context).size.width * 0.8 * progress,
+                  decoration: BoxDecoration(
+                    color: Colors.black, // Black filled portion instead of gradient
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Day markers
+                ...List.generate(daysTarget, (index) {
+                  double markerPosition = MediaQuery.of(context).size.width * 0.8 * (index + 1) / daysTarget;
+                  return Positioned(
+                    left: markerPosition - 2,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 4,
+                      decoration: BoxDecoration(
+                        color: index < daysCompleted 
+                            ? Colors.white.withOpacity(0.8)
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+            
+            // Motivational text based on progress
+            SizedBox(height: 8),
+            Text(
+              _getProgressMotivationalText(progress),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildBodyMetricsHistory() {
@@ -1977,7 +2597,7 @@ String _formatMealDate(dynamic timestamp) {
                       .shimmer(delay: 1000.ms, duration: 1800.ms),
                   SizedBox(height: 30),
                   Text(
-                    "Your Streak",
+                    "Weekly Streak",
                     style: TextStyle(
                       fontFamily: 'Fredoka-SemiBold',
                       fontSize: 22,
@@ -1985,45 +2605,7 @@ String _formatMealDate(dynamic timestamp) {
                     ),
                   ).animate().fadeIn(duration: 600.ms, delay: 600.ms),
                   SizedBox(height: 15),
-                  Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 2,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: _streakCount != null
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.local_fire_department,
-                                  color: Colors.orange, size: 30),
-                              SizedBox(width: 10),
-                              Text(
-                                _streakCount == 0
-                                    ? "No active streak yet"
-                                    : "Current Streak: $_streakCount weeks",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 18,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xffFFA500),
-                            ),
-                          ),
-                  )
+                  _buildEnhancedStreakWidget()
                       .animate()
                       .fadeIn(duration: 600.ms, delay: 700.ms)
                       .slideY(begin: 0.1, end: 0),
