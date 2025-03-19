@@ -3721,14 +3721,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
             DateTime now = DateTime.now();
             if (now.isBefore(baselineEndDate) &&
                 now.isAfter(
-                    baselineEndDate.subtract(const Duration(days: 7)))) {
+                    baselineEndDate.subtract(const Duration(days: 6)))) {
               for (var activity in activityData) {
                 if (activity['start_date'] != null) {
                   print(activity);
                   DateTime activityDate = activity['start_date'].toDate();
                   if (activityDate.isBefore(baselineEndDate) &&
                       activityDate.isAfter(
-                          baselineEndDate.subtract(const Duration(days: 7)))) {
+                          baselineEndDate.subtract(const Duration(days: 6)))) {
                     weeklyActivityCount++;
                     weeklyDistanceTotal +=
                         safeParseDouble(activity['distance']);
@@ -3736,17 +3736,17 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 }
               }
             } else if (now.isBefore(
-                    baselineEndDate.subtract(const Duration(days: 7))) &&
+                    baselineEndDate.subtract(const Duration(days: 6))) &&
                 now.isAfter(
-                    baselineEndDate.subtract(const Duration(days: 14)))) {
+                    baselineEndDate.subtract(const Duration(days: 13)))) {
               for (var activity in activityData) {
                 if (activity['start_date'] != null) {
                   print(activity);
                   DateTime activityDate = activity['start_date'].toDate();
                   if (activityDate.isBefore(
-                          baselineEndDate.subtract(const Duration(days: 7))) &&
+                          baselineEndDate.subtract(const Duration(days: 6))) &&
                       activityDate.isAfter(
-                          baselineEndDate.subtract(const Duration(days: 14)))) {
+                          baselineEndDate.subtract(const Duration(days: 13)))) {
                     weeklyActivityCount++;
                     weeklyDistanceTotal +=
                         safeParseDouble(activity['distance']);
@@ -3754,17 +3754,17 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 }
               }
             } else if (now.isBefore(
-                    baselineEndDate.subtract(const Duration(days: 14))) &&
+                    baselineEndDate.subtract(const Duration(days: 13))) &&
                 now.isAfter(
-                    baselineEndDate.subtract(const Duration(days: 21)))) {
+                    baselineEndDate.subtract(const Duration(days: 20)))) {
               for (var activity in activityData) {
                 if (activity['start_date'] != null) {
                   print(activity);
                   DateTime activityDate = activity['start_date'].toDate();
                   if (activityDate.isBefore(
-                          baselineEndDate.subtract(const Duration(days: 14))) &&
+                          baselineEndDate.subtract(const Duration(days: 13))) &&
                       activityDate.isAfter(
-                          baselineEndDate.subtract(const Duration(days: 21)))) {
+                          baselineEndDate.subtract(const Duration(days: 20)))) {
                     weeklyActivityCount++;
                     weeklyDistanceTotal +=
                         safeParseDouble(activity['distance']);
@@ -3772,17 +3772,17 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 }
               }
             } else if (now.isBefore(
-                    baselineEndDate.subtract(const Duration(days: 21))) &&
+                    baselineEndDate.subtract(const Duration(days: 20))) &&
                 now.isAfter(
-                    baselineEndDate.subtract(const Duration(days: 28)))) {
+                    baselineEndDate.subtract(const Duration(days: 27)))) {
               for (var activity in activityData) {
                 if (activity['start_date'] != null) {
                   print(activity);
                   DateTime activityDate = activity['start_date'].toDate();
                   if (activityDate.isBefore(
-                          baselineEndDate.subtract(const Duration(days: 21))) &&
+                          baselineEndDate.subtract(const Duration(days: 20))) &&
                       activityDate.isAfter(
-                          baselineEndDate.subtract(const Duration(days: 28)))) {
+                          baselineEndDate.subtract(const Duration(days: 27)))) {
                     weeklyActivityCount++;
                     weeklyDistanceTotal +=
                         safeParseDouble(activity['distance']);
