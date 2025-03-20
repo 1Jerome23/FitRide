@@ -82,6 +82,30 @@ class WeightCalorieData {
   WeightCalorieData(this.date, this.weight, this.netCalories);
 }
 
+class WeightData {
+  final DateTime date;
+  final double weight;
+  WeightData(this.date, this.weight);
+}
+
+class BMRData {
+  final DateTime date;
+  final double bmr;
+  BMRData(this.date, this.bmr);
+}
+
+class CaloriesConsumedData {
+  final DateTime date;
+  final double caloriesConsumed;
+  CaloriesConsumedData(this.date, this.caloriesConsumed);
+}
+
+class CaloriesBurnedData {
+  final DateTime date;
+  final double caloriesBurned;
+  CaloriesBurnedData(this.date, this.caloriesBurned);
+}
+
 class BaselineComparisonData {
   final String metric;
   final double baselineValue;
@@ -267,7 +291,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   String targetDuration = "0";
 
   int age = 0;
-  String gender = "-"; 
+  String gender = "-";
   String healthCondition = "-";
   String height = "0";
   String weight = "0";
@@ -1550,11 +1574,12 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Future<Map<String, dynamic>> _fetchWeightAndCalorieData() async {
-    if (userId == null)
+    if (userId == null) {
       return {
         'correlationData': <WeightCalorieData>[],
         'correlationCoefficient': 0.0
       };
+    }
 
     try {
       // Fetch weight data
@@ -1583,14 +1608,17 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
       // Process weight data
       Map<String, double> weightByDate = {};
+      Map<String, double> bmrByDate = {};
       for (var doc in weightSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         double weight = safeParseDouble(data['weight']);
+        double basalMetabolicRate = safeParseDouble(data['basalMetabolicRate']);
 
         if (weight > 0 && data['timestamp'] != null) {
           DateTime date = data['timestamp'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
           weightByDate[dateKey] = weight;
+          bmrByDate[dateKey] = basalMetabolicRate;
         }
       }
 
@@ -1614,12 +1642,11 @@ class _RecommendationPageState extends State<RecommendationPage> {
         if (calories > 0 && data['start_date'] != null) {
           DateTime date = data['start_date'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
-          caloriesBurnedByDate[dateKey] =
-              (caloriesBurnedByDate[dateKey] ?? 0) + calories;
+          caloriesBurnedByDate[dateKey] = calories;
         }
       }
 
-      List<WeightCalorieData> correlationData = [];
+      /*List<WeightCalorieData> correlationData = [];
       Set<String> allDates = {
         ...weightByDate.keys,
         ...caloriesConsumedByDate.keys,
@@ -1629,11 +1656,12 @@ class _RecommendationPageState extends State<RecommendationPage> {
       List<String> sortedDates = allDates.toList()..sort();
 
       for (String dateKey in sortedDates) {
-        if (weightByDate.containsKey(dateKey)) {
+        if (caloriesConsumedByDate.containsKey(dateKey) ) {
           double weight = weightByDate[dateKey]!;
+          double bmr = bmrByDate[dateKey] ?? 0;
           double caloriesConsumed = caloriesConsumedByDate[dateKey] ?? 0;
           double caloriesBurned = caloriesBurnedByDate[dateKey] ?? 0;
-          double netCalories = caloriesConsumed - caloriesBurned;
+          double netCalories = caloriesConsumed - (caloriesBurned + bmr);
 
           DateTime date = DateFormat('yyyy-MM-dd').parse(dateKey);
           correlationData.add(WeightCalorieData(date, weight, netCalories));
@@ -1649,11 +1677,15 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
         correlationCoefficient =
             _calculatePearsonCorrelation(weights, netCalories);
-      }
+      }*/
+
 
       return {
-        'correlationData': correlationData,
-        'correlationCoefficient': correlationCoefficient,
+        'weightByDate': weightByDate,
+        'caloriesConsumedByDate': caloriesConsumedByDate,
+        'caloriesBurnedByDate': caloriesBurnedByDate,
+        'bmrByDate': bmrByDate,
+        //'correlationCoefficient': correlationCoefficient,
       };
     } catch (e) {
       print("Error fetching correlation data: $e");
@@ -2424,7 +2456,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
         List<DateTime> parsedDates = sessionDates
             .map((date) => DateFormat('MM/dd').parse(date))
             .toList();
-
 
         sessionDates = parsedDates
             .map((date) => DateFormat('MM/dd').format(date))
@@ -3817,33 +3848,33 @@ class _RecommendationPageState extends State<RecommendationPage> {
         var data = userDataDoc.data() as Map<String, dynamic>;
 
         setState(() {
-        age = int.tryParse(data['age']?.toString() ?? '30') ?? 30;
-        healthCondition = data['healthCondition'] ?? "-";
-        // Add gender to the fetched data
-        gender = data['gender'] ?? "Male"; // Default to Male if not specified
-        heartRateLimit = data['heartRateLimit']?.toString() ?? "0";
-        // Parse health conditions into specific types
-        height = data['height']?.toString() ?? "0";
-        weight = data.containsKey('weight')
-            ? data['weight']?.toString() ?? "0"
-            : "0";
-        bodyFat = data.containsKey('bodyFat')
-            ? data['bodyFat']?.toString() ?? "0"
-            : "0";
-        basalMetabolicRate = data.containsKey('basalMetabolicRate')
-            ? data['basalMetabolicRate']?.toString() ?? "0"
-            : "0";
+          age = int.tryParse(data['age']?.toString() ?? '30') ?? 30;
+          healthCondition = data['healthCondition'] ?? "-";
+          // Add gender to the fetched data
+          gender = data['gender'] ?? "Male"; // Default to Male if not specified
+          heartRateLimit = data['heartRateLimit']?.toString() ?? "0";
+          // Parse health conditions into specific types
+          height = data['height']?.toString() ?? "0";
+          weight = data.containsKey('weight')
+              ? data['weight']?.toString() ?? "0"
+              : "0";
+          bodyFat = data.containsKey('bodyFat')
+              ? data['bodyFat']?.toString() ?? "0"
+              : "0";
+          basalMetabolicRate = data.containsKey('basalMetabolicRate')
+              ? data['basalMetabolicRate']?.toString() ?? "0"
+              : "0";
 
-        // Calculate heart rate zones
-        maxHeartRateCalculated = 220 - age;
-        zone1HeartRate = (maxHeartRateCalculated * 0.6).round();
-        zone2HeartRate = (maxHeartRateCalculated * 0.7).round();
-        zone3HeartRate = (maxHeartRateCalculated * 0.8).round();
-        zone4HeartRate = (maxHeartRateCalculated * 0.9).round();
-        zone5HeartRate = (maxHeartRateCalculated * 0.95).round();
-        recommendedHeartRate = maxHeartRateCalculated;
-      });
-    }
+          // Calculate heart rate zones
+          maxHeartRateCalculated = 220 - age;
+          zone1HeartRate = (maxHeartRateCalculated * 0.6).round();
+          zone2HeartRate = (maxHeartRateCalculated * 0.7).round();
+          zone3HeartRate = (maxHeartRateCalculated * 0.8).round();
+          zone4HeartRate = (maxHeartRateCalculated * 0.9).round();
+          zone5HeartRate = (maxHeartRateCalculated * 0.95).round();
+          recommendedHeartRate = maxHeartRateCalculated;
+        });
+      }
 
       if (goalType != "Leisure") {
         print("Attempting to fetch user data...");
@@ -3965,7 +3996,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       print("Error fetching user data: $e");
     }
   }
-  
+
   // New method to analyze historical trends across all activities
   void _analyzeHistoricalTrends() {
     if (activityData.length < 2) return;
@@ -4146,232 +4177,231 @@ class _RecommendationPageState extends State<RecommendationPage> {
       levelOfExertion = latestData['levelOfExertion']?.toString() ?? "0";
     }
   }
-Widget _buildCardioRespiratoryContainer() {
-  // Only show this container if user has cardiovascular or respiratory condition
-  if (healthCondition != "Cardiovascular or Respiratory") {
-    return SizedBox.shrink();
-  }
 
-  // Create a dedicated list for heart rate recommendations
-  List<String> heartRateRecommendations = [];
-  
-  // Get specific heart rate recommendations from health recommendations
-  if (healthRecommendations.isNotEmpty) {
-    List<String> toRemove = [];
-    
-    for (String recommendation in healthRecommendations) {
-      if (recommendation.contains("heart rate") || 
-          recommendation.contains("bpm") || 
-          recommendation.contains("cardiovascular") ||
-          recommendation.contains("Heart Rate") || 
-          recommendation.contains("respiratory") ||
-          recommendation.contains("Heart rate") ||
-          recommendation.contains("air quality")) {
-        heartRateRecommendations.add(recommendation);
-        toRemove.add(recommendation);
+  Widget _buildCardioRespiratoryContainer() {
+    // Only show this container if user has cardiovascular or respiratory condition
+    if (healthCondition != "Cardiovascular or Respiratory") {
+      return SizedBox.shrink();
+    }
+
+    // Create a dedicated list for heart rate recommendations
+    List<String> heartRateRecommendations = [];
+
+    // Get specific heart rate recommendations from health recommendations
+    if (healthRecommendations.isNotEmpty) {
+      List<String> toRemove = [];
+
+      for (String recommendation in healthRecommendations) {
+        if (recommendation.contains("heart rate") ||
+            recommendation.contains("bpm") ||
+            recommendation.contains("cardiovascular") ||
+            recommendation.contains("Heart Rate") ||
+            recommendation.contains("respiratory") ||
+            recommendation.contains("Heart rate") ||
+            recommendation.contains("air quality")) {
+          heartRateRecommendations.add(recommendation);
+          toRemove.add(recommendation);
+        }
+      }
+
+      // Remove heart rate recommendations from general health recommendations
+      for (String item in toRemove) {
+        healthRecommendations.remove(item);
       }
     }
-    
-    // Remove heart rate recommendations from general health recommendations
-    for (String item in toRemove) {
-      healthRecommendations.remove(item);
+
+    // If no specific heart rate recommendations found, add default ones based on max heart rate
+    if (heartRateRecommendations.isEmpty) {
+      double maxHeartRate = 220 - age.toDouble();
+      double heartRateLimitValue = safeParseDouble(heartRateLimit);
+
+      if (heartRateLimitValue > 0) {
+        maxHeartRate = heartRateLimitValue;
+      }
+
+      double safeTrainingZoneUpper = maxHeartRate * 0.8; // 80% of max/limit
+      double moderateTrainingZone = maxHeartRate * 0.6; // 60% of max/limit
+
+      heartRateRecommendations.add(
+          "With your condition, keep most training at ${moderateTrainingZone.toInt()} bpm (60% of your maximum) and never exceed ${safeTrainingZoneUpper.toInt()} bpm (80% of maximum).");
+
+      heartRateRecommendations.add(
+          "Monitor your heart rate closely during workouts. Consider using a heart rate monitor for precise tracking.");
+
+      heartRateRecommendations.add(
+          "Check with your healthcare provider before increasing exercise intensity.");
+
+      heartRateRecommendations.add(
+          "For cardiovascular conditions, maintain moderate intensity and aim for 150 minutes weekly of zone 2 training.");
     }
-  }
-  
-  // If no specific heart rate recommendations found, add default ones based on max heart rate
-  if (heartRateRecommendations.isEmpty) {
-    double maxHeartRate = 220 - age.toDouble();
-    double heartRateLimitValue = safeParseDouble(heartRateLimit);
-    
-    if (heartRateLimitValue > 0) {
-      maxHeartRate = heartRateLimitValue;
-    }
-    
-    double safeTrainingZoneUpper = maxHeartRate * 0.8; // 80% of max/limit
-    double moderateTrainingZone = maxHeartRate * 0.6; // 60% of max/limit
-    
-    heartRateRecommendations.add(
-      "With your condition, keep most training at ${moderateTrainingZone.toInt()} bpm (60% of your maximum) and never exceed ${safeTrainingZoneUpper.toInt()} bpm (80% of maximum)."
-    );
-    
-    heartRateRecommendations.add(
-      "Monitor your heart rate closely during workouts. Consider using a heart rate monitor for precise tracking."
-    );
-    
-    heartRateRecommendations.add(
-      "Check with your healthcare provider before increasing exercise intensity."
-    );
-    
-    heartRateRecommendations.add(
-      "For cardiovascular conditions, maintain moderate intensity and aim for 150 minutes weekly of zone 2 training."
-    );
-  }
 
-  // List of recommendations to actually display (limited)
-  List<String> displayRecommendations = heartRateRecommendations.length > 2 
-      ? heartRateRecommendations.sublist(0, 2) 
-      : heartRateRecommendations;
+    // List of recommendations to actually display (limited)
+    List<String> displayRecommendations = heartRateRecommendations.length > 2
+        ? heartRateRecommendations.sublist(0, 2)
+        : heartRateRecommendations;
 
-  return Container(
-    height: 320,
-    margin: EdgeInsets.symmetric(vertical: 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.red.withOpacity(0.15),
-          spreadRadius: 1,
-          blurRadius: 12,
-          offset: Offset(0, 6),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.red[400]!, Colors.red[700]!],
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-            ),
+    return Container(
+      height: 320,
+      margin: EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.15),
+            spreadRadius: 1,
+            blurRadius: 12,
+            offset: Offset(0, 6),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.favorite, color: Colors.white, size: 20),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "Heart Health Recommendations",
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // List view (scrollable)
-        Expanded(
-          child: NotificationListener<OverscrollIndicatorNotification>(
-            onNotification: (overscroll) {
-              overscroll.disallowIndicator();
-              return true;
-            },
-            child: ListView.builder(
-              physics: NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              itemCount: displayRecommendations.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: EdgeInsets.only(bottom: 12),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.1), width: 1),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        margin: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.priority_high_rounded,
-                          size: 18,
-                          color: Colors.red,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          displayRecommendations[index],
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: Colors.black87,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-
-        // Tap indicator
-        InkWell(
-          onTap: () => _showFullscreenOverlay(
-            context,
-            "Heart Health Recommendations",
-            Icons.favorite,
-            Colors.red[600]!,
-            [Colors.red[400]!, Colors.red[700]!],
-            heartRateRecommendations,
-          ),
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 8),
-            alignment: Alignment.center,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.05),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.red[400]!, Colors.red[700]!],
               ),
-              border: Border(
-                top: BorderSide(color: Colors.red.withOpacity(0.1), width: 1),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.touch_app_rounded,
-                  size: 16,
-                  color: Colors.red[600],
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.favorite, color: Colors.white, size: 20),
                 ),
-                SizedBox(width: 6),
-                Text(
-                  heartRateRecommendations.length > 2
-                      ? "Tap to view all ${heartRateRecommendations.length} recommendations"
-                      : "Tap to expand",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.red[600],
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Heart Health Recommendations",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+
+          // List view (scrollable)
+          Expanded(
+            child: NotificationListener<OverscrollIndicatorNotification>(
+              onNotification: (overscroll) {
+                overscroll.disallowIndicator();
+                return true;
+              },
+              child: ListView.builder(
+                physics: NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                itemCount: displayRecommendations.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: Colors.red.withOpacity(0.1), width: 1),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.priority_high_rounded,
+                            size: 18,
+                            color: Colors.red,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            displayRecommendations[index],
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // Tap indicator
+          InkWell(
+            onTap: () => _showFullscreenOverlay(
+              context,
+              "Heart Health Recommendations",
+              Icons.favorite,
+              Colors.red[600]!,
+              [Colors.red[400]!, Colors.red[700]!],
+              heartRateRecommendations,
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.05),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+                border: Border(
+                  top: BorderSide(color: Colors.red.withOpacity(0.1), width: 1),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.touch_app_rounded,
+                    size: 16,
+                    color: Colors.red[600],
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    heartRateRecommendations.length > 2
+                        ? "Tap to view all ${heartRateRecommendations.length} recommendations"
+                        : "Tap to expand",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Generate seasonal advice based on current weather
   void _generateSeasonalAdvice() {
     double temp = safeParseDouble(temperature);
@@ -4735,16 +4765,18 @@ Widget _buildCardioRespiratoryContainer() {
 
     // Updated heart rate zones based on research (Fletcher, 2023)
     double maxHeartRate = 0;
-    
+
     // Check if user has health condition and a heart rate limit is specified
-    if (healthCondition == "Cardiovascular or Respiratory" && heartRateLimitValue > 0) {
+    if (healthCondition == "Cardiovascular or Respiratory" &&
+        heartRateLimitValue > 0) {
       maxHeartRate = heartRateLimitValue;
-      healthRecommendations.add("Based on your health condition, we're using your physician-recommended heart rate limit of ${heartRateLimitValue.toInt()} bpm for training zones.");
+      healthRecommendations.add(
+          "Based on your health condition, we're using your physician-recommended heart rate limit of ${heartRateLimitValue.toInt()} bpm for training zones.");
     } else {
       // Standard calculation for healthy individuals
       maxHeartRate = 220 - age.toDouble();
     }
-    
+
     // Updated fat burning zone based on research (50-70% of max HR)
     double fatBurningZoneLower = maxHeartRate * 0.5;
     double fatBurningZoneUpper = maxHeartRate * 0.7;
@@ -4861,12 +4893,13 @@ Widget _buildCardioRespiratoryContainer() {
     if (healthCondition == "Cardiovascular or Respiratory") {
       if (heartRateLimitValue > 0) {
         // Use the physician-recommended heart rate limit
-        double safeTrainingZoneUpper = heartRateLimitValue * 0.9; // 90% of limit
+        double safeTrainingZoneUpper =
+            heartRateLimitValue * 0.9; // 90% of limit
         double moderateTrainingZone = heartRateLimitValue * 0.7; // 70% of limit
-        
+
         healthRecommendations.add(
             "Monitor heart rate closely during workouts. Keep most of your training at ${moderateTrainingZone.toInt()} bpm (70% of your limit) and never exceed ${safeTrainingZoneUpper.toInt()} bpm.");
-        
+
         if (latestHeartRate > safeTrainingZoneUpper && latestHeartRate > 0) {
           healthRecommendations.add(
               "⚠️ Your recent average heart rate (${latestHeartRate.toInt()} bpm) exceeds your safe training zone. Reduce intensity immediately to stay below ${safeTrainingZoneUpper.toInt()} bpm.");
@@ -4877,76 +4910,76 @@ Widget _buildCardioRespiratoryContainer() {
             "With your health condition, consult your physician about establishing a safe heart rate training zone. Meanwhile, use perceived exertion (moderate effort, able to hold a conversation) to guide intensity.");
       }
     }
-    
+
     // Body fat percentage recommendations
     if (bodyFatPercentage > 0) {
-       String bodyFatCategory = "";
-    
-    if (gender == "Female") {
-      // Female body fat categories according to American Council on Exercise
-      if (bodyFatPercentage < 10) {
-        bodyFatCategory = "below essential fat";
-      } else if (bodyFatPercentage <= 12) {
-        bodyFatCategory = "essential fat";
-      } else if (bodyFatPercentage <= 20) {
-        bodyFatCategory = "athletic";
-      } else if (bodyFatPercentage <= 24) {
-        bodyFatCategory = "fitness";
-      } else if (bodyFatPercentage <= 31) {
-        bodyFatCategory = "acceptable";
+      String bodyFatCategory = "";
+
+      if (gender == "Female") {
+        // Female body fat categories according to American Council on Exercise
+        if (bodyFatPercentage < 10) {
+          bodyFatCategory = "below essential fat";
+        } else if (bodyFatPercentage <= 12) {
+          bodyFatCategory = "essential fat";
+        } else if (bodyFatPercentage <= 20) {
+          bodyFatCategory = "athletic";
+        } else if (bodyFatPercentage <= 24) {
+          bodyFatCategory = "fitness";
+        } else if (bodyFatPercentage <= 31) {
+          bodyFatCategory = "acceptable";
+        } else {
+          bodyFatCategory = "obesity";
+        }
       } else {
-        bodyFatCategory = "obesity";
+        // Male body fat categories according to American Council on Exercise
+        if (bodyFatPercentage < 2) {
+          bodyFatCategory = "below essential fat";
+        } else if (bodyFatPercentage <= 4) {
+          bodyFatCategory = "essential fat";
+        } else if (bodyFatPercentage <= 13) {
+          bodyFatCategory = "athletic";
+        } else if (bodyFatPercentage <= 17) {
+          bodyFatCategory = "fitness";
+        } else if (bodyFatPercentage <= 25) {
+          bodyFatCategory = "acceptable";
+        } else {
+          bodyFatCategory = "obesity";
+        }
+      }
+
+      healthRecommendations.add(
+          "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range for ${gender}.");
+
+      // Gender-specific recommendations based on body fat category
+      if (bodyFatCategory == "below essential fat") {
+        healthRecommendations.add(
+            "Your body fat percentage is below essential levels. This can be dangerous for health. Consider consulting a healthcare professional about healthy body composition.");
+      } else if (bodyFatCategory == "obesity") {
+        int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
+        // Updated based on Weegu et al. (2023) research
+        healthRecommendations.add(
+            "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
+      } else if (bodyFatCategory == "acceptable") {
+        // Updated based on HIIT research
+        healthRecommendations.add(
+            "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
+      } else if (bodyFatCategory == "fitness") {
+        // Updated based on nutrition timing research
+        healthRecommendations.add(
+            "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
+      } else if (bodyFatCategory == "athletic") {
+        // Updated based on carbohydrate research
+        healthRecommendations.add(
+            "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
+      } else if (bodyFatCategory == "essential fat") {
+        healthRecommendations.add(
+            "Maintain current level through consistent performance rather than further reduction.");
       }
     } else {
-      // Male body fat categories according to American Council on Exercise
-      if (bodyFatPercentage < 2) {
-        bodyFatCategory = "below essential fat";
-      } else if (bodyFatPercentage <= 4) {
-        bodyFatCategory = "essential fat";
-      } else if (bodyFatPercentage <= 13) {
-        bodyFatCategory = "athletic";
-      } else if (bodyFatPercentage <= 17) {
-        bodyFatCategory = "fitness";
-      } else if (bodyFatPercentage <= 25) {
-        bodyFatCategory = "acceptable";
-      } else {
-        bodyFatCategory = "obesity";
-      }
+      // Updated based on Myles C's advice on BMI vs body fat
+      healthRecommendations.add(
+          "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
     }
-
-    healthRecommendations.add(
-        "Your body fat (${bodyFatPercentage.toStringAsFixed(1)}%) is in the '$bodyFatCategory' range for ${gender}.");
-
-    // Gender-specific recommendations based on body fat category
-    if (bodyFatCategory == "below essential fat") {
-      healthRecommendations.add(
-          "Your body fat percentage is below essential levels. This can be dangerous for health. Consider consulting a healthcare professional about healthy body composition.");
-    } else if (bodyFatCategory == "obesity") {
-      int recommendedSessions = weeklyActivityCount < 2 ? 3 : 4;
-      // Updated based on Weegu et al. (2023) research
-      healthRecommendations.add(
-          "Aim for ${recommendedSessions} sessions/week for 8+ weeks. Cycling-based HIIT helps preserve muscle while reducing fat, with less joint impact than running.");
-    } else if (bodyFatCategory == "acceptable") {
-      // Updated based on HIIT research
-      healthRecommendations.add(
-          "Use 2:1 ratio of high-intensity to steady-state cardio with active recovery periods for optimal body composition changes.");
-    } else if (bodyFatCategory == "fitness") {
-      // Updated based on nutrition timing research
-      healthRecommendations.add(
-          "Focus on nutrition timing with pre-workout carbs (banana or eggs 1 hour before) and post-workout protein for better results.");
-    } else if (bodyFatCategory == "athletic") {
-      // Updated based on carbohydrate research
-      healthRecommendations.add(
-          "Shift to performance goals. For rides >2.5 hours, consume 90g carbs/hour from multiple sources. Mix glucose and fructose for better absorption.");
-    } else if (bodyFatCategory == "essential fat") {
-      healthRecommendations.add(
-          "Maintain current level through consistent performance rather than further reduction.");
-    }
-  } else {
-    // Updated based on Myles C's advice on BMI vs body fat
-    healthRecommendations.add(
-        "Measure your body fat percentage to receive more tailored recommendations - it's a better indicator of fitness than BMI. Focus on consistency rather than intensity initially.");
-  }
 
     // BMR-based recommendations
     if (bmr > 0) {
@@ -5062,7 +5095,7 @@ Widget _buildCardioRespiratoryContainer() {
     double zone2HeartRateLower = maxHeartRate * 0.6;
     double zone2HeartRateUpper = maxHeartRate * 0.7;
     double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
-   
+
     double latestHeartRate = safeParseDouble(averageHeartrate);
 
     // Tracking progress and providing feedback
@@ -5346,7 +5379,7 @@ Widget _buildCardioRespiratoryContainer() {
     return double.tryParse(value.toString()) ?? 0.0;
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -5436,7 +5469,7 @@ Widget _buildCardioRespiratoryContainer() {
                           Icons.lightbulb_outline_rounded),
                     ),
                     SizedBox(height: 12),
-                    
+
                     // Add the cardiovascular container right after the "Personalized Insights" title
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
@@ -5453,8 +5486,8 @@ Widget _buildCardioRespiratoryContainer() {
                       },
                       child: _buildCardioRespiratoryContainer(),
                     ),
-                    
-                    // Then show the recommendation carousel 
+
+                    // Then show the recommendation carousel
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 900),
@@ -5489,7 +5522,7 @@ Widget _buildCardioRespiratoryContainer() {
                     ),
                     SizedBox(height: 50),
                     _buildWeeklySummary(),
-                    
+
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1000),
@@ -6539,31 +6572,34 @@ Widget _buildCardioRespiratoryContainer() {
         }
 
         var data = snapshot.data!;
-        List<WeightCalorieData> chartData = data['correlationData'];
+        //List<WeightCalorieData> chartData = data['correlationData'];
+        List<WeightData> weightDataChart = data['weightByDate'];
+        List<BMRData> bmrDataChart = data['bmrByDate'];
+        List<CaloriesBurnedData> caloriesBurnedDataChart = data['caloriesBurnedByDate'];
+        List<CaloriesConsumedData> caloriesConsumedDataChart = data['caloriesConsumedByDate'];
 
-        if (chartData.isEmpty) {
+        if (weightDataChart.isEmpty || caloriesBurnedDataChart.isEmpty || caloriesConsumedDataChart.isEmpty) {
           return _buildEmptyGraph("Not enough data for correlation analysis");
         }
 
-        String correlationStrength = "No correlation";
         String correlationExplanation =
             "Need more data points to determine correlation.";
 
         bool isInSurplus = false;
         double latestNetCalories = 0;
 
-        if (chartData.isNotEmpty) {
-          chartData.sort((a, b) => b.date.compareTo(a.date));
-          latestNetCalories = chartData[0].netCalories;
-          isInSurplus = latestNetCalories >= 0;
+        if (weightDataChart.isNotEmpty && caloriesBurnedDataChart.isNotEmpty && caloriesConsumedDataChart.isNotEmpty) {
+          weightDataChart.sort((a, b) => a.date.compareTo(b.date));
+          caloriesBurnedDataChart.sort((a, b) => a.date.compareTo(b.date));
+          caloriesConsumedDataChart.sort((a, b) => a.date.compareTo(b.date));
+          bmrDataChart.sort((a, b) => a.date.compareTo(b.date));
         }
 
-        chartData.sort((a, b) => a.date.compareTo(b.date));
 
-        DateTime startDate = chartData.first.date;
-        DateTime endDate = startDate.add(Duration(days: 7));
+        DateTime startDate = weightDataChart.first.date;
+        DateTime endDate = caloriesConsumedDataChart.last.date;
 
-        chartData = chartData
+        /*chartData = chartData
             .where((data) =>
                 data.date.isAfter(startDate.subtract(Duration(days: 1))) &&
                 data.date.isBefore(endDate.add(Duration(days: 1))))
@@ -6602,15 +6638,8 @@ Widget _buildCardioRespiratoryContainer() {
           correlationExplanation = isInSurplus
               ? "You're currently in a caloric surplus, which may slow weight loss progress. Track more data for better insights."
               : "You're currently in a caloric deficit, which supports weight loss goals. Track more data for personalized insights.";
-        }
+        }*/
 
-        chartData.sort((a, b) => a.date.compareTo(b.date));
-
-        List<WeightCalorieData> netData = [];
-
-        for (var point in chartData) {
-          netData.add(point);
-        }
 
         return _buildGraphContainer(
           title: "Calories and\nWeight Correlation",
@@ -6697,11 +6726,11 @@ Widget _buildCardioRespiratoryContainer() {
                     textStyle: TextStyle(color: Colors.white, fontSize: 12),
                   ),
                   series: <ChartSeries>[
-                    SplineSeries<WeightCalorieData, DateTime>(
+                    SplineSeries<WeightData, DateTime>(
                       name: 'Weight (kg)',
-                      dataSource: chartData,
-                      xValueMapper: (WeightCalorieData data, _) => data.date,
-                      yValueMapper: (WeightCalorieData data, _) => data.weight,
+                      dataSource: weightDataChart,
+                      xValueMapper: (WeightData data, _) => data.date,
+                      yValueMapper: (WeightData data, _) => data.weight,
                       color: Colors.blue[700],
                       width: 2.5,
                       markerSettings: MarkerSettings(
@@ -6714,7 +6743,7 @@ Widget _buildCardioRespiratoryContainer() {
                         width: 8,
                       ),
                     ),
-                    if (netData.isNotEmpty)
+                    if (caloriesConsumedDataChart.isNotEmpty)
                       SplineSeries<WeightCalorieData, DateTime>(
                         name: 'Net Calories',
                         dataSource: netData,
