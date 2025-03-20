@@ -3694,7 +3694,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
             "uid": data['uid'],
           });
         }
-        // await _fetchActiveSubgoal();
+        await _fetchActiveSubgoal();
 
         setState(() {
           activityData = newActivityData;
