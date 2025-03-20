@@ -207,8 +207,8 @@ class _QuestionPageState extends State<QuestionPage>
       'uid': user.uid,
       'timestamp': FieldValue.serverTimestamp(),
       'goalType': _selectedGoal,
-      'base_lineStartDate': baseLineStartDate, 
-      'base_lineEndDate': baseLineEndDate, 
+      'baselineStartDate': baseLineStartDate, 
+      'baselineEndDate': baseLineEndDate, 
       'baseline_complete': false, 
     };
 

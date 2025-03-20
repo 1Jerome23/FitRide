@@ -5964,7 +5964,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
         // Get the date range - first day to first day + 28 days
         DateTime startDate = chartData.first.date;
-        DateTime endDate = startDate.add(Duration(days: 28));
+        DateTime endDate = startDate.add(Duration(days: 7));
 
         // Filter data to only include points within the 28-day range
         chartData = chartData
@@ -6315,7 +6315,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
         chartData.sort((a, b) => a.date.compareTo(b.date));
 
         DateTime startDate = chartData.first.date;
-        DateTime endDate = startDate.add(Duration(days: 28));
+        DateTime endDate = startDate.add(Duration(days: 7));
 
         chartData = chartData
             .where((data) =>
