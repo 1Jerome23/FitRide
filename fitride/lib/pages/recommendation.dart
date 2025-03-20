@@ -11,6 +11,333 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
+class CalorieData {
+  double weeklyCaloriesBurned = 0.0;
+  double weeklyCaloriesConsumed = 0.0;
+  double netCalories = 0.0;
+  bool isInSurplus = false;
+  double bmrContribution = 0.0;
+  double activityContribution = 0.0;
+
+  // Date ranges for cycling week calculation
+  DateTime weekStartDate = DateTime.now();
+  DateTime weekEndDate = DateTime.now();
+
+  // Last 7 days of data for correlation
+  List<WeightData> recentWeightData = [];
+  List<CaloriesConsumedData> recentCaloriesConsumedData = [];
+  List<CaloriesBurnedData> recentCaloriesBurnedData = [];
+  List<WeightCalorieData> recentNetCaloriesData = [];
+
+  // Singleton instance
+  static final CalorieData _instance = CalorieData._internal();
+
+  // Factory constructor
+  factory CalorieData() {
+    return _instance;
+  }
+
+  // Private constructor
+  CalorieData._internal();
+
+  double safeParseDouble(dynamic value) {
+    if (value == null || value == "-") return 0.0;
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  // Method to determine current cycling week based on user's cycling dates
+  void determineCurrentCyclingWeek(DateTime baselineEndDate,
+      bool hasActiveSubgoal, DateTime subgoalStartDate) {
+    DateTime now = DateTime.now();
+
+    // If we have an active subgoal, use the subgoal date range
+    if (hasActiveSubgoal) {
+      weekStartDate = subgoalStartDate;
+      weekEndDate = now;
+    }
+    // Otherwise use baseline dates for determining the correct week
+    else // Current week: now is within the last 6 days before baselineEndDate
+    if (now.isBefore(baselineEndDate) &&
+        now.isAfter(baselineEndDate.subtract(const Duration(days: 7)))) {
+      weekStartDate = baselineEndDate.subtract(const Duration(days: 6));
+      weekEndDate = baselineEndDate;
+    }
+    // Previous week
+    else if (now.isBefore(baselineEndDate.subtract(const Duration(days: 7))) &&
+        now.isAfter(baselineEndDate.subtract(const Duration(days: 14)))) {
+      weekStartDate = baselineEndDate.subtract(const Duration(days: 13));
+      weekEndDate = baselineEndDate.subtract(const Duration(days: 7));
+    }
+    // Two weeks ago
+    else if (now.isBefore(baselineEndDate.subtract(const Duration(days: 14))) &&
+        now.isAfter(baselineEndDate.subtract(const Duration(days: 21)))) {
+      weekStartDate = baselineEndDate.subtract(const Duration(days: 20));
+      weekEndDate = baselineEndDate.subtract(const Duration(days: 14));
+    }
+    // Three weeks ago
+    else if (now.isBefore(baselineEndDate.subtract(const Duration(days: 21))) &&
+        now.isAfter(baselineEndDate.subtract(const Duration(days: 28)))) {
+      weekStartDate = baselineEndDate.subtract(const Duration(days: 27));
+      weekEndDate = baselineEndDate.subtract(const Duration(days: 21));
+    }
+    // Default fallback - use last 7 days
+    else {
+      weekStartDate = now.subtract(Duration(days: 6));
+      weekEndDate = now;
+    }
+
+    print(
+        "Cycling week determined: ${DateFormat('yyyy-MM-dd').format(weekStartDate)} to ${DateFormat('yyyy-MM-dd').format(weekEndDate)}");
+  }
+
+  // Method to calculate all calorie data at once
+  Future<void> calculateAll(
+      String? userId,
+      String basalMetabolicRate,
+      List<Map<String, dynamic>> activityData,
+      List<Map<String, dynamic>> nutritionData,
+      DateTime baselineEndDate,
+      bool hasActiveSubgoal,
+      DateTime subgoalStartDate) async {
+    // Determine the correct week based on cycling dates
+    determineCurrentCyclingWeek(
+        baselineEndDate, hasActiveSubgoal, subgoalStartDate);
+
+    // Reset data
+    weeklyCaloriesBurned = 0.0;
+    weeklyCaloriesConsumed = 0.0;
+
+    // Calculate BMR contribution
+    double dailyBMR = safeParseDouble(basalMetabolicRate);
+
+    // Calculate number of days in the week period
+    int daysInWeek = weekEndDate.difference(weekStartDate).inDays;
+    bmrContribution = dailyBMR * daysInWeek;
+    print("week start: $weekStartDate");
+    print("week end: $weekEndDate");
+    print("bmrContribution: $bmrContribution");
+
+    // Track days for which we've counted activity calories
+    Map<String, bool> processedDays = {};
+
+    // Calculate calories burned from activities
+    activityContribution = 0.0;
+    for (var activity in activityData) {
+      if (activity['start_date'] != null) {
+        DateTime activityDate = activity['start_date'].toDate();
+        if (activityDate.isAfter(weekStartDate) &&
+            activityDate.isBefore(weekEndDate.add(Duration(days: 1)))) {
+          // Add activity calories
+          double caloriesBurned = safeParseDouble(activity['calories_burned']);
+          activityContribution += caloriesBurned + dailyBMR;
+
+          // Track this day
+          String dateKey = DateFormat('yyyy-MM-dd').format(activityDate);
+          processedDays[dateKey] = true;
+        }
+      }
+    }
+
+    // Add BMR for days without activity
+    double bmrForUnprocessedDays = 0.0;
+    for (int i = 0; i <= daysInWeek; i++) {
+      DateTime currentDate = weekStartDate.add(Duration(days: i));
+      if (currentDate.isBefore(weekEndDate.add(Duration(days: 1)))) {
+        String dateKey = DateFormat('yyyy-MM-dd').format(currentDate);
+
+        if (!processedDays.containsKey(dateKey)) {
+          bmrForUnprocessedDays += dailyBMR;
+          processedDays[dateKey] = true;
+        }
+      }
+    }
+
+    // Total calories burned = activity + BMR for days without activity
+    weeklyCaloriesBurned = activityContribution + bmrForUnprocessedDays;
+
+    // Calculate calories consumed
+    weeklyCaloriesConsumed = 0.0;
+    for (var entry in nutritionData) {
+      if (entry['date'] != null) {
+        DateTime entryDate = entry['timestamp'].toDate();
+        if (entryDate.isAfter(weekStartDate) &&
+            entryDate.isBefore(weekEndDate.add(Duration(days: 1)))) {
+          double dailyCalories = safeParseDouble(entry['total_calories']);
+          weeklyCaloriesConsumed += dailyCalories;
+        }
+      }
+    }
+
+    // Calculate net calories
+    netCalories = weeklyCaloriesConsumed - weeklyCaloriesBurned;
+    isInSurplus = netCalories > 0;
+
+    // Now fetch the correlation data for consistency
+    await fetchCorrelationData(userId, basalMetabolicRate);
+  }
+
+  // Fetch correlation data for consistency with the graph
+  Future<void> fetchCorrelationData(
+      String? userId, String basalMetabolicRate) async {
+    if (userId == null) return;
+
+    try {
+      // Fetch weight data - no limit on date range to show all available data
+      QuerySnapshot weightSnapshot = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(30) // Increased to show more history
+          .get();
+
+      // Fetch food entries for calorie consumed data - no limit on date range
+      QuerySnapshot foodSnapshot = await FirebaseFirestore.instance
+          .collection('food_entries')
+          .where('userId', isEqualTo: userId)
+          .orderBy('date', descending: true)
+          .limit(60) // Increased to ensure we get all data
+          .get();
+
+      // Fetch activity data for calories burned - no limit on date range
+      QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: userId)
+          .orderBy('start_date', descending: true)
+          .limit(60) // Increased to ensure we get all data
+          .get();
+
+      // Process weight data
+      recentWeightData = [];
+      Map<String, double> bmrByDate = {};
+
+      for (var doc in weightSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        double weight = safeParseDouble(data['weight']);
+        double basalMetabolicRate = safeParseDouble(data['basalMetabolicRate']);
+
+        if (weight > 0 && data['timestamp'] != null) {
+          DateTime date = data['timestamp'].toDate();
+          String dateKey = DateFormat('yyyy-MM-dd').format(date);
+
+          recentWeightData.add(WeightData(date, weight));
+          bmrByDate[dateKey] = basalMetabolicRate;
+        }
+      }
+
+      // Process calories consumed data - independent of weight data
+      recentCaloriesConsumedData = [];
+
+      for (var doc in foodSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        double calories = safeParseDouble(data['total_calories']);
+
+        if (calories > 0 && data['date'] != null) {
+          DateTime date = data['date'].toDate();
+          recentCaloriesConsumedData.add(CaloriesConsumedData(date, calories));
+        }
+      }
+
+      // Process calories burned data - independent of weight data
+      recentCaloriesBurnedData = [];
+
+      for (var doc in activitySnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        double calories = safeParseDouble(data['calories_burned']);
+
+        if (calories > 0 && data['start_date'] != null) {
+          DateTime date = data['start_date'].toDate();
+          recentCaloriesBurnedData.add(CaloriesBurnedData(date, calories));
+        }
+      }
+
+      // Sort data chronologically
+      recentWeightData.sort((a, b) => a.date.compareTo(b.date));
+      recentCaloriesConsumedData.sort((a, b) => a.date.compareTo(b.date));
+      recentCaloriesBurnedData.sort((a, b) => a.date.compareTo(b.date));
+
+      // Calculate net calories for all dates - not just ones with weight data
+      recentNetCaloriesData = [];
+
+      // Get all unique dates across all datasets
+      Set<DateTime> allDates = {};
+      for (var item in recentCaloriesConsumedData) {
+        allDates.add(DateTime(item.date.year, item.date.month, item.date.day));
+      }
+
+      for (var item in recentCaloriesBurnedData) {
+        allDates.add(DateTime(item.date.year, item.date.month, item.date.day));
+      }
+
+      // Daily BMR fallback from string parameter
+      double dailyBMR = safeParseDouble(basalMetabolicRate);
+
+      for (DateTime date in allDates) {
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+
+        // Find consumed calories for this date
+        double consumedCalories = 0;
+        for (var item in recentCaloriesConsumedData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            consumedCalories += item.caloriesConsumed;
+          }
+        }
+
+        // Find burned calories for this date
+        double burnedCalories = 0;
+        for (var item in recentCaloriesBurnedData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            burnedCalories += item.caloriesBurned;
+          }
+        }
+
+        // Find BMR for this date
+        double bmr = bmrByDate[dateKey] ?? dailyBMR;
+
+        // Add BMR to burned calories if no activity data
+        double totalBurnedCalories = burnedCalories > 0 ? burnedCalories : bmr;
+
+        // Calculate net calories
+        double netCalories = consumedCalories - totalBurnedCalories;
+
+        // Find weight for this date (if available), but still include the data point
+        // even if no weight data is available
+        double? weight;
+        for (var item in recentWeightData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            weight = item.weight;
+            break;
+          }
+        }
+
+        // If no weight on this exact date, find the nearest prior weight
+        if (weight == null) {
+          for (var item in recentWeightData.reversed) {
+            if (item.date.isBefore(date)) {
+              weight = item.weight;
+              break;
+            }
+          }
+          // If still no weight, use the earliest available
+          if (weight == null && recentWeightData.isNotEmpty) {
+            weight = recentWeightData.first.weight;
+          }
+        }
+
+        // Add the data point if we have either consumed or burned data
+        if (consumedCalories > 0 || burnedCalories > 0) {
+          recentNetCaloriesData
+              .add(WeightCalorieData(date, weight ?? 0, netCalories));
+        }
+      }
+
+      // Sort by date
+      recentNetCaloriesData.sort((a, b) => a.date.compareTo(b.date));
+    } catch (e) {
+      print("Error fetching correlation data: $e");
+    }
+  }
+}
+
 class _AnimatedAutoSizingOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
   final String title;
@@ -377,7 +704,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    _fetchUserData().then((_) async {
+      // Initialize calorie data after user data is fetched
+      await CalorieData().calculateAll(userId, basalMetabolicRate, activityData,
+          nutritionData, baselineEndDate, hasActiveSubgoal, subgoalStartDate);
+      setState(() {
+        _isLoadingGraphs = false;
+      });
+    });
   }
 
   @override
@@ -406,8 +740,13 @@ class _RecommendationPageState extends State<RecommendationPage> {
         double speed = safeParseDouble(data['average_speed']);
         String activityName = data['name'] ?? 'Cycling Activity';
 
-        if (data['start_date'] != null && heartRate > 0 && speed > 0) {
+        // Include the data point if it has at least heart rate OR speed data
+        if (data['start_date'] != null && (heartRate > 0 || speed > 0)) {
           DateTime date = data['start_date'].toDate();
+
+          // Use a minimum value of 0.1 if either value is missing or 0
+          heartRate = heartRate > 0 ? heartRate : 0.1;
+          speed = speed > 0 ? speed : 0.1;
 
           chartData
               .add(HeartRateSpeedData(date, heartRate, speed, activityName));
@@ -415,7 +754,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
       }
 
       chartData.sort((a, b) => a.date.compareTo(b.date));
-
       return chartData;
     } catch (e) {
       print("Error fetching heart rate and speed data: $e");
@@ -1019,84 +1357,88 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .limit(30)
           .get();
 
-      // Map food entries by date
-      Map<String, Map<String, dynamic>> foodByDate = {};
+      // Process food entries - collect all data without filtering
+      List<Map<String, dynamic>> foodEntries = [];
       for (var doc in foodSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-
         if (data['date'] != null) {
           DateTime date = data['date'].toDate();
-          String dateKey = DateFormat('yyyy-MM-dd').format(date);
-
-          foodByDate[dateKey] = {
+          foodEntries.add({
+            'date': date,
             'totalCalories': safeParseDouble(data['total_calories']),
             'totalCarbs': safeParseDouble(data['total_carbs']),
             'totalFat': safeParseDouble(data['total_fat']),
             'totalProtein': safeParseDouble(data['total_protein']),
-            'date': date,
-          };
+          });
         }
       }
 
-      // Map activities by date
-      Map<String, Map<String, dynamic>> activitiesByDate = {};
+      // Process activities - collect all data without filtering
+      List<Map<String, dynamic>> activities = [];
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-
         if (data['start_date'] != null) {
           DateTime date = data['start_date'].toDate();
-          String dateKey = DateFormat('yyyy-MM-dd').format(date);
-
-          if (activitiesByDate.containsKey(dateKey)) {
-            double existingDistance =
-                safeParseDouble(activitiesByDate[dateKey]!['distance']);
-            double newDistance = safeParseDouble(data['distance']);
-
-            if (newDistance > existingDistance) {
-              activitiesByDate[dateKey] = {
-                'elapsedTime': safeParseDouble(data['elapsed_time']) / 60,
-                'distance': safeParseDouble(data['distance']),
-                'averageSpeed': safeParseDouble(data['average_speed']),
-                'date': date,
-              };
-            }
-          } else {
-            activitiesByDate[dateKey] = {
-              'elapsedTime': safeParseDouble(data['elapsed_time']) /
-                  60, // Convert to minutes
-              'distance': safeParseDouble(data['distance']),
-              'averageSpeed': safeParseDouble(data['average_speed']),
-              'date': date,
-            };
-          }
+          activities.add({
+            'date': date,
+            'elapsedTime': safeParseDouble(data['elapsed_time']) /
+                60, // Convert to minutes
+            'distance': safeParseDouble(data['distance']),
+            'averageSpeed': safeParseDouble(data['average_speed']),
+          });
         }
       }
 
+      // Get all unique dates from both datasets
+      Set<String> allDateKeys = {};
+      for (var entry in foodEntries) {
+        allDateKeys.add(DateFormat('yyyy-MM-dd').format(entry['date']));
+      }
+      for (var activity in activities) {
+        allDateKeys.add(DateFormat('yyyy-MM-dd').format(activity['date']));
+      }
+
+      // Create combined data points - include a point if EITHER food or activity data exists
       List<NutritionActivityData> combinedData = [];
+      for (String dateKey in allDateKeys) {
+        // Find food data for this date
+        Map<String, dynamic>? foodData;
+        for (var entry in foodEntries) {
+          if (DateFormat('yyyy-MM-dd').format(entry['date']) == dateKey) {
+            foodData = entry;
+            break;
+          }
+        }
 
-      Set<String> allDates = {...foodByDate.keys, ...activitiesByDate.keys};
+        // Find activity data for this date
+        Map<String, dynamic>? activityData;
+        for (var activity in activities) {
+          if (DateFormat('yyyy-MM-dd').format(activity['date']) == dateKey) {
+            activityData = activity;
+            break;
+          }
+        }
 
-      for (String dateKey in allDates) {
-        var foodData = foodByDate[dateKey];
-        var activityData = activitiesByDate[dateKey];
+        // Add data point if we have EITHER food OR activity data
+        if (foodData != null || activityData != null) {
+          DateTime date =
+              foodData != null ? foodData['date'] : activityData!['date'];
 
-        if (foodData != null && activityData != null) {
           combinedData.add(NutritionActivityData(
-            date: foodData['date'],
-            totalCalories: foodData['totalCalories'],
-            totalCarbs: foodData['totalCarbs'],
-            totalFat: foodData['totalFat'],
-            totalProtein: foodData['totalProtein'],
-            elapsedTime: activityData['elapsedTime'],
-            distance: activityData['distance'],
-            averageSpeed: activityData['averageSpeed'],
+            date: date,
+            totalCalories: foodData?['totalCalories'],
+            totalCarbs: foodData?['totalCarbs'],
+            totalFat: foodData?['totalFat'],
+            totalProtein: foodData?['totalProtein'],
+            elapsedTime: activityData?['elapsedTime'],
+            distance: activityData?['distance'],
+            averageSpeed: activityData?['averageSpeed'],
           ));
         }
       }
 
-      // Sort by date (oldest to newest)
+      // Sort by date
       combinedData.sort((a, b) => a.date.compareTo(b.date));
-
       return combinedData;
     } catch (e) {
       print("Error fetching nutrition and activity data: $e");
@@ -1560,24 +1902,16 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   // Helper method to calculate the weekly calories consumed
   double _calculateWeeklyCaloriesConsumed() {
-    if (nutritionData.isEmpty) return 0.0;
-
-    double weeklyCalories = 0.0;
-
-    // Sum up calories from all food diary entries in the nutritionData list
-    for (var entry in nutritionData) {
-      double dailyCalories = safeParseDouble(entry['total_calories']);
-      weeklyCalories += dailyCalories;
-    }
-
-    return weeklyCalories;
+    return CalorieData().weeklyCaloriesConsumed;
   }
 
   Future<Map<String, dynamic>> _fetchWeightAndCalorieData() async {
     if (userId == null) {
       return {
-        'correlationData': <WeightCalorieData>[],
-        'correlationCoefficient': 0.0
+        'weightData': <WeightData>[],
+        'bmrData': <BMRData>[],
+        'caloriesConsumedData': <CaloriesConsumedData>[],
+        'caloriesBurnedData': <CaloriesBurnedData>[]
       };
     }
 
@@ -1595,7 +1929,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .collection('food_entries')
           .where('userId', isEqualTo: userId)
           .orderBy('date', descending: true)
-          .limit(14)
+          .limit(30) // Increased limit to show more food entries
           .get();
 
       // Fetch activity data for calories burned
@@ -1603,12 +1937,14 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .collection('activities')
           .where('uid', isEqualTo: userId)
           .orderBy('start_date', descending: true)
-          .limit(30)
+          .limit(30) // Increased limit to show more activities
           .get();
 
-      // Process weight data
-      Map<String, double> weightByDate = {};
+      // Process weight and BMR data
+      List<WeightData> weightData = [];
+      List<BMRData> bmrData = [];
       Map<String, double> bmrByDate = {};
+
       for (var doc in weightSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         double weight = safeParseDouble(data['weight']);
@@ -1617,24 +1953,29 @@ class _RecommendationPageState extends State<RecommendationPage> {
         if (weight > 0 && data['timestamp'] != null) {
           DateTime date = data['timestamp'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
-          weightByDate[dateKey] = weight;
+
+          weightData.add(WeightData(date, weight));
+          bmrData.add(BMRData(date, basalMetabolicRate));
           bmrByDate[dateKey] = basalMetabolicRate;
         }
       }
 
-      Map<String, double> caloriesConsumedByDate = {};
+      // Process calories consumed data
+      List<CaloriesConsumedData> caloriesConsumedData = [];
+
       for (var doc in foodSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         double calories = safeParseDouble(data['total_calories']);
 
         if (calories > 0 && data['date'] != null) {
           DateTime date = data['date'].toDate();
-          String dateKey = DateFormat('yyyy-MM-dd').format(date);
-          caloriesConsumedByDate[dateKey] = calories;
+          caloriesConsumedData.add(CaloriesConsumedData(date, calories));
         }
       }
 
-      Map<String, double> caloriesBurnedByDate = {};
+      // Process calories burned data (including BMR)
+      List<CaloriesBurnedData> caloriesBurnedData = [];
+
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         double calories = safeParseDouble(data['calories_burned']);
@@ -1642,56 +1983,147 @@ class _RecommendationPageState extends State<RecommendationPage> {
         if (calories > 0 && data['start_date'] != null) {
           DateTime date = data['start_date'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
-          caloriesBurnedByDate[dateKey] = calories;
+
+          // Add BMR to calories burned if available for that date
+          double dailyBMR = 0;
+          // Find the most recent BMR value before this activity date
+          for (var bmrEntry in bmrData) {
+            if (bmrEntry.date.isBefore(date) ||
+                bmrEntry.date.isAtSameMomentAs(date)) {
+              dailyBMR = bmrEntry.bmr;
+              break;
+            }
+          }
+
+          // If no BMR found, use the latest available
+          if (dailyBMR == 0 && bmrData.isNotEmpty) {
+            dailyBMR = bmrData.first.bmr;
+          }
+
+          // Add activity calories + daily BMR (prorated for partial day)
+          double totalCaloriesBurned =
+              calories + (dailyBMR / 24 * 1); // Assume 1 hour of activity
+
+          caloriesBurnedData.add(CaloriesBurnedData(date, totalCaloriesBurned));
         }
       }
 
-      /*List<WeightCalorieData> correlationData = [];
-      Set<String> allDates = {
-        ...weightByDate.keys,
-        ...caloriesConsumedByDate.keys,
-        ...caloriesBurnedByDate.keys
-      };
+      // Sort all data chronologically
+      weightData.sort((a, b) => a.date.compareTo(b.date));
+      bmrData.sort((a, b) => a.date.compareTo(b.date));
+      caloriesConsumedData.sort((a, b) => a.date.compareTo(b.date));
+      caloriesBurnedData.sort((a, b) => a.date.compareTo(b.date));
 
-      List<String> sortedDates = allDates.toList()..sort();
+      // Calculate net calories (consumed - burned including BMR)
+      List<WeightCalorieData> netCaloriesData = [];
 
-      for (String dateKey in sortedDates) {
-        if (caloriesConsumedByDate.containsKey(dateKey) ) {
-          double weight = weightByDate[dateKey]!;
-          double bmr = bmrByDate[dateKey] ?? 0;
-          double caloriesConsumed = caloriesConsumedByDate[dateKey] ?? 0;
-          double caloriesBurned = caloriesBurnedByDate[dateKey] ?? 0;
-          double netCalories = caloriesConsumed - (caloriesBurned + bmr);
-
-          DateTime date = DateFormat('yyyy-MM-dd').parse(dateKey);
-          correlationData.add(WeightCalorieData(date, weight, netCalories));
-        }
+      // Get all unique dates across all datasets
+      Set<DateTime> allDates = {};
+      for (var item in caloriesConsumedData) {
+        allDates.add(DateTime(item.date.year, item.date.month, item.date.day));
+      }
+      for (var item in caloriesBurnedData) {
+        allDates.add(DateTime(item.date.year, item.date.month, item.date.day));
       }
 
-      double correlationCoefficient = 0.0;
+      // For each date, calculate net calories if both consumed and burned data exist
+      for (DateTime date in allDates) {
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
 
-      if (correlationData.length >= 3) {
-        List<double> weights = correlationData.map((e) => e.weight).toList();
-        List<double> netCalories =
-            correlationData.map((e) => e.netCalories).toList();
+        // Find weight for this date
+        double? weight;
+        for (var item in weightData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            weight = item.weight;
+            break;
+          }
+        }
 
-        correlationCoefficient =
-            _calculatePearsonCorrelation(weights, netCalories);
-      }*/
+        // Skip if no weight found and we don't have enough info for net calories
+        if (weight == null) {
+          // Try to find nearest weight before this date
+          for (var item in weightData.reversed) {
+            if (item.date.isBefore(date)) {
+              weight = item.weight;
+              break;
+            }
+          }
+          // If still no weight, use the earliest available
+          if (weight == null && weightData.isNotEmpty) {
+            weight = weightData.first.weight;
+          }
+        }
 
+        // Find consumed calories for this date
+        double consumedCalories = 0;
+        for (var item in caloriesConsumedData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            consumedCalories += item.caloriesConsumed;
+          }
+        }
+
+        // Find burned calories for this date
+        double burnedCalories = 0;
+        for (var item in caloriesBurnedData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            burnedCalories += item.caloriesBurned;
+          }
+        }
+
+        // Find BMR for this date
+        double bmr = 0;
+        for (var item in bmrData) {
+          if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
+            bmr = item.bmr;
+            break;
+          }
+        }
+
+        // If no BMR found for this specific date, use the most recent BMR before this date
+        if (bmr == 0) {
+          for (var item in bmrData.reversed) {
+            if (item.date.isBefore(date)) {
+              bmr = item.bmr;
+              break;
+            }
+          }
+          // If still no BMR, use the earliest available
+          if (bmr == 0 && bmrData.isNotEmpty) {
+            bmr = bmrData.first.bmr;
+          }
+        }
+
+        // Calculate daily BMR contribution if not already included in burned calories
+        double dailyBMRContribution = burnedCalories > 0 ? 0 : bmr;
+
+        // Add daily BMR to burned calories if not already included
+        double totalBurnedCalories = burnedCalories + dailyBMRContribution;
+
+        // Calculate net calories (positive means surplus, negative means deficit)
+        double netCalories = consumedCalories - totalBurnedCalories;
+
+        // Only add if we have either consumed or burned data
+        if (consumedCalories > 0 || burnedCalories > 0) {
+          netCaloriesData
+              .add(WeightCalorieData(date, weight ?? 0, netCalories));
+        }
+      }
 
       return {
-        'weightByDate': weightByDate,
-        'caloriesConsumedByDate': caloriesConsumedByDate,
-        'caloriesBurnedByDate': caloriesBurnedByDate,
-        'bmrByDate': bmrByDate,
-        //'correlationCoefficient': correlationCoefficient,
+        'weightData': weightData,
+        'bmrData': bmrData,
+        'caloriesConsumedData': caloriesConsumedData,
+        'caloriesBurnedData': caloriesBurnedData,
+        'netCaloriesData': netCaloriesData,
       };
     } catch (e) {
       print("Error fetching correlation data: $e");
       return {
-        'correlationData': <WeightCalorieData>[],
-        'correlationCoefficient': 0.0
+        'weightData': <WeightData>[],
+        'bmrData': <BMRData>[],
+        'caloriesConsumedData': <CaloriesConsumedData>[],
+        'caloriesBurnedData': <CaloriesBurnedData>[],
+        'netCaloriesData': <WeightCalorieData>[],
       };
     }
   }
@@ -1721,22 +2153,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   double _calculateWeeklyCaloriesBurned() {
-    if (activityData.isEmpty) return 0.0;
-
-    double weeklyCalories = 0.0;
-    DateTime oneWeekAgo = DateTime.now().subtract(Duration(days: 7));
-
-    for (var activity in activityData) {
-      if (activity['start_date'] != null) {
-        DateTime activityDate = activity['start_date'].toDate();
-        if (activityDate.isAfter(oneWeekAgo)) {
-          double caloriesBurned = safeParseDouble(activity['calories_burned']);
-          weeklyCalories += caloriesBurned;
-        }
-      }
-    }
-
-    return weeklyCalories;
+    return CalorieData().weeklyCaloriesBurned;
   }
 
 // Method to fetch active subgoal when loading the page
@@ -2818,36 +3235,85 @@ class _RecommendationPageState extends State<RecommendationPage> {
           .limit(30)
           .get();
 
-      Map<String, double> weatherByDate = {};
+      // Process all weather data
+      List<Map<String, dynamic>> weatherEntries = [];
       for (var doc in weatherSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         if (data['timestamp'] != null && data['temperature'] != null) {
           DateTime date = data['timestamp'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(date);
           double temperature = safeParseDouble(data['temperature']);
-          weatherByDate[dateKey] = temperature;
+          weatherEntries.add(
+              {'date': date, 'dateKey': dateKey, 'temperature': temperature});
         }
       }
 
-      List<TemperatureActivityData> temperatureActivityData = [];
+      // Process all activity data
+      List<Map<String, dynamic>> activityEntries = [];
       for (var doc in activitySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-
         if (data['start_date'] != null) {
           DateTime activityDate = data['start_date'].toDate();
           String dateKey = DateFormat('yyyy-MM-dd').format(activityDate);
 
-          if (weatherByDate.containsKey(dateKey)) {
-            double temperature = weatherByDate[dateKey]!;
-            double speed = safeParseDouble(data['average_speed']);
-            double distance = safeParseDouble(data['distance']);
-            double durationSeconds = safeParseDouble(data['elapsed_time']);
-            double durationMinutes = durationSeconds / 60.0;
+          double speed = safeParseDouble(data['average_speed']);
+          double distance = safeParseDouble(data['distance']);
+          double durationSeconds = safeParseDouble(data['elapsed_time']);
+          double durationMinutes = durationSeconds / 60.0;
 
-            if (temperature > -50 && temperature < 50 && speed > 0) {
-              temperatureActivityData.add(TemperatureActivityData(
-                  temperature, speed, distance, durationMinutes, activityDate));
-            }
+          activityEntries.add({
+            'date': activityDate,
+            'dateKey': dateKey,
+            'speed': speed,
+            'distance': distance,
+            'durationMinutes': durationMinutes
+          });
+        }
+      }
+
+      // Create combined temperature-activity data
+      List<TemperatureActivityData> temperatureActivityData = [];
+
+      // Get all unique dates with either weather or activity data
+      Set<String> allDateKeys = {};
+      for (var entry in weatherEntries) {
+        allDateKeys.add(entry['dateKey']);
+      }
+      for (var entry in activityEntries) {
+        allDateKeys.add(entry['dateKey']);
+      }
+
+      // For each date, create a data point if we have either/both data types
+      for (String dateKey in allDateKeys) {
+        // Find weather data for this date
+        Map<String, dynamic>? weatherData;
+        for (var entry in weatherEntries) {
+          if (entry['dateKey'] == dateKey) {
+            weatherData = entry;
+            break;
+          }
+        }
+
+        // Find activity data for this date
+        Map<String, dynamic>? activityData;
+        for (var entry in activityEntries) {
+          if (entry['dateKey'] == dateKey) {
+            activityData = entry;
+            break;
+          }
+        }
+
+        // Only create a point if we have both weather and activity data for this date
+        if (weatherData != null && activityData != null) {
+          double temperature = weatherData['temperature'];
+          double speed = activityData['speed'];
+          double distance = activityData['distance'];
+          double durationMinutes = activityData['durationMinutes'];
+          DateTime date = activityData['date'];
+
+          if (temperature > -50 && temperature < 50 && speed > 0) {
+            temperatureActivityData.add(TemperatureActivityData(
+                temperature, speed, distance, durationMinutes, date));
           }
         }
       }
@@ -5374,6 +5840,59 @@ class _RecommendationPageState extends State<RecommendationPage> {
     }
   }
 
+  // Helper method to generate insights based on net calories and weight data
+  String _generateNetCalorieInsight(List<WeightData> weightData,
+      List<WeightCalorieData> netCaloriesData, bool isInSurplus) {
+    if (weightData.isEmpty || netCaloriesData.isEmpty) {
+      return "Track more data to see how your caloric balance affects your weight.";
+    }
+
+    // Sort data by date
+    weightData.sort((a, b) => a.date.compareTo(b.date));
+    netCaloriesData.sort((a, b) => a.date.compareTo(b.date));
+
+    // Check if we have enough data for correlation analysis
+    if (weightData.length >= 2 && netCaloriesData.length >= 3) {
+      // Calculate weight change
+      double initialWeight = weightData.first.weight;
+      double currentWeight = weightData.last.weight;
+      double weightChange = currentWeight - initialWeight;
+
+      // Calculate average net calories
+      double avgNetCalories =
+          netCaloriesData.map((e) => e.netCalories).reduce((a, b) => a + b) /
+              netCaloriesData.length;
+
+      // Check weight change direction vs caloric balance
+      if (weightChange > 0.5 && avgNetCalories > 0) {
+        // Weight gain with caloric surplus
+        return "Your weight gain of ${weightChange.toStringAsFixed(1)} kg matches your average caloric surplus of ${avgNetCalories.toStringAsFixed(0)} calories. Reduce daily calories by 500-750 kcal for weight loss.";
+      } else if (weightChange < -0.5 && avgNetCalories < 0) {
+        // Weight loss with caloric deficit
+        return "Great progress! Your weight loss of ${(-weightChange).toStringAsFixed(1)} kg correlates with your average caloric deficit of ${(-avgNetCalories).toStringAsFixed(0)} calories.";
+      } else if (weightChange > 0.5 && avgNetCalories < 0) {
+        // Weight gain despite caloric deficit
+        return "Despite tracking a caloric deficit, your weight increased by ${weightChange.toStringAsFixed(1)} kg. Review tracking accuracy or consult a healthcare provider.";
+      } else if (weightChange < -0.5 && avgNetCalories > 0) {
+        // Weight loss despite caloric surplus
+        return "Your weight decreased by ${(-weightChange).toStringAsFixed(1)} kg despite a caloric surplus. Your BMR might be higher than estimated or activity level underreported.";
+      } else {
+        // Weight stable
+        return "Your weight has remained stable (±${abs(weightChange).toStringAsFixed(1)} kg) with an average daily ${avgNetCalories > 0 ? 'surplus' : 'deficit'} of ${abs(avgNetCalories).toStringAsFixed(0)} calories.";
+      }
+    }
+
+    // Default message if not enough data for correlation
+    return isInSurplus
+        ? "You're currently in a caloric surplus averaging ${netCaloriesData.last.netCalories.toStringAsFixed(0)} calories. This may lead to weight gain over time."
+        : "You're maintaining a caloric deficit averaging ${(-netCaloriesData.last.netCalories).toStringAsFixed(0)} calories. Consistent deficits typically lead to weight loss.";
+  }
+
+// Helper method for absolute value
+  double abs(double value) {
+    return value < 0 ? -value : value;
+  }
+
   double safeParseDouble(dynamic value) {
     if (value == null || value == "-") return 0.0;
     return double.tryParse(value.toString()) ?? 0.0;
@@ -6572,74 +7091,70 @@ class _RecommendationPageState extends State<RecommendationPage> {
         }
 
         var data = snapshot.data!;
-        //List<WeightCalorieData> chartData = data['correlationData'];
-        List<WeightData> weightDataChart = data['weightByDate'];
-        List<BMRData> bmrDataChart = data['bmrByDate'];
-        List<CaloriesBurnedData> caloriesBurnedDataChart = data['caloriesBurnedByDate'];
-        List<CaloriesConsumedData> caloriesConsumedDataChart = data['caloriesConsumedByDate'];
+        List<WeightData> weightData = data['weightData'] ?? [];
+        List<BMRData> bmrData = data['bmrData'] ?? [];
+        List<CaloriesConsumedData> caloriesConsumedData =
+            data['caloriesConsumedData'] ?? [];
+        List<CaloriesBurnedData> caloriesBurnedData =
+            data['caloriesBurnedData'] ?? [];
+        List<WeightCalorieData> netCaloriesData = data['netCaloriesData'] ?? [];
 
-        if (weightDataChart.isEmpty || caloriesBurnedDataChart.isEmpty || caloriesConsumedDataChart.isEmpty) {
+        if (weightData.isEmpty &&
+            caloriesConsumedData.isEmpty &&
+            caloriesBurnedData.isEmpty) {
           return _buildEmptyGraph("Not enough data for correlation analysis");
         }
 
-        String correlationExplanation =
-            "Need more data points to determine correlation.";
-
+        // Determine if we're in a caloric surplus or deficit based on the most recent data
         bool isInSurplus = false;
         double latestNetCalories = 0;
 
-        if (weightDataChart.isNotEmpty && caloriesBurnedDataChart.isNotEmpty && caloriesConsumedDataChart.isNotEmpty) {
-          weightDataChart.sort((a, b) => a.date.compareTo(b.date));
-          caloriesBurnedDataChart.sort((a, b) => a.date.compareTo(b.date));
-          caloriesConsumedDataChart.sort((a, b) => a.date.compareTo(b.date));
-          bmrDataChart.sort((a, b) => a.date.compareTo(b.date));
+        if (netCaloriesData.isNotEmpty) {
+          netCaloriesData.sort(
+              (a, b) => b.date.compareTo(a.date)); // Sort by date, newest first
+          latestNetCalories = netCaloriesData.first.netCalories;
+          isInSurplus = latestNetCalories > 0;
         }
 
+        // Get all data sorted by date
+        if (weightData.isNotEmpty)
+          weightData.sort((a, b) => a.date.compareTo(b.date));
+        if (caloriesConsumedData.isNotEmpty)
+          caloriesConsumedData.sort((a, b) => a.date.compareTo(b.date));
+        if (caloriesBurnedData.isNotEmpty)
+          caloriesBurnedData.sort((a, b) => a.date.compareTo(b.date));
+        if (netCaloriesData.isNotEmpty)
+          netCaloriesData.sort((a, b) => a.date.compareTo(b.date));
 
-        DateTime startDate = weightDataChart.first.date;
-        DateTime endDate = caloriesConsumedDataChart.last.date;
+        // Determine date range for chart
+        DateTime? startDate;
+        DateTime? endDate;
 
-        /*chartData = chartData
-            .where((data) =>
-                data.date.isAfter(startDate.subtract(Duration(days: 1))) &&
-                data.date.isBefore(endDate.add(Duration(days: 1))))
-            .toList();
+        // Use the earliest and latest dates across all datasets
+        List<DateTime> allDates = [];
+        if (weightData.isNotEmpty) {
+          allDates.addAll(weightData.map((e) => e.date));
+        }
+        if (caloriesConsumedData.isNotEmpty) {
+          allDates.addAll(caloriesConsumedData.map((e) => e.date));
+        }
+        if (caloriesBurnedData.isNotEmpty) {
+          allDates.addAll(caloriesBurnedData.map((e) => e.date));
+        }
 
-        if (chartData.length >= 3) {
-          double correlationCoefficient = data['correlationCoefficient'];
-
-          if (correlationCoefficient < -0.7) {
-            correlationStrength = "Strong negative";
-            correlationExplanation = isInSurplus
-                ? "Warning: Your caloric surplus is strongly associated with weight gain. Consider reducing calorie intake for better results."
-                : "Great job! Your caloric deficit is strongly associated with weight loss. Continue your current approach.";
-          } else if (correlationCoefficient < -0.3) {
-            correlationStrength = "Moderate negative";
-            correlationExplanation = isInSurplus
-                ? "Note: Your caloric surplus shows moderate association with weight changes. Aim for a deficit to improve results."
-                : "Good progress! Your caloric deficit is showing moderate association with weight loss. Maintain consistency for better results.";
-          } else if (correlationCoefficient < 0.3) {
-            correlationStrength = "Weak/No correlation";
-            correlationExplanation = isInSurplus
-                ? "Your caloric surplus doesn't yet show a clear relationship with weight changes. Consider tracking more consistently."
-                : "Your caloric deficit hasn't yet shown a clear relationship with weight. Ensure you're tracking accurately and consistently.";
-          } else if (correlationCoefficient < 0.7) {
-            correlationStrength = "Moderate positive";
-            correlationExplanation = isInSurplus
-                ? "Caution: Your caloric surplus is moderately associated with weight gain, which may conflict with your goals."
-                : "Unusual pattern: Despite caloric deficits, you're showing moderate weight gain. Consider reviewing tracking accuracy or consulting a professional.";
-          } else {
-            correlationStrength = "Strong positive";
-            correlationExplanation = isInSurplus
-                ? "Warning: Your caloric surplus is strongly driving weight gain, which may hinder your cycling performance goals."
-                : "Unexpected trend: Despite tracking deficits, weight is increasing. Consider reviewing measurement accuracy or consulting a nutritionist.";
-          }
+        if (allDates.isNotEmpty) {
+          allDates.sort();
+          startDate = allDates.first;
+          endDate = allDates.last;
         } else {
-          correlationExplanation = isInSurplus
-              ? "You're currently in a caloric surplus, which may slow weight loss progress. Track more data for better insights."
-              : "You're currently in a caloric deficit, which supports weight loss goals. Track more data for personalized insights.";
-        }*/
+          // Fallback if no data
+          startDate = DateTime.now().subtract(Duration(days: 14));
+          endDate = DateTime.now();
+        }
 
+        // Generate insight based on the data
+        String correlationExplanation = _generateNetCalorieInsight(
+            weightData, netCaloriesData, isInSurplus);
 
         return _buildGraphContainer(
           title: "Calories and\nWeight Correlation",
@@ -6726,37 +7241,43 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     textStyle: TextStyle(color: Colors.white, fontSize: 12),
                   ),
                   series: <ChartSeries>[
-                    SplineSeries<WeightData, DateTime>(
-                      name: 'Weight (kg)',
-                      dataSource: weightDataChart,
-                      xValueMapper: (WeightData data, _) => data.date,
-                      yValueMapper: (WeightData data, _) => data.weight,
-                      color: Colors.blue[700],
-                      width: 2.5,
-                      markerSettings: MarkerSettings(
-                        isVisible: true,
-                        shape: DataMarkerType.circle,
+                    // Weight data series
+                    if (weightData.isNotEmpty)
+                      SplineSeries<WeightData, DateTime>(
+                        name: 'Weight (kg)',
+                        dataSource: weightData,
+                        xValueMapper: (WeightData data, _) => data.date,
+                        yValueMapper: (WeightData data, _) => data.weight,
                         color: Colors.blue[700],
-                        borderColor: Colors.white,
-                        borderWidth: 2,
-                        height: 8,
-                        width: 8,
+                        width: 2.5,
+                        markerSettings: MarkerSettings(
+                          isVisible: true,
+                          shape: DataMarkerType.circle,
+                          color: Colors.blue[700],
+                          borderColor: Colors.white,
+                          borderWidth: 2,
+                          height: 8,
+                          width: 8,
+                        ),
                       ),
-                    ),
-                    if (caloriesConsumedDataChart.isNotEmpty)
+
+                    // Net calories series (combines consumed - burned)
+                    if (netCaloriesData.isNotEmpty)
                       SplineSeries<WeightCalorieData, DateTime>(
                         name: 'Net Calories',
-                        dataSource: netData,
+                        dataSource: netCaloriesData,
                         xValueMapper: (WeightCalorieData data, _) => data.date,
                         yValueMapper: (WeightCalorieData data, _) =>
                             data.netCalories,
                         yAxisName: 'Calories',
-                        color: Colors.red[500],
+                        color:
+                            isInSurplus ? Colors.red[500] : Colors.green[500],
                         width: 2.0,
                         markerSettings: MarkerSettings(
                           isVisible: true,
                           shape: DataMarkerType.diamond,
-                          color: Colors.red[500],
+                          color:
+                              isInSurplus ? Colors.red[500] : Colors.green[500],
                           borderColor: Colors.white,
                           borderWidth: 1,
                           height: 8,
@@ -6789,8 +7310,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
                         ),
                       ),
                       coordinateUnit: CoordinateUnit.point,
-                      x: chartData[0].date,
-                      y: -400,
+                      x: netCaloriesData.isNotEmpty
+                          ? netCaloriesData.first.date
+                          : startDate,
+                      y: -500,
                       yAxisName: 'Calories',
                     ),
                     CartesianChartAnnotation(
@@ -6813,8 +7336,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
                         ),
                       ),
                       coordinateUnit: CoordinateUnit.point,
-                      x: chartData[0].date,
-                      y: 400,
+                      x: netCaloriesData.isNotEmpty
+                          ? netCaloriesData.first.date
+                          : startDate,
+                      y: 500,
                       yAxisName: 'Calories',
                     ),
                   ],
@@ -6829,9 +7354,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     color: isInSurplus ? Colors.red[50] : Colors.green[50],
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color:
-                            isInSurplus ? Colors.red[200]! : Colors.green[200]!,
-                        width: 1),
+                      color:
+                          isInSurplus ? Colors.red[200]! : Colors.green[200]!,
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -7755,101 +8281,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
               ),
             ),
             Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Calories\nBurned",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF7E00).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.local_fire_department_rounded,
-                              color: Color(0xffFF7E00),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Value display
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) {
-                                  return LinearGradient(
-                                          colors: [
-                                        Color(0xffFF7E00),
-                                        Color(0xffFF5900)
-                                      ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight)
-                                      .createShader(Rect.fromLTRB(
-                                          0, 0, bounds.width, bounds.height));
-                                },
-                                child: Text(
-                                  "${weeklyCaloriesBurned.toInt()}",
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                "kcal this week",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              child: _buildWeeklyCaloriesBurnedCard(cardHeight),
             ),
           ],
         ),
@@ -8156,223 +8588,403 @@ class _RecommendationPageState extends State<RecommendationPage> {
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        "Caloric Balance",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Color(0xffFFA500).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.equalizer_rounded,
-                        color: Color(0xffFFA500),
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 15),
+          child: _buildCaloricBalanceSection(),
+        ),
+      ],
+    );
+  }
 
-                // Single bar balance visualization
-                Container(
-                  width: double.infinity,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xffFFA500),
-                                      Color(0xffFF8C00)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xff4CAF50),
-                                      Color(0xff388E3C)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      // Balance bar with safe flex values
-                      Container(
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Row(
-                          children: [
-                            Flexible(
-                              flex: burnedFlex,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xffFFA500),
-                                      Color(0xffFF8C00)
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(5),
-                                    bottomLeft: Radius.circular(5),
-                                    topRight: weeklyCaloriesConsumed == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                    bottomRight: weeklyCaloriesConsumed == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Flexible(
-                              flex: consumedFlex,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xff4CAF50),
-                                      Color(0xff388E3C)
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.only(
-                                    topRight: Radius.circular(5),
-                                    bottomRight: Radius.circular(5),
-                                    topLeft: weeklyCaloriesBurned == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                    bottomLeft: weeklyCaloriesBurned == 0
-                                        ? Radius.circular(5)
-                                        : Radius.zero,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+  Widget _buildCaloricBalanceSection() {
+    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+    double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+
+    // Calculate net calories (deficit or surplus)
+    double netCalories = weeklyCaloriesConsumed - weeklyCaloriesBurned;
+    bool isInSurplus = netCalories > 0;
+
+    // Safe flex values for visualization
+    int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
+    int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
+
+    // Scale down if values are too large
+    if (burnedFlex > 10000 || consumedFlex > 10000) {
+      int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
+      burnedFlex = burnedFlex ~/ divisor;
+      consumedFlex = consumedFlex ~/ divisor;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    "Caloric Balance",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-
-                SizedBox(height: 15),
-                Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                            ? [Color(0xffFFA500), Color(0xffFF8C00)]
-                            : [Color(0xff4CAF50), Color(0xff388E3C)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: weeklyCaloriesBurned > weeklyCaloriesConsumed
-                              ? Color(0xffFFA500).withOpacity(0.3)
-                              : Color(0xff4CAF50).withOpacity(0.3),
-                          spreadRadius: 1,
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          weeklyCaloriesBurned > weeklyCaloriesConsumed
-                              ? Icons.trending_down_rounded
-                              : Icons.trending_up_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          "Net: ${(weeklyCaloriesBurned - weeklyCaloriesConsumed).abs().toInt()} kcal ${weeklyCaloriesBurned > weeklyCaloriesConsumed ? 'deficit' : 'surplus'}",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Color(0xffFFA500).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.equalizer_rounded,
+                    color: Color(0xffFFA500),
+                    size: 18,
                   ),
                 ),
               ],
             ),
-          ),
+            SizedBox(height: 15),
+
+            // Single bar balance visualization
+            Container(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                              ),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            "Burned: ${weeklyCaloriesBurned.toInt()} kcal",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xff4CAF50), Color(0xff388E3C)],
+                              ),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            "Consumed: ${weeklyCaloriesConsumed.toInt()} kcal",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  // Add BMR information
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 12, color: Colors.grey[600]),
+                        SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            "Includes ${(safeParseDouble(basalMetabolicRate) * 7).toInt()} kcal from BMR (${safeParseDouble(basalMetabolicRate).toInt()} kcal/day)",
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  // Balance bar with safe flex values
+                  Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          flex: burnedFlex,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(5),
+                                bottomLeft: Radius.circular(5),
+                                topRight: weeklyCaloriesConsumed == 0
+                                    ? Radius.circular(5)
+                                    : Radius.zero,
+                                bottomRight: weeklyCaloriesConsumed == 0
+                                    ? Radius.circular(5)
+                                    : Radius.zero,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Flexible(
+                          flex: consumedFlex,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xff4CAF50), Color(0xff388E3C)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(5),
+                                bottomRight: Radius.circular(5),
+                                topLeft: weeklyCaloriesBurned == 0
+                                    ? Radius.circular(5)
+                                    : Radius.zero,
+                                bottomLeft: weeklyCaloriesBurned == 0
+                                    ? Radius.circular(5)
+                                    : Radius.zero,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 15),
+            Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isInSurplus
+                        ? [Color(0xff4CAF50), Color(0xff388E3C)]
+                        : [Color(0xffFFA500), Color(0xffFF8C00)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isInSurplus
+                          ? Color(0xff4CAF50).withOpacity(0.3)
+                          : Color(0xffFFA500).withOpacity(0.3),
+                      spreadRadius: 1,
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isInSurplus
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_down_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "Net: ${netCalories.abs().toInt()} kcal ${isInSurplus ? 'surplus' : 'deficit'}",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyCaloriesBurnedCard(double cardHeight) {
+    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+    double bmrContribution =
+        safeParseDouble(basalMetabolicRate) * 7; // 7 days of BMR
+    double activityContribution = weeklyCaloriesBurned - bmrContribution;
+
+    // Ensure activity contribution isn't negative
+    activityContribution = math.max(0, activityContribution);
+
+    return Container(
+      height: cardHeight,
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    "Calories\nBurned",
+                    style: TextStyle(
+                      fontFamily: 'Fredoka-SemiBold',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Color(0xffFF7E00).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.local_fire_department_rounded,
+                    color: Color(0xffFF7E00),
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+
+            // Value display
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (bounds) {
+                        return LinearGradient(
+                                colors: [Color(0xffFF7E00), Color(0xffFF5900)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight)
+                            .createShader(Rect.fromLTRB(
+                                0, 0, bounds.width, bounds.height));
+                      },
+                      child: Text(
+                        "${weeklyCaloriesBurned.toInt()}",
+                        style: TextStyle(
+                          fontFamily: 'Fredoka-SemiBold',
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      "kcal this week",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // BMR and Activity breakdown
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Activity: ${activityContribution.toInt()} kcal",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
