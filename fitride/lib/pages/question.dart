@@ -1,3 +1,4 @@
+import 'package:fitride/pages/goal_tracking.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_swipe/liquid_swipe.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -150,7 +151,7 @@ class _QuestionPageState extends State<QuestionPage>
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  HomePage(),
+                  GoalTrackingPage(),
               transitionsBuilder:
                   (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
