@@ -1338,380 +1338,402 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Future<List<NutritionActivityData>> _fetchNutritionActivityData() async {
-    if (userId == null) return [];
+  if (userId == null) return [];
 
-    try {
-      // Fetch food entries data
-      QuerySnapshot foodSnapshot = await FirebaseFirestore.instance
-          .collection('food_entries')
-          .where('userId', isEqualTo: userId)
-          .orderBy('date', descending: true)
-          .limit(30)
-          .get();
+  try {
+    // Fetch food entries data
+    QuerySnapshot foodSnapshot = await FirebaseFirestore.instance
+        .collection('food_entries')
+        .where('userId', isEqualTo: userId)
+        .orderBy('date', descending: true)
+        .limit(30)
+        .get();
 
-      // Fetch activity data
-      QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('uid', isEqualTo: userId)
-          .orderBy('start_date', descending: true)
-          .limit(30)
-          .get();
+    // Fetch activity data
+    QuerySnapshot activitySnapshot = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('uid', isEqualTo: userId)
+        .orderBy('start_date', descending: true)
+        .limit(30)
+        .get();
 
-      // Process food entries - collect all data without filtering
-      List<Map<String, dynamic>> foodEntries = [];
-      for (var doc in foodSnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        if (data['date'] != null) {
-          DateTime date = data['date'].toDate();
-          foodEntries.add({
+    print("Food entries: ${foodSnapshot.docs.length}");
+    print("Activity entries: ${activitySnapshot.docs.length}");
+
+    // Process food entries
+    Map<String, Map<String, dynamic>> foodByDate = {};
+    for (var doc in foodSnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      if (data['date'] != null) {
+        DateTime date = data['date'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+        
+        // If multiple entries for same date, add values
+        if (foodByDate.containsKey(dateKey)) {
+          foodByDate[dateKey]!['totalCalories'] = 
+              (foodByDate[dateKey]!['totalCalories'] ?? 0) + safeParseDouble(data['total_calories']);
+          foodByDate[dateKey]!['totalCarbs'] = 
+              (foodByDate[dateKey]!['totalCarbs'] ?? 0) + safeParseDouble(data['total_carbs']);
+          foodByDate[dateKey]!['totalFat'] = 
+              (foodByDate[dateKey]!['totalFat'] ?? 0) + safeParseDouble(data['total_fat']);
+          foodByDate[dateKey]!['totalProtein'] = 
+              (foodByDate[dateKey]!['totalProtein'] ?? 0) + safeParseDouble(data['total_protein']);
+        } else {
+          foodByDate[dateKey] = {
             'date': date,
             'totalCalories': safeParseDouble(data['total_calories']),
             'totalCarbs': safeParseDouble(data['total_carbs']),
             'totalFat': safeParseDouble(data['total_fat']),
             'totalProtein': safeParseDouble(data['total_protein']),
-          });
+          };
         }
       }
+    }
 
-      // Process activities - collect all data without filtering
-      List<Map<String, dynamic>> activities = [];
-      for (var doc in activitySnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        if (data['start_date'] != null) {
-          DateTime date = data['start_date'].toDate();
-          activities.add({
+    // Process activities
+    Map<String, Map<String, dynamic>> activityByDate = {};
+    for (var doc in activitySnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      if (data['start_date'] != null) {
+        DateTime date = data['start_date'].toDate();
+        String dateKey = DateFormat('yyyy-MM-dd').format(date);
+        
+        // If multiple activities on same day, use the longest/most significant one
+        if (activityByDate.containsKey(dateKey)) {
+          double currentDistance = safeParseDouble(data['distance']);
+          double existingDistance = activityByDate[dateKey]!['distance'] ?? 0;
+          
+          // Replace if this activity has longer distance
+          if (currentDistance > existingDistance) {
+            activityByDate[dateKey] = {
+              'date': date,
+              'elapsedTime': safeParseDouble(data['elapsed_time']) / 60, // Convert to minutes
+              'distance': currentDistance,
+              'averageSpeed': safeParseDouble(data['average_speed']),
+            };
+          }
+        } else {
+          activityByDate[dateKey] = {
             'date': date,
-            'elapsedTime': safeParseDouble(data['elapsed_time']) /
-                60, // Convert to minutes
+            'elapsedTime': safeParseDouble(data['elapsed_time']) / 60, // Convert to minutes
             'distance': safeParseDouble(data['distance']),
             'averageSpeed': safeParseDouble(data['average_speed']),
-          });
+          };
         }
       }
+    }
 
-      // Get all unique dates from both datasets
-      Set<String> allDateKeys = {};
-      for (var entry in foodEntries) {
-        allDateKeys.add(DateFormat('yyyy-MM-dd').format(entry['date']));
-      }
-      for (var activity in activities) {
-        allDateKeys.add(DateFormat('yyyy-MM-dd').format(activity['date']));
-      }
-
-      // Create combined data points - include a point if EITHER food or activity data exists
-      List<NutritionActivityData> combinedData = [];
-      for (String dateKey in allDateKeys) {
-        // Find food data for this date
-        Map<String, dynamic>? foodData;
-        for (var entry in foodEntries) {
-          if (DateFormat('yyyy-MM-dd').format(entry['date']) == dateKey) {
-            foodData = entry;
-            break;
-          }
-        }
-
-        // Find activity data for this date
-        Map<String, dynamic>? activityData;
-        for (var activity in activities) {
-          if (DateFormat('yyyy-MM-dd').format(activity['date']) == dateKey) {
-            activityData = activity;
-            break;
-          }
-        }
-
-        // Add data point if we have EITHER food OR activity data
-        if (foodData != null || activityData != null) {
-          DateTime date =
-              foodData != null ? foodData['date'] : activityData!['date'];
-
-          combinedData.add(NutritionActivityData(
-            date: date,
-            totalCalories: foodData?['totalCalories'],
-            totalCarbs: foodData?['totalCarbs'],
-            totalFat: foodData?['totalFat'],
-            totalProtein: foodData?['totalProtein'],
-            elapsedTime: activityData?['elapsedTime'],
-            distance: activityData?['distance'],
-            averageSpeed: activityData?['averageSpeed'],
-          ));
-        }
-      }
-
-      // Sort by date
-      combinedData.sort((a, b) => a.date.compareTo(b.date));
-      return combinedData;
-    } catch (e) {
-      print("Error fetching nutrition and activity data: $e");
+    // Get dates that exist in BOTH food and activity data
+    Set<String> matchingDates = foodByDate.keys.toSet().intersection(activityByDate.keys.toSet());
+    print("Days with both food and activity data: ${matchingDates.length}");
+    
+    if (matchingDates.isEmpty) {
+      print("No days found with both food and activity data");
       return [];
     }
+
+    // Create combined data only for days that have both types of data
+    List<NutritionActivityData> combinedData = [];
+    for (String dateKey in matchingDates) {
+      // Get the data from both sources
+      final foodData = foodByDate[dateKey]!;
+      final activityData = activityByDate[dateKey]!;
+      
+      // Use the date from activity data as the primary date
+      final date = activityData['date'];
+      
+      // Add data point with values from both sources
+      combinedData.add(NutritionActivityData(
+        date: date,
+        // Food metrics
+        totalCalories: foodData['totalCalories'],
+        totalCarbs: foodData['totalCarbs'],
+        totalFat: foodData['totalFat'],
+        totalProtein: foodData['totalProtein'],
+        // Activity metrics
+        elapsedTime: activityData['elapsedTime'],
+        distance: activityData['distance'],
+        averageSpeed: activityData['averageSpeed'],
+      ));
+    }
+
+    // Sort by date (ascending)
+    combinedData.sort((a, b) => a.date.compareTo(b.date));
+    print("Combined data points: ${combinedData.length}");
+
+    return combinedData;
+  } catch (e) {
+    print("Error fetching nutrition and activity data: $e");
+    return [];
   }
+}
 
   Widget _buildNutritionActivityGraph() {
-    return FutureBuilder<List<NutritionActivityData>>(
-      future: _fetchNutritionActivityData(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingGraph();
-        }
+  return FutureBuilder<List<NutritionActivityData>>(
+    future: _fetchNutritionActivityData(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return _buildEmptyGraph("Error loading nutrition and activity data");
-        }
+      if (snapshot.hasError || !snapshot.hasData) {
+        return _buildEmptyGraph("Error loading nutrition and activity data");
+      }
 
-        List<NutritionActivityData> data = snapshot.data!;
+      List<NutritionActivityData> data = snapshot.data!;
 
-        if (data.isEmpty) {
-          return _buildEmptyGraph(
-              "No matching nutrition and activity data found");
-        }
+      if (data.isEmpty) {
+        return _buildEmptyGraph("No matching nutrition and activity data found");
+      }
 
-        // Default selections
-        String selectedNutritionMetric = 'totalCalories';
-        String selectedActivityMetric = 'averageSpeed';
+      // Print data points for debugging
+      print("Data points loaded: ${data.length}");
+      for (var item in data) {
+        print("Date: ${item.date}, Calories: ${item.totalCalories}, Speed: ${item.averageSpeed}");
+      }
 
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return _buildGraphContainer(
-              title: "Nutrition &\nPerformance",
-              subtitle: "Correlation Analysis",
-              height: 340, // Match other graphs
-              child: Column(
-                children: [
-                  // Main chart section
-                  Expanded(
-                    child: SfCartesianChart(
-                      margin: EdgeInsets.all(10),
-                      primaryXAxis: DateTimeAxis(
+      // Default selections
+      String selectedNutritionMetric = 'totalCalories';
+      String selectedActivityMetric = 'averageSpeed';
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return _buildGraphContainer(
+            title: "Nutrition &\nPerformance",
+            subtitle: "Correlation Analysis",
+            height: 340, // Match other graphs
+            child: Column(
+              children: [
+                // Main chart section
+                Expanded(
+                  child: SfCartesianChart(
+                    margin: EdgeInsets.all(10),
+                    primaryXAxis: DateTimeAxis(
+                      majorGridLines: MajorGridLines(width: 0),
+                      minorGridLines: MinorGridLines(width: 0),
+                      axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+                      labelStyle: TextStyle(
+                        color: Colors.grey[700],
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      dateFormat: DateFormat('MM/dd'),
+                      intervalType: DateTimeIntervalType.days,
+                    ),
+                    primaryYAxis: NumericAxis(
+                      name: 'Nutrition',
+                      majorGridLines: MajorGridLines(
+                        width: 0.5,
+                        color: Colors.grey[200],
+                        dashArray: <double>[3, 3],
+                      ),
+                      axisLine: AxisLine(width: 0),
+                      labelFormat: _getNutritionYAxisFormat(selectedNutritionMetric),
+                      labelStyle: TextStyle(
+                        color: _getNutritionColor(selectedNutritionMetric),
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                      ),
+                    ),
+                    axes: <ChartAxis>[
+                      NumericAxis(
+                        name: 'Activity',
+                        opposedPosition: true,
                         majorGridLines: MajorGridLines(width: 0),
-                        minorGridLines: MinorGridLines(width: 0),
-                        axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-                        labelStyle: TextStyle(
-                          color: Colors.grey[700],
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        dateFormat: DateFormat('MM/dd'),
-                        intervalType: DateTimeIntervalType.days,
-                      ),
-                      primaryYAxis: NumericAxis(
-                        name: 'Nutrition',
-                        majorGridLines: MajorGridLines(
-                          width: 0.5,
-                          color: Colors.grey[200],
-                          dashArray: <double>[3, 3],
-                        ),
                         axisLine: AxisLine(width: 0),
-                        labelFormat:
-                            _getNutritionYAxisFormat(selectedNutritionMetric),
+                        labelFormat: _getActivityYAxisFormat(selectedActivityMetric),
                         labelStyle: TextStyle(
-                          color: _getNutritionColor(selectedNutritionMetric),
+                          color: _getActivityColor(selectedActivityMetric),
                           fontFamily: 'Inter',
                           fontSize: 10,
                         ),
                       ),
-                      axes: <ChartAxis>[
-                        NumericAxis(
-                          name: 'Activity',
-                          opposedPosition: true,
-                          majorGridLines: MajorGridLines(width: 0),
-                          axisLine: AxisLine(width: 0),
-                          labelFormat:
-                              _getActivityYAxisFormat(selectedActivityMetric),
-                          labelStyle: TextStyle(
-                            color: _getActivityColor(selectedActivityMetric),
-                            fontFamily: 'Inter',
-                            fontSize: 10,
-                          ),
+                    ],
+                    series: <ChartSeries>[
+                      // Nutrition series (improved handling of nulls)
+                      SplineSeries<NutritionActivityData, DateTime>(
+                        name: _getNutritionSeriesName(selectedNutritionMetric),
+                        dataSource: data,
+                        xValueMapper: (NutritionActivityData data, _) => data.date,
+                        yValueMapper: (NutritionActivityData data, _) {
+                          // Handle null values gracefully
+                          return _getNutritionValue(data, selectedNutritionMetric) ?? 0;
+                        },
+                        emptyPointSettings: EmptyPointSettings(
+                          mode: EmptyPointMode.gap, // Use a gap where null values exist
                         ),
-                      ],
-                      series: <ChartSeries>[
-                        // Nutrition series
-                        SplineSeries<NutritionActivityData, DateTime>(
-                          name:
-                              _getNutritionSeriesName(selectedNutritionMetric),
-                          dataSource: data,
-                          xValueMapper: (NutritionActivityData data, _) =>
-                              data.date,
-                          yValueMapper: (NutritionActivityData data, _) =>
-                              _getNutritionValue(data, selectedNutritionMetric),
+                        color: _getNutritionColor(selectedNutritionMetric),
+                        width: 2.5,
+                        markerSettings: MarkerSettings(
+                          isVisible: true,
+                          shape: DataMarkerType.circle,
+                          height: 6,
+                          width: 6,
                           color: _getNutritionColor(selectedNutritionMetric),
-                          width: 2.5,
-                          markerSettings: MarkerSettings(
-                            isVisible: true,
-                            shape: DataMarkerType.circle,
-                            height: 6,
-                            width: 6,
-                            color: _getNutritionColor(selectedNutritionMetric),
-                            borderColor: Colors.white,
-                            borderWidth: 2,
-                          ),
+                          borderColor: Colors.white,
+                          borderWidth: 2,
                         ),
+                      ),
 
-                        // Activity series
-                        SplineSeries<NutritionActivityData, DateTime>(
-                          name: _getActivitySeriesName(selectedActivityMetric),
-                          dataSource: data,
-                          xValueMapper: (NutritionActivityData data, _) =>
-                              data.date,
-                          yValueMapper: (NutritionActivityData data, _) =>
-                              _getActivityValue(data, selectedActivityMetric),
-                          yAxisName: 'Activity',
+                      // Activity series (improved handling of nulls)
+                      SplineSeries<NutritionActivityData, DateTime>(
+                        name: _getActivitySeriesName(selectedActivityMetric),
+                        dataSource: data,
+                        xValueMapper: (NutritionActivityData data, _) => data.date,
+                        yValueMapper: (NutritionActivityData data, _) {
+                          // Handle null values gracefully
+                          return _getActivityValue(data, selectedActivityMetric) ?? 0;
+                        },
+                        emptyPointSettings: EmptyPointSettings(
+                          mode: EmptyPointMode.gap, // Use a gap where null values exist
+                        ),
+                        yAxisName: 'Activity',
+                        color: _getActivityColor(selectedActivityMetric),
+                        width: 2.5,
+                        markerSettings: MarkerSettings(
+                          isVisible: true,
+                          shape: DataMarkerType.diamond,
+                          height: 6,
+                          width: 6,
                           color: _getActivityColor(selectedActivityMetric),
-                          width: 2.5,
-                          markerSettings: MarkerSettings(
-                            isVisible: true,
-                            shape: DataMarkerType.diamond,
-                            height: 6,
-                            width: 6,
-                            color: _getActivityColor(selectedActivityMetric),
-                            borderColor: Colors.white,
-                            borderWidth: 2,
-                          ),
+                          borderColor: Colors.white,
+                          borderWidth: 2,
                         ),
-                      ],
-                      tooltipBehavior: TooltipBehavior(
-                        enable: true,
+                      ),
+                    ],
+                    tooltipBehavior: TooltipBehavior(
+                      enable: true,
+                      color: Colors.grey[800],
+                      textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    legend: Legend(
+                      isVisible: true,
+                      position: LegendPosition.bottom,
+                      overflowMode: LegendItemOverflowMode.wrap,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
                         color: Colors.grey[800],
-                        textStyle: TextStyle(color: Colors.white, fontSize: 12),
                       ),
-                      legend: Legend(
-                        isVisible: true,
-                        position: LegendPosition.bottom,
-                        overflowMode: LegendItemOverflowMode.wrap,
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: Colors.grey[800],
-                        ),
-                        iconHeight: 14,
-                        iconWidth: 14,
+                      iconHeight: 14,
+                      iconWidth: 14,
+                    ),
+                  ),
+                ),
+
+                // Toggle buttons row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Nutrition toggle buttons
+                      _buildMetricToggleButton(
+                        'Calories',
+                        selectedNutritionMetric == 'totalCalories',
+                        Colors.orange[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalCalories'),
                       ),
-                    ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Carbs',
+                        selectedNutritionMetric == 'totalCarbs',
+                        Colors.green[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalCarbs'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Fat',
+                        selectedNutritionMetric == 'totalFat',
+                        Colors.yellow[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalFat'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Protein',
+                        selectedNutritionMetric == 'totalProtein',
+                        Colors.purple[700]!,
+                        () => setState(() => selectedNutritionMetric = 'totalProtein'),
+                      ),
+                    ],
                   ),
+                ),
 
-                  // Toggle buttons row
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Nutrition toggle buttons
-                        _buildMetricToggleButton(
-                          'Calories',
-                          selectedNutritionMetric == 'totalCalories',
-                          Colors.orange[700]!,
-                          () => setState(
-                              () => selectedNutritionMetric = 'totalCalories'),
-                        ),
-                        SizedBox(width: 4),
-                        _buildMetricToggleButton(
-                          'Carbs',
-                          selectedNutritionMetric == 'totalCarbs',
-                          Colors.green[700]!,
-                          () => setState(
-                              () => selectedNutritionMetric = 'totalCarbs'),
-                        ),
-                        SizedBox(width: 4),
-                        _buildMetricToggleButton(
-                          'Fat',
-                          selectedNutritionMetric == 'totalFat',
-                          Colors.yellow[700]!,
-                          () => setState(
-                              () => selectedNutritionMetric = 'totalFat'),
-                        ),
-                        SizedBox(width: 4),
-                        _buildMetricToggleButton(
-                          'Protein',
-                          selectedNutritionMetric == 'totalProtein',
-                          Colors.purple[700]!,
-                          () => setState(
-                              () => selectedNutritionMetric = 'totalProtein'),
-                        ),
-                      ],
-                    ),
+                // Activity toggle buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildMetricToggleButton(
+                        'Time',
+                        selectedActivityMetric == 'elapsedTime',
+                        Colors.blue[700]!,
+                        () => setState(() => selectedActivityMetric = 'elapsedTime'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Distance',
+                        selectedActivityMetric == 'distance',
+                        Colors.indigo[700]!,
+                        () => setState(() => selectedActivityMetric = 'distance'),
+                      ),
+                      SizedBox(width: 4),
+                      _buildMetricToggleButton(
+                        'Speed',
+                        selectedActivityMetric == 'averageSpeed',
+                        Colors.teal[700]!,
+                        () => setState(() => selectedActivityMetric = 'averageSpeed'),
+                      ),
+                    ],
                   ),
+                ),
 
-                  // Activity toggle buttons
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildMetricToggleButton(
-                          'Time',
-                          selectedActivityMetric == 'elapsedTime',
-                          Colors.blue[700]!,
-                          () => setState(
-                              () => selectedActivityMetric = 'elapsedTime'),
-                        ),
-                        SizedBox(width: 4),
-                        _buildMetricToggleButton(
-                          'Distance',
-                          selectedActivityMetric == 'distance',
-                          Colors.indigo[700]!,
-                          () => setState(
-                              () => selectedActivityMetric = 'distance'),
-                        ),
-                        SizedBox(width: 4),
-                        _buildMetricToggleButton(
-                          'Speed',
-                          selectedActivityMetric == 'averageSpeed',
-                          Colors.teal[700]!,
-                          () => setState(
-                              () => selectedActivityMetric = 'averageSpeed'),
-                        ),
-                      ],
-                    ),
+                // Insight section
+                Container(
+                  margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue[200]!, width: 1),
                   ),
-
-                  // Insight section
-                  Container(
-                    margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue[200]!, width: 1),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.insights_rounded,
-                          color: Colors.blue[700],
-                        ),
-                        SizedBox(width: 5),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _getInsightText(data, selectedNutritionMetric,
-                                    selectedActivityMetric),
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 11,
-                                  color: Colors.grey[800],
-                                  height: 1,
-                                ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        color: Colors.blue[700],
+                      ),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _getInsightText(data, selectedNutritionMetric, selectedActivityMetric),
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11,
+                                color: Colors.grey[800],
+                                height: 1,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
 // Update the metric toggle button for a more compact design
   Widget _buildMetricToggleButton(
@@ -2002,7 +2024,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
           // Add activity calories + daily BMR (prorated for partial day)
           double totalCaloriesBurned =
-              calories + (dailyBMR / 24 * 1); // Assume 1 hour of activity
+              calories + (dailyBMR); // Assume 1 hour of activity
 
           caloriesBurnedData.add(CaloriesBurnedData(date, totalCaloriesBurned));
         }
@@ -2837,358 +2859,352 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Widget _buildTemperatureCyclingCorrelationGraph() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _fetchTemperatureCyclingData(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingGraph();
-        }
+  return FutureBuilder<Map<String, dynamic>>(
+    future: _fetchTemperatureCyclingData(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _buildLoadingGraph();
+      }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return _buildEmptyGraph(
-              "Error loading temperature and activity data");
-        }
+      if (snapshot.hasError || !snapshot.hasData) {
+        return _buildEmptyGraph(
+            "Error loading temperature and activity data");
+      }
 
-        var correlationData = snapshot.data!;
-        List<TemperatureActivityData> data =
-            correlationData['temperatureActivityData'] ?? [];
+      var correlationData = snapshot.data!;
+      List<TemperatureActivityData> data =
+          correlationData['temperatureActivityData'] ?? [];
 
-        if (data.isEmpty) {
-          return _buildEmptyGraph(
-              "No matching temperature and activity data found");
-        }
+      if (data.isEmpty) {
+        return _buildEmptyGraph(
+            "No matching temperature and activity data found");
+      }
 
-        if (data.length > 7) {
-          data = data.sublist(data.length - 7);
-        }
+      if (data.length > 7) {
+        data = data.sublist(data.length - 7);
+      }
 
-        List<String> sessionDates = [];
+      // First, sort the data by date
+      data.sort((a, b) => a.date.compareTo(b.date)); // This ensures ascending order
+
+      // THEN create the sessionDates list from the already sorted data
+      List<String> sessionDates = [];
+      for (var item in data) {
+        sessionDates.add(DateFormat('MM/dd').format(item.date));
+      }
+
+      // The rest of your calculation code
+      double tempSpeedCorrelation = 0.0;
+      double tempDistanceCorrelation = .0;
+      double tempDurationCorrelation = 0.0;
+
+      if (data.length > 2) {
+        List<double> temps = [];
+        List<double> speeds = [];
+        List<double> distances = [];
+        List<double> durations = [];
 
         for (var item in data) {
-          sessionDates.add(DateFormat('MM/dd').format(item.date));
+          temps.add(item.temperature);
+          speeds.add(item.speed);
+          distances.add(item.distance);
+          durations.add(item.duration);
         }
 
-        data.sort((a, b) => a.date.compareTo(b.date));
+        tempSpeedCorrelation = _calculatePearsonCorrelation(temps, speeds);
+        tempDistanceCorrelation =
+            _calculatePearsonCorrelation(temps, distances);
+        tempDurationCorrelation =
+            _calculatePearsonCorrelation(temps, durations);
+      }
 
-        List<DateTime> parsedDates = sessionDates
-            .map((date) => DateFormat('MM/dd').parse(date))
-            .toList();
+      double maxSpeed = 0, maxDistance = 0, maxDuration = 0;
+      for (var item in data) {
+        if (item.speed > maxSpeed) maxSpeed = item.speed;
+        if (item.distance > maxDistance) maxDistance = item.distance;
+        if (item.duration > maxDuration) maxDuration = item.duration;
+      }
 
-        sessionDates = parsedDates
-            .map((date) => DateFormat('MM/dd').format(date))
-            .toList();
-        double tempSpeedCorrelation = 0.0;
-        double tempDistanceCorrelation = 0.0;
-        double tempDurationCorrelation = 0.0;
-
-        if (data.length > 2) {
-          List<double> temps = [];
-          List<double> speeds = [];
-          List<double> distances = [];
-          List<double> durations = [];
-
-          for (var item in data) {
-            temps.add(item.temperature);
-            speeds.add(item.speed);
-            distances.add(item.distance);
-            durations.add(item.duration);
-          }
-
-          tempSpeedCorrelation = _calculatePearsonCorrelation(temps, speeds);
-          tempDistanceCorrelation =
-              _calculatePearsonCorrelation(temps, distances);
-          tempDurationCorrelation =
-              _calculatePearsonCorrelation(temps, durations);
-        }
-
-        double maxSpeed = 0, maxDistance = 0, maxDuration = 0;
-        for (var item in data) {
-          if (item.speed > maxSpeed) maxSpeed = item.speed;
-          if (item.distance > maxDistance) maxDistance = item.distance;
-          if (item.duration > maxDuration) maxDuration = item.duration;
-        }
-
-        return _buildGraphContainer(
-          title: "Temperature\n Analysis",
-          subtitle: "Weather impact on cycling",
-          height: 650,
-          child: Column(
-            children: [
-              // Main chart section
-              Expanded(
-                child: SfCartesianChart(
-                  margin: EdgeInsets.all(10),
-                  primaryXAxis: CategoryAxis(
-                    majorGridLines: MajorGridLines(width: 0),
-                    labelStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: Colors.grey[700],
-                    ),
-                    labelRotation: 0,
-                    title: AxisTitle(
-                      text: 'Date',
-                      textStyle: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[800],
-                      ),
-                    ),
+      return _buildGraphContainer(
+        title: "Temperature\n Analysis",
+        subtitle: "Weather impact on cycling",
+        height: 650,
+        child: Column(
+          children: [
+            // Main chart section
+            Expanded(
+              child: SfCartesianChart(
+                margin: EdgeInsets.all(10),
+                primaryXAxis: CategoryAxis(
+                  majorGridLines: MajorGridLines(width: 0),
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.grey[700],
                   ),
-                  primaryYAxis: NumericAxis(
-                    name: 'Temperature',
-                    labelFormat: '{value}°C',
-                    labelStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: Colors.red[600],
-                    ),
-                    majorGridLines: MajorGridLines(
-                      width: 0.5,
-                      color: Colors.grey[200],
-                      dashArray: <double>[3, 3],
-                    ),
-                    title: AxisTitle(
-                      text: 'Temperature (°C)',
-                      textStyle: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.red[600],
-                      ),
-                    ),
-                  ),
-                  axes: <ChartAxis>[
-                    NumericAxis(
-                      name: 'Speed',
-                      opposedPosition: true,
-                      labelFormat: '{value} km/h',
-                      labelStyle: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 10,
-                        color: Colors.blue[700],
-                      ),
-                      majorGridLines: MajorGridLines(width: 0),
-                      title: AxisTitle(
-                        text: 'Speed',
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.blue[700],
-                        ),
-                      ),
-                    ),
-                    NumericAxis(
-                      name: 'Distance',
-                      opposedPosition: true,
-                      labelFormat: '{value} km',
-                      labelStyle: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 0,
-                        color: Colors.green[700],
-                      ),
-                      majorGridLines: MajorGridLines(width: 0),
-                      minimum: 0,
-                      maximum: maxDistance * 1.1,
-                      axisLine: AxisLine(width: 0),
-                    ),
-                    NumericAxis(
-                      name: 'Duration',
-                      opposedPosition: true,
-                      labelFormat: '{value} min',
-                      labelStyle: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 0,
-                        color: Colors.purple[700],
-                      ),
-                      majorGridLines: MajorGridLines(width: 0),
-                      minimum: 0,
-                      maximum: maxDuration * 1.1,
-                      axisLine: AxisLine(width: 0),
-                    ),
-                  ],
-                  series: <ChartSeries>[
-                    ColumnSeries<TemperatureActivityData, String>(
-                      name: 'Temperature (°C)',
-                      dataSource: data,
-                      xValueMapper: (TemperatureActivityData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (TemperatureActivityData data, _) =>
-                          data.temperature,
-                      width: 0.6,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(4)),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.red[300]!,
-                          Colors.red[500]!,
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
-                      dataLabelSettings: DataLabelSettings(
-                        isVisible: false,
-                        labelAlignment: ChartDataLabelAlignment.top,
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.red[800],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    SplineSeries<TemperatureActivityData, String>(
-                      name: 'Speed (km/h)',
-                      dataSource: data,
-                      xValueMapper: (TemperatureActivityData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (TemperatureActivityData data, _) =>
-                          data.speed,
-                      yAxisName: 'Speed',
-                      color: Colors.blue[600],
-                      width: 2,
-                      markerSettings: MarkerSettings(
-                        isVisible: true,
-                        shape: DataMarkerType.circle,
-                        width: 2,
-                        height: 2,
-                        borderWidth: 2,
-                        borderColor: Colors.blue[800],
-                      ),
-                      dataLabelSettings: DataLabelSettings(
-                        isVisible: false,
-                        labelAlignment: ChartDataLabelAlignment.top,
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.blue[800],
-                        ),
-                      ),
-                    ),
-                    SplineSeries<TemperatureActivityData, String>(
-                      name: 'Distance (km)',
-                      dataSource: data,
-                      xValueMapper: (TemperatureActivityData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (TemperatureActivityData data, _) =>
-                          data.distance,
-                      yAxisName: 'Distance',
-                      color: Colors.green[600],
-                      width: 2,
-                      markerSettings: MarkerSettings(
-                        isVisible: true,
-                        shape: DataMarkerType.diamond,
-                        width: 2,
-                        height: 2,
-                        borderWidth: 2,
-                        borderColor: Colors.green[800],
-                      ),
-                      dataLabelSettings: DataLabelSettings(
-                        isVisible: false,
-                        labelAlignment: ChartDataLabelAlignment.top,
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.green[800],
-                        ),
-                      ),
-                    ),
-                    SplineSeries<TemperatureActivityData, String>(
-                      name: 'Duration (min)',
-                      dataSource: data,
-                      xValueMapper: (TemperatureActivityData data, index) =>
-                          sessionDates[index],
-                      yValueMapper: (TemperatureActivityData data, _) =>
-                          data.duration,
-                      yAxisName: 'Duration',
-                      color: Colors.purple[600],
-                      width: 2,
-                      markerSettings: MarkerSettings(
-                        isVisible: true,
-                        shape: DataMarkerType.triangle,
-                        width: 2,
-                        height: 2,
-                        borderWidth: 2,
-                        borderColor: Colors.purple[800],
-                      ),
-                      dataLabelSettings: DataLabelSettings(
-                        isVisible: false,
-                        labelAlignment: ChartDataLabelAlignment.top,
-                        textStyle: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: Colors.purple[800],
-                        ),
-                      ),
-                    ),
-                  ],
-                  tooltipBehavior: TooltipBehavior(
-                    enable: true,
-                    color: Colors.grey[800],
-                    textStyle: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                  legend: Legend(
-                    isVisible: true,
-                    position: LegendPosition.bottom,
-                    overflowMode: LegendItemOverflowMode.wrap,
+                  labelRotation: 0,
+                  title: AxisTitle(
+                    text: 'Date',
                     textStyle: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: Colors.grey[800],
                     ),
-                    iconHeight: 14,
-                    iconWidth: 14,
                   ),
                 ),
-              ),
-
-              Container(
-                margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[200]!, width: 1),
+                primaryYAxis: NumericAxis(
+                  name: 'Temperature',
+                  labelFormat: '{value}°C',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    color: Colors.red[600],
+                  ),
+                  majorGridLines: MajorGridLines(
+                    width: 0.5,
+                    color: Colors.grey[200],
+                    dashArray: <double>[3, 3],
+                  ),
+                  title: AxisTitle(
+                    text: 'Temperature (°C)',
+                    textStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red[600],
+                    ),
+                  ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.insights_rounded,
+                axes: <ChartAxis>[
+                  NumericAxis(
+                    name: 'Speed',
+                    opposedPosition: true,
+                    labelFormat: '{value} km/h',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
                       color: Colors.blue[700],
                     ),
-                    SizedBox(width: 5),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _getTemperatureInsightText(
-                                tempSpeedCorrelation,
-                                tempDistanceCorrelation,
-                                tempDurationCorrelation),
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11,
-                              color: Colors.grey[800],
-                              height: 1,
-                            ),
-                          ),
-                        ],
+                    majorGridLines: MajorGridLines(width: 0),
+                    title: AxisTitle(
+                      text: 'Speed',
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue[700],
                       ),
                     ),
-                  ],
+                  ),
+                  NumericAxis(
+                    name: 'Distance',
+                    opposedPosition: true,
+                    labelFormat: '{value} km',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 0,
+                      color: Colors.green[700],
+                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    minimum: 0,
+                    maximum: maxDistance * 1.1,
+                    axisLine: AxisLine(width: 0),
+                  ),
+                  NumericAxis(
+                    name: 'Duration',
+                    opposedPosition: true,
+                    labelFormat: '{value} min',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 0,
+                      color: Colors.purple[700],
+                    ),
+                    majorGridLines: MajorGridLines(width: 0),
+                    minimum: 0,
+                    maximum: maxDuration * 1.1,
+                    axisLine: AxisLine(width: 0),
+                  ),
+                ],
+                series: <ChartSeries>[
+                  ColumnSeries<TemperatureActivityData, String>(
+                    name: 'Temperature (°C)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) =>
+                        sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) =>
+                        data.temperature,
+                    width: 0.6,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(4)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red[300]!,
+                        Colors.red[500]!,
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.red[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Speed (km/h)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) =>
+                        sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) =>
+                        data.speed,
+                    yAxisName: 'Speed',
+                    color: Colors.blue[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.circle,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.blue[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.blue[800],
+                      ),
+                    ),
+                  ),
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Distance (km)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) =>
+                        sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) =>
+                        data.distance,
+                    yAxisName: 'Distance',
+                    color: Colors.green[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.diamond,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.green[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                  ),
+                  SplineSeries<TemperatureActivityData, String>(
+                    name: 'Duration (min)',
+                    dataSource: data,
+                    xValueMapper: (TemperatureActivityData data, index) =>
+                        sessionDates[index],
+                    yValueMapper: (TemperatureActivityData data, _) =>
+                        data.duration,
+                    yAxisName: 'Duration',
+                    color: Colors.purple[600],
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      shape: DataMarkerType.triangle,
+                      width: 2,
+                      height: 2,
+                      borderWidth: 2,
+                      borderColor: Colors.purple[800],
+                    ),
+                    dataLabelSettings: DataLabelSettings(
+                      isVisible: false,
+                      labelAlignment: ChartDataLabelAlignment.top,
+                      textStyle: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: Colors.purple[800],
+                      ),
+                    ),
+                  ),
+                ],
+                tooltipBehavior: TooltipBehavior(
+                  enable: true,
+                  color: Colors.grey[800],
+                  textStyle: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                legend: Legend(
+                  isVisible: true,
+                  position: LegendPosition.bottom,
+                  overflowMode: LegendItemOverflowMode.wrap,
+                  textStyle: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: Colors.grey[800],
+                  ),
+                  iconHeight: 14,
+                  iconWidth: 14,
                 ),
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
 
+            Container(
+              margin: EdgeInsets.fromLTRB(12, 4, 12, 8),
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue[200]!, width: 1),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.insights_rounded,
+                    color: Colors.blue[700],
+                  ),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getTemperatureInsightText(
+                              tempSpeedCorrelation,
+                              tempDistanceCorrelation,
+                              tempDurationCorrelation),
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: Colors.grey[800],
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
   String _getTemperatureInsightText(
       double speedCorr, double distanceCorr, double durationCorr) {
     String insight = "";
