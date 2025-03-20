@@ -3964,7 +3964,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
       print("Error fetching user data: $e");
     }
   }
-
+  
   // New method to analyze historical trends across all activities
   void _analyzeHistoricalTrends() {
     if (activityData.length < 2) return;
@@ -4145,7 +4145,232 @@ class _RecommendationPageState extends State<RecommendationPage> {
       levelOfExertion = latestData['levelOfExertion']?.toString() ?? "0";
     }
   }
+Widget _buildCardioRespiratoryContainer() {
+  // Only show this container if user has cardiovascular or respiratory condition
+  if (healthCondition != "Cardiovascular or Respiratory") {
+    return SizedBox.shrink();
+  }
 
+  // Create a dedicated list for heart rate recommendations
+  List<String> heartRateRecommendations = [];
+  
+  // Get specific heart rate recommendations from health recommendations
+  if (healthRecommendations.isNotEmpty) {
+    List<String> toRemove = [];
+    
+    for (String recommendation in healthRecommendations) {
+      if (recommendation.contains("heart rate") || 
+          recommendation.contains("bpm") || 
+          recommendation.contains("cardiovascular") ||
+          recommendation.contains("Heart Rate") || 
+          recommendation.contains("respiratory") ||
+          recommendation.contains("Heart rate") ||
+          recommendation.contains("air quality")) {
+        heartRateRecommendations.add(recommendation);
+        toRemove.add(recommendation);
+      }
+    }
+    
+    // Remove heart rate recommendations from general health recommendations
+    for (String item in toRemove) {
+      healthRecommendations.remove(item);
+    }
+  }
+  
+  // If no specific heart rate recommendations found, add default ones based on max heart rate
+  if (heartRateRecommendations.isEmpty) {
+    double maxHeartRate = 220 - age.toDouble();
+    double heartRateLimitValue = safeParseDouble(heartRateLimit);
+    
+    if (heartRateLimitValue > 0) {
+      maxHeartRate = heartRateLimitValue;
+    }
+    
+    double safeTrainingZoneUpper = maxHeartRate * 0.8; // 80% of max/limit
+    double moderateTrainingZone = maxHeartRate * 0.6; // 60% of max/limit
+    
+    heartRateRecommendations.add(
+      "With your condition, keep most training at ${moderateTrainingZone.toInt()} bpm (60% of your maximum) and never exceed ${safeTrainingZoneUpper.toInt()} bpm (80% of maximum)."
+    );
+    
+    heartRateRecommendations.add(
+      "Monitor your heart rate closely during workouts. Consider using a heart rate monitor for precise tracking."
+    );
+    
+    heartRateRecommendations.add(
+      "Check with your healthcare provider before increasing exercise intensity."
+    );
+    
+    heartRateRecommendations.add(
+      "For cardiovascular conditions, maintain moderate intensity and aim for 150 minutes weekly of zone 2 training."
+    );
+  }
+
+  // List of recommendations to actually display (limited)
+  List<String> displayRecommendations = heartRateRecommendations.length > 2 
+      ? heartRateRecommendations.sublist(0, 2) 
+      : heartRateRecommendations;
+
+  return Container(
+    height: 320,
+    margin: EdgeInsets.symmetric(vertical: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.red.withOpacity(0.15),
+          spreadRadius: 1,
+          blurRadius: 12,
+          offset: Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.red[400]!, Colors.red[700]!],
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.favorite, color: Colors.white, size: 20),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "Heart Health Recommendations",
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // List view (scrollable)
+        Expanded(
+          child: NotificationListener<OverscrollIndicatorNotification>(
+            onNotification: (overscroll) {
+              overscroll.disallowIndicator();
+              return true;
+            },
+            child: ListView.builder(
+              physics: NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              itemCount: displayRecommendations.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withOpacity(0.1), width: 1),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.priority_high_rounded,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          displayRecommendations[index],
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            color: Colors.black87,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // Tap indicator
+        InkWell(
+          onTap: () => _showFullscreenOverlay(
+            context,
+            "Heart Health Recommendations",
+            Icons.favorite,
+            Colors.red[600]!,
+            [Colors.red[400]!, Colors.red[700]!],
+            heartRateRecommendations,
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(vertical: 8),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.05),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              border: Border(
+                top: BorderSide(color: Colors.red.withOpacity(0.1), width: 1),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.touch_app_rounded,
+                  size: 16,
+                  color: Colors.red[600],
+                ),
+                SizedBox(width: 6),
+                Text(
+                  heartRateRecommendations.length > 2
+                      ? "Tap to view all ${heartRateRecommendations.length} recommendations"
+                      : "Tap to expand",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
   // Generate seasonal advice based on current weather
   void _generateSeasonalAdvice() {
     double temp = safeParseDouble(temperature);
@@ -5120,7 +5345,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     return double.tryParse(value.toString()) ?? 0.0;
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -5210,6 +5435,25 @@ class _RecommendationPageState extends State<RecommendationPage> {
                           Icons.lightbulb_outline_rounded),
                     ),
                     SizedBox(height: 12),
+                    
+                    // Add the cardiovascular container right after the "Personalized Insights" title
+                    TweenAnimationBuilder(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: Duration(milliseconds: 1000),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, double value, child) {
+                        return Transform.translate(
+                          offset: Offset(0, 30 * (1 - value)),
+                          child: Opacity(
+                            opacity: value,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _buildCardioRespiratoryContainer(),
+                    ),
+                    
+                    // Then show the recommendation carousel 
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 900),
@@ -5244,6 +5488,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                     ),
                     SizedBox(height: 50),
                     _buildWeeklySummary(),
+                    
                     TweenAnimationBuilder(
                       tween: Tween<double>(begin: 0, end: 1),
                       duration: Duration(milliseconds: 1000),
