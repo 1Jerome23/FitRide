@@ -2419,11 +2419,12 @@ class _RecommendationPageState extends State<RecommendationPage> {
           sessionDates.add(DateFormat('MM/dd').format(item.date));
         }
 
+        data.sort((a, b) => a.date.compareTo(b.date));
+
         List<DateTime> parsedDates = sessionDates
             .map((date) => DateFormat('MM/dd').parse(date))
             .toList();
 
-        parsedDates.sort((a, b) => a.compareTo(b));
 
         sessionDates = parsedDates
             .map((date) => DateFormat('MM/dd').format(date))
