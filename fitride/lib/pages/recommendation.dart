@@ -6606,15 +6606,10 @@ Widget _buildCardioRespiratoryContainer() {
 
         chartData.sort((a, b) => a.date.compareTo(b.date));
 
-        List<WeightCalorieData> surplusData = [];
-        List<WeightCalorieData> deficitData = [];
+        List<WeightCalorieData> netData = [];
 
         for (var point in chartData) {
-          if (point.netCalories >= 0) {
-            surplusData.add(point);
-          } else {
-            deficitData.add(point);
-          }
+          netData.add(point);
         }
 
         return _buildGraphContainer(
@@ -6719,10 +6714,10 @@ Widget _buildCardioRespiratoryContainer() {
                         width: 8,
                       ),
                     ),
-                    if (surplusData.isNotEmpty)
+                    if (netData.isNotEmpty)
                       SplineSeries<WeightCalorieData, DateTime>(
-                        name: 'Calorie Surplus',
-                        dataSource: surplusData,
+                        name: 'Net Calories',
+                        dataSource: netData,
                         xValueMapper: (WeightCalorieData data, _) => data.date,
                         yValueMapper: (WeightCalorieData data, _) =>
                             data.netCalories,
@@ -6733,29 +6728,6 @@ Widget _buildCardioRespiratoryContainer() {
                           isVisible: true,
                           shape: DataMarkerType.diamond,
                           color: Colors.red[500],
-                          borderColor: Colors.white,
-                          borderWidth: 1,
-                          height: 8,
-                          width: 8,
-                        ),
-                        emptyPointSettings: EmptyPointSettings(
-                          mode: EmptyPointMode.gap,
-                        ),
-                      ),
-                    if (deficitData.isNotEmpty)
-                      SplineSeries<WeightCalorieData, DateTime>(
-                        name: 'Calorie Deficit',
-                        dataSource: deficitData,
-                        xValueMapper: (WeightCalorieData data, _) => data.date,
-                        yValueMapper: (WeightCalorieData data, _) =>
-                            data.netCalories,
-                        yAxisName: 'Calories',
-                        color: Colors.green[500],
-                        width: 2.0,
-                        markerSettings: MarkerSettings(
-                          isVisible: true,
-                          shape: DataMarkerType.diamond,
-                          color: Colors.green[500],
                           borderColor: Colors.white,
                           borderWidth: 1,
                           height: 8,
