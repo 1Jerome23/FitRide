@@ -224,7 +224,7 @@ class CalorieData {
         }
       }
 
-      // Process calories consumed data - independent of weight data
+
       recentCaloriesConsumedData = [];
 
       for (var doc in foodSnapshot.docs) {
@@ -237,7 +237,7 @@ class CalorieData {
         }
       }
 
-      // Process calories burned data - independent of weight data
+
       recentCaloriesBurnedData = [];
 
       for (var doc in activitySnapshot.docs) {
@@ -255,7 +255,7 @@ class CalorieData {
       recentCaloriesConsumedData.sort((a, b) => a.date.compareTo(b.date));
       recentCaloriesBurnedData.sort((a, b) => a.date.compareTo(b.date));
 
-      // Calculate net calories for all dates - not just ones with weight data
+
       recentNetCaloriesData = [];
 
       // Get all unique dates across all datasets
@@ -299,8 +299,6 @@ class CalorieData {
         // Calculate net calories
         double netCalories = consumedCalories - totalBurnedCalories;
 
-        // Find weight for this date (if available), but still include the data point
-        // even if no weight data is available
         double? weight;
         for (var item in recentWeightData) {
           if (DateFormat('yyyy-MM-dd').format(item.date) == dateKey) {
