@@ -5237,7 +5237,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
     equipmentRecommendations.add("Consider padded shorts for longer rides.");
   }
 
-  void _generateWeightManagementRecommendations() {
+void _generateWeightManagementRecommendations() {
     double targetWeightValue = safeParseDouble(targetWeight);
     double currentWeightValue = safeParseDouble(weight);
     double bmr = safeParseDouble(basalMetabolicRate);
@@ -5535,6 +5535,19 @@ class _RecommendationPageState extends State<RecommendationPage> {
             "For cold weather, ensure proper 10-15 minute warm-up before high-intensity work.");
       }
 
+      // Sleep recommendations for health and recovery - based on sleep science research
+      healthRecommendations.add(
+          "Aim for 7-9 hours of quality sleep nightly for optimal recovery and performance. Consistent sleep/wake times improve recovery rate by up to 30%.");
+      
+      if (weeklyActivityCount >= 4) {
+        healthRecommendations.add(
+            "With your high training volume, prioritize sleep hygiene: avoid screens 1 hour before bed, keep your bedroom cool (16-19°C), and consider a 20-30 minute nap on heavy training days.");
+      }
+      
+      if (totalHighIntensitySessions >= 8 && activityData.length >= 15) {
+        healthRecommendations.add(
+            "Your high-intensity training requires enhanced recovery. Sleep in complete darkness to maximize melatonin production and growth hormone release, which peaks during deep sleep.");
+      }
       // Recovery recommendations - updated based on Dupuy et al.
       trainingRecommendations.add(
           "For optimal recovery: 1) active recovery with light cycling, 2) compression garments to reduce fatigue, 3) cold therapy or contrast water therapy to reduce DOMS and inflammation.");
@@ -5558,7 +5571,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
       }
     }
   }
-
   void _generateCyclingEnduranceRecommendations() {
     // Basic data
     double targetDistanceValue = safeParseDouble(targetDistance);
