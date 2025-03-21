@@ -6817,7 +6817,7 @@ void _generateWeightManagementRecommendations() {
         // For weight data, create data points
         double userWeight = safeParseDouble(weight);
         double previousUserWeight =
-            previousWeight > 0 ? previousWeight : userWeight * 0.98;
+            previousWeight > 0 ? previousWeight : userWeight;
 
         // Create weight data points at the start and end of the range
         List<Map<String, dynamic>> weightDataPoints = [];
