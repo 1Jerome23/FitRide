@@ -2809,27 +2809,24 @@ class _RecommendationPageState extends State<RecommendationPage> {
             "Your ${(-weightChange).toStringAsFixed(1)} kg weight loss, if continued, may compromise endurance performance. Ensure adequate fueling with ${recommendedCarbGrams.toInt()}g carbs daily to sustain your ${weeklyDistanceTotal.toInt()} km weekly training load.");
       }
     }
-
-    // Hydration advice based on actual training data
-    double avgRideTime = 0;
-    int timeDataPoints = 0;
-    for (var activity in activityData) {
-      double time =
-          safeParseDouble(activity['elapsed_time']) / 60; // convert to minutes
-      if (time > 0) {
-        avgRideTime += time;
-        timeDataPoints++;
-      }
-    }
-    if (timeDataPoints > 0) {
-      avgRideTime /= timeDataPoints;
-      double recommendedFluidPerRide =
-          (avgRideTime / 60) * 750; // 750ml per hour
+        // Hydration based on Holland et al. (2017) hydration research
+        if (latestWeight > 0) {
+      // Hydration needs based on body weight
+      double shortRideHydrationRate = 0.175; // midpoint of 0.15-0.20 range for 1-2 hour rides
+      double longRideHydrationRate = 0.205; // midpoint of 0.14-0.27 range for 2+ hour rides
+      
+      // Calculate total fluid recommendations (ml) for different ride durations
+      int oneHourRideFluid = (shortRideHydrationRate * latestWeight * 60).round();
+      int twoHourRideFluid = (shortRideHydrationRate * latestWeight * 120).round();
+      int threeHourRideFluid = (longRideHydrationRate * latestWeight * 180).round();
+      
       nutritionRecommendations.add(
-          "For your average ${avgRideTime.toInt()}-minute rides, consume approximately ${recommendedFluidPerRide.toInt()} ml of fluid. Stay hydrated with 2-3 liters of water daily plus electrolytes when training in hot conditions.");
+        "Based on your ${latestWeight.toStringAsFixed(1)} kg body weight, consume approximately ${oneHourRideFluid} ml of fluid for 1-hour rides and ${twoHourRideFluid} ml for 2-hour rides. For longer rides exceeding 2 hours, increase to ${threeHourRideFluid} ml (${(longRideHydrationRate * latestWeight).toStringAsFixed(1)} ml/min). High-intensity sessions under 1 hour may require less fluid to avoid performance decreases."
+      );
     } else {
       nutritionRecommendations.add(
-          "Stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
+        "Stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of moderate-intensity cycling. For high-intensity sessions under 1 hour, excessive hydration can be counterproductive - focus on proper pre-ride hydration instead."
+      );
     }
   }
 
@@ -5822,35 +5819,6 @@ void _generateWeightManagementRecommendations() {
       // Nutrition recommendations - updated based on research and Myles C's advice
       healthRecommendations.add(
           "Pre-ride nutrition: Eat a light meal (like a banana or boiled eggs) 30-60 minutes before riding. Never start on an empty stomach. Post-ride: consume a 3:1 carb:protein ratio within 30 minutes.");
-
-      // Updated based on Holland et al. (2017) hydration research
-      if (currentDistanceValue > 30) {
-        double rideHours = currentDurationValue / 60;
-        double weightInKg = safeParseDouble(weight);
-
-        if (rideHours >= 1 && rideHours <= 2) {
-          // For 1-2 hour moderate-intensity rides
-          double recommendedFluidRate = 0.175; // midpoint of 0.15-0.20 range
-          double totalFluidRecommendation =
-              recommendedFluidRate * weightInKg * rideHours * 60;
-
-          healthRecommendations.add(
-              "For your ${rideHours.toStringAsFixed(1)}-hour moderate rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid (${(recommendedFluidRate * weightInKg).toStringAsFixed(1)} ml/min) for optimal performance.");
-        } else if (rideHours > 2) {
-          // For rides longer than 2 hours
-          double recommendedFluidRate = 0.205; // midpoint of 0.14-0.27 range
-          double totalFluidRecommendation =
-              recommendedFluidRate * weightInKg * rideHours * 60;
-
-          healthRecommendations.add(
-              "For your ${rideHours.toStringAsFixed(1)}-hour rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid total and 60-90g of carbohydrates per hour from multiple sources to maintain energy levels.");
-        } else if (rideHours < 1 &&
-            latestAverageHeartrate > thresholdZoneLower) {
-          // For high-intensity rides under 1 hour
-          healthRecommendations.add(
-              "For high-intensity rides under 1 hour, excessive hydration can be counterproductive. Focus on pre-ride hydration instead of drinking large amounts during the ride.");
-        }
-      }
 
       // Recovery recommendations
       if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
