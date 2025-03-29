@@ -11,7 +11,8 @@ class HealthSummary extends StatefulWidget {
   @override
   _HealthSummaryState createState() => _HealthSummaryState();
 }
-// Utility class for weight data
+
+// Utility classes for chart data
 class WeightData {
   final DateTime date;
   final double weight;
@@ -19,18 +20,64 @@ class WeightData {
   WeightData({required this.date, required this.weight});
 }
 
+class BodyFatData {
+  final DateTime date;
+  final double bodyFat;
+
+  BodyFatData({required this.date, required this.bodyFat});
+}
+
+class BMRData {
+  final DateTime date;
+  final double bmr;
+
+  BMRData({required this.date, required this.bmr});
+}
+
+class HeartRateData {
+  final DateTime date;
+  final double heartRate;
+
+  HeartRateData({required this.date, required this.heartRate});
+}
+
+class CaloriesBurnedData {
+  final DateTime date;
+  final double calories;
+
+  CaloriesBurnedData({required this.date, required this.calories});
+}
+
 class _HealthSummaryState extends State<HealthSummary> {
   late String userId;
   String goalType = "-";
+  // Initialize expandable state for all metric cards
+  late Map<String, bool> expandedState;
+  
   @override
   void initState() {
     super.initState();
+    // Initialize all expandable states to false
+    expandedState = {
+      'weight': false,
+      'bodyFat': false,
+      'bmi': false,
+      'height': false,
+      'bmr': false,
+      'heartRate': false,
+      'calories': false,
+      'distance': false,
+      'dailyCalories': false,
+    };
+    
     final user = FirebaseAuth.instance.currentUser;
     userId = user?.uid ?? '';
     if (userId.isNotEmpty) {
       fetchGoalType();
     }
   }
+
+  // Removed old initState as it's now included in the expandedState declaration above
 
   Future<void> fetchGoalType() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -332,267 +379,884 @@ class _HealthSummaryState extends State<HealthSummary> {
     }
   }
 
+  // Fetch weight data for chart
   Future<List<WeightData>> _fetchWeightData() async {
-  try {
-    QuerySnapshot weightQuery = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: userId)
-        .orderBy('timestamp', descending: false)
-        .get();
+    try {
+      QuerySnapshot weightQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: userId)
+          .orderBy('timestamp', descending: false)
+          .get();
 
-    List<WeightData> weightData = weightQuery.docs
-        .map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final timestamp = data['timestamp'] as Timestamp?;
-          final weight = double.tryParse(data['weight']?.toString() ?? '0') ?? 0;
+      List<WeightData> weightData = weightQuery.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['timestamp'] as Timestamp?;
+            final weight = double.tryParse(data['weight']?.toString() ?? '0') ?? 0;
 
-          return timestamp != null && weight > 0
-              ? WeightData(date: timestamp.toDate(), weight: weight)
-              : null;
-        })
-        .whereType<WeightData>()
-        .toList();
+            return timestamp != null && weight > 0
+                ? WeightData(date: timestamp.toDate(), weight: weight)
+                : null;
+          })
+          .whereType<WeightData>()
+          .toList();
 
-    return weightData;
-  } catch (e) {
-    print("❌ Error fetching weight data: $e");
-    return [];
+      return weightData;
+    } catch (e) {
+      print("❌ Error fetching weight data: $e");
+      return [];
+    }
   }
-}
 
-Widget _buildWeightTrackingChart() {
-  return FutureBuilder<List<WeightData>>(
-    future: _fetchWeightData(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return _buildLoadingGraph();
-      }
+  // Fetch body fat data for chart
+  Future<List<BodyFatData>> _fetchBodyFatData() async {
+    try {
+      QuerySnapshot bodyFatQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: userId)
+          .orderBy('timestamp', descending: false)
+          .get();
 
-      if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-        return _buildEmptyGraph("No weight tracking data available");
-      }
+      List<BodyFatData> bodyFatData = bodyFatQuery.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['timestamp'] as Timestamp?;
+            final bodyFat = double.tryParse(data['bodyFat']?.toString() ?? '0') ?? 0;
 
-      List<WeightData> weightData = snapshot.data!;
-      
-      // Sort data by date
-      weightData.sort((a, b) => a.date.compareTo(b.date));
+            return timestamp != null && bodyFat > 0
+                ? BodyFatData(date: timestamp.toDate(), bodyFat: bodyFat)
+                : null;
+          })
+          .whereType<BodyFatData>()
+          .toList();
 
-      // Determine date range
-      DateTime startDate = weightData.first.date;
-      DateTime endDate = weightData.last.date;
+      return bodyFatData;
+    } catch (e) {
+      print("❌ Error fetching body fat data: $e");
+      return [];
+    }
+  }
 
-      return _buildGraphContainer(
-        title: "Weight Tracking",
-        subtitle: "Your Weight Journey",
-        height: 400,
-        child: SfCartesianChart(
-          margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
-          zoomPanBehavior: ZoomPanBehavior(
-            enablePinching: true,
-            enablePanning: true,
-            zoomMode: ZoomMode.x,
-          ),
-          primaryXAxis: DateTimeAxis(
-            minimum: startDate,
-            maximum: endDate,
-            majorGridLines: MajorGridLines(width: 0),
-            minorGridLines: MinorGridLines(width: 0),
-            axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-            labelStyle: TextStyle(
-              color: Colors.grey[700],
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+  // Fetch BMR data for chart
+  Future<List<BMRData>> _fetchBMRData() async {
+    try {
+      QuerySnapshot bmrQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: userId)
+          .orderBy('timestamp', descending: false)
+          .get();
+
+      List<BMRData> bmrData = bmrQuery.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['timestamp'] as Timestamp?;
+            final bmr = double.tryParse(data['basalMetabolicRate']?.toString() ?? '0') ?? 0;
+
+            return timestamp != null && bmr > 0
+                ? BMRData(date: timestamp.toDate(), bmr: bmr)
+                : null;
+          })
+          .whereType<BMRData>()
+          .toList();
+
+      return bmrData;
+    } catch (e) {
+      print("❌ Error fetching BMR data: $e");
+      return [];
+    }
+  }
+
+  // Fetch heart rate data for chart
+  Future<List<HeartRateData>> _fetchHeartRateData() async {
+    try {
+      QuerySnapshot heartRateQuery = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: userId)
+          .orderBy('start_date', descending: false)
+          .get();
+
+      List<HeartRateData> heartRateData = heartRateQuery.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['start_date'] as Timestamp?;
+            final heartRate = double.tryParse(data['average_heartrate']?.toString() ?? '0') ?? 0;
+
+            return timestamp != null && heartRate > 0
+                ? HeartRateData(date: timestamp.toDate(), heartRate: heartRate)
+                : null;
+          })
+          .whereType<HeartRateData>()
+          .toList();
+
+      return heartRateData;
+    } catch (e) {
+      print("❌ Error fetching heart rate data: $e");
+      return [];
+    }
+  }
+
+  // Fetch calories burned data for chart
+  Future<List<CaloriesBurnedData>> _fetchCaloriesBurnedData() async {
+    try {
+      QuerySnapshot caloriesQuery = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('uid', isEqualTo: userId)
+          .orderBy('start_date', descending: false)
+          .get();
+
+      List<CaloriesBurnedData> caloriesData = caloriesQuery.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final timestamp = data['start_date'] as Timestamp?;
+            final calories = double.tryParse(data['calories_burned']?.toString() ?? '0') ?? 0;
+
+            return timestamp != null && calories > 0
+                ? CaloriesBurnedData(date: timestamp.toDate(), calories: calories)
+                : null;
+          })
+          .whereType<CaloriesBurnedData>()
+          .toList();
+
+      return caloriesData;
+    } catch (e) {
+      print("❌ Error fetching calories burned data: $e");
+      return [];
+    }
+  }
+
+  // Function to build the weight chart
+  Widget _buildWeightTrackingChart() {
+    return FutureBuilder<List<WeightData>>(
+      future: _fetchWeightData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyGraph("No weight tracking data available");
+        }
+
+        List<WeightData> weightData = snapshot.data!;
+        
+        // Sort data by date
+        weightData.sort((a, b) => a.date.compareTo(b.date));
+
+        // Determine date range
+        DateTime startDate = weightData.first.date;
+        DateTime endDate = weightData.last.date;
+
+        return _buildGraphContainer(
+          title: "Weight Tracking",
+          subtitle: "Your Weight Journey",
+          height: 400,
+          child: SfCartesianChart(
+            margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
+            zoomPanBehavior: ZoomPanBehavior(
+              enablePinching: true,
+              enablePanning: true,
+              zoomMode: ZoomMode.x,
             ),
-            dateFormat: DateFormat('MM/dd'),
-            intervalType: DateTimeIntervalType.days,
-            labelRotation: 0,
-          ),
-          primaryYAxis: NumericAxis(
-            majorGridLines: MajorGridLines(
-              width: 0.5,
-              color: Colors.grey[200],
-              dashArray: <double>[3, 3],
+            primaryXAxis: DateTimeAxis(
+              minimum: startDate,
+              maximum: endDate,
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelRotation: 0,
             ),
-            axisLine: AxisLine(width: 0),
-            labelFormat: '{value} kg',
-            labelStyle: TextStyle(
-              color: Colors.blue[700],
-              fontFamily: 'Inter',
-              fontSize: 10,
-            ),
-          ),
-          series: <ChartSeries>[
-            SplineSeries<WeightData, DateTime>(
-              dataSource: weightData,
-              xValueMapper: (WeightData data, _) => data.date,
-              yValueMapper: (WeightData data, _) => data.weight,
-              color: Colors.blue[700],
-              width: 2.5,
-              markerSettings: MarkerSettings(
-                isVisible: true,
-                shape: DataMarkerType.circle,
+            primaryYAxis: NumericAxis(
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelFormat: '{value} kg',
+              labelStyle: TextStyle(
                 color: Colors.blue[700],
-                borderColor: Colors.white,
-                borderWidth: 2,
-                height: 8,
-                width: 8,
+                fontFamily: 'Inter',
+                fontSize: 10,
               ),
             ),
-          ],
-          tooltipBehavior: TooltipBehavior(
-            enable: true,
-            color: Colors.grey[800],
-            textStyle: TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildLoadingGraph() {
-  return Container(
-    height: 280,
-    padding: EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 0,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              color: Color(0xffFFA500),
-              strokeWidth: 3,
-            ),
-          ),
-          SizedBox(height: 16),
-          Text(
-            "Loading your data...",
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildEmptyGraph(String message) {
-  return Container(
-    height: 280,
-    padding: EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 0,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.insert_chart_outlined_rounded,
-            color: Colors.grey[300],
-            size: 48,
-          ),
-          SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 15,
-              color: Colors.grey[700],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// Helper method to create a graph container (if not already defined)
-Widget _buildGraphContainer({
-  required String title,
-  required String subtitle,
-  required double height,
-  required Widget child,
-}) {
-  return Container(
-    height: height,
-    margin: EdgeInsets.only(bottom: 20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.grey.withOpacity(0.1),
-          spreadRadius: 0,
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontFamily: 'Fredoka-SemiBold',
-                  fontSize: 20,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: Colors.grey[600],
+            series: <ChartSeries>[
+              SplineSeries<WeightData, DateTime>(
+                dataSource: weightData,
+                xValueMapper: (WeightData data, _) => data.date,
+                yValueMapper: (WeightData data, _) => data.weight,
+                color: Colors.blue[700],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  color: Colors.blue[700],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                  height: 8,
+                  width: 8,
                 ),
               ),
             ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  // Function to build the body fat chart
+  Widget _buildBodyFatChart() {
+    return FutureBuilder<List<BodyFatData>>(
+      future: _fetchBodyFatData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyGraph("No body fat data available");
+        }
+
+        List<BodyFatData> bodyFatData = snapshot.data!;
+        
+        // Sort data by date
+        bodyFatData.sort((a, b) => a.date.compareTo(b.date));
+
+        // Determine date range
+        DateTime startDate = bodyFatData.first.date;
+        DateTime endDate = bodyFatData.last.date;
+
+        return _buildGraphContainer(
+          title: "Body Fat Tracking",
+          subtitle: "Your Body Fat Journey",
+          height: 400,
+          child: SfCartesianChart(
+            margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
+            zoomPanBehavior: ZoomPanBehavior(
+              enablePinching: true,
+              enablePanning: true,
+              zoomMode: ZoomMode.x,
+            ),
+            primaryXAxis: DateTimeAxis(
+              minimum: startDate,
+              maximum: endDate,
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelRotation: 0,
+            ),
+            primaryYAxis: NumericAxis(
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelFormat: '{value} %',
+              labelStyle: TextStyle(
+                color: Colors.purple[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            series: <ChartSeries>[
+              SplineSeries<BodyFatData, DateTime>(
+                dataSource: bodyFatData,
+                xValueMapper: (BodyFatData data, _) => data.date,
+                yValueMapper: (BodyFatData data, _) => data.bodyFat,
+                color: Colors.purple[700],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  color: Colors.purple[700],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                  height: 8,
+                  width: 8,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Function to build the BMR chart
+  Widget _buildBMRChart() {
+    return FutureBuilder<List<BMRData>>(
+      future: _fetchBMRData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyGraph("No basal metabolic rate data available");
+        }
+
+        List<BMRData> bmrData = snapshot.data!;
+        
+        // Sort data by date
+        bmrData.sort((a, b) => a.date.compareTo(b.date));
+
+        // Determine date range
+        DateTime startDate = bmrData.first.date;
+        DateTime endDate = bmrData.last.date;
+
+        return _buildGraphContainer(
+          title: "Basal Metabolic Rate Tracking",
+          subtitle: "Your BMR Journey",
+          height: 400,
+          child: SfCartesianChart(
+            margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
+            zoomPanBehavior: ZoomPanBehavior(
+              enablePinching: true,
+              enablePanning: true,
+              zoomMode: ZoomMode.x,
+            ),
+            primaryXAxis: DateTimeAxis(
+              minimum: startDate,
+              maximum: endDate,
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelRotation: 0,
+            ),
+            primaryYAxis: NumericAxis(
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelFormat: '{value} kcal',
+              labelStyle: TextStyle(
+                color: Colors.deepOrange[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            series: <ChartSeries>[
+              SplineSeries<BMRData, DateTime>(
+                dataSource: bmrData,
+                xValueMapper: (BMRData data, _) => data.date,
+                yValueMapper: (BMRData data, _) => data.bmr,
+                color: Colors.deepOrange[700],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  color: Colors.deepOrange[700],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                  height: 8,
+                  width: 8,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Function to build the heart rate chart
+  Widget _buildHeartRateChart() {
+    return FutureBuilder<List<HeartRateData>>(
+      future: _fetchHeartRateData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyGraph("No heart rate data available");
+        }
+
+        List<HeartRateData> heartRateData = snapshot.data!;
+        
+        // Sort data by date
+        heartRateData.sort((a, b) => a.date.compareTo(b.date));
+
+        // Determine date range
+        DateTime startDate = heartRateData.first.date;
+        DateTime endDate = heartRateData.last.date;
+
+        return _buildGraphContainer(
+          title: "Heart Rate Tracking",
+          subtitle: "Your Heart Rate History",
+          height: 400,
+          child: SfCartesianChart(
+            margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
+            zoomPanBehavior: ZoomPanBehavior(
+              enablePinching: true,
+              enablePanning: true,
+              zoomMode: ZoomMode.x,
+            ),
+            primaryXAxis: DateTimeAxis(
+              minimum: startDate,
+              maximum: endDate,
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelRotation: 0,
+            ),
+            primaryYAxis: NumericAxis(
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelFormat: '{value} bpm',
+              labelStyle: TextStyle(
+                color: Colors.red[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            series: <ChartSeries>[
+              SplineSeries<HeartRateData, DateTime>(
+                dataSource: heartRateData,
+                xValueMapper: (HeartRateData data, _) => data.date,
+                yValueMapper: (HeartRateData data, _) => data.heartRate,
+                color: Colors.red[700],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  color: Colors.red[700],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                  height: 8,
+                  width: 8,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Function to build the calories burned chart
+  Widget _buildCaloriesBurnedChart() {
+    return FutureBuilder<List<CaloriesBurnedData>>(
+      future: _fetchCaloriesBurnedData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGraph();
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyGraph("No calories burned data available");
+        }
+
+        List<CaloriesBurnedData> caloriesData = snapshot.data!;
+        
+        // Sort data by date
+        caloriesData.sort((a, b) => a.date.compareTo(b.date));
+
+        // Determine date range
+        DateTime startDate = caloriesData.first.date;
+        DateTime endDate = caloriesData.last.date;
+
+        return _buildGraphContainer(
+          title: "Calories Burned Tracking",
+          subtitle: "Your Calories Burned History",
+          height: 400,
+          child: SfCartesianChart(
+            margin: EdgeInsets.fromLTRB(10, 10, 16, 5),
+            zoomPanBehavior: ZoomPanBehavior(
+              enablePinching: true,
+              enablePanning: true,
+              zoomMode: ZoomMode.x,
+            ),
+            primaryXAxis: DateTimeAxis(
+              minimum: startDate,
+              maximum: endDate,
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              axisLine: AxisLine(width: 1, color: Colors.grey[200]),
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelRotation: 0,
+            ),
+            primaryYAxis: NumericAxis(
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelFormat: '{value} kcal',
+              labelStyle: TextStyle(
+                color: Colors.orange[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            series: <ChartSeries>[
+              SplineSeries<CaloriesBurnedData, DateTime>(
+                dataSource: caloriesData,
+                xValueMapper: (CaloriesBurnedData data, _) => data.date,
+                yValueMapper: (CaloriesBurnedData data, _) => data.calories,
+                color: Colors.orange[700],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  color: Colors.orange[700],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                  height: 8,
+                  width: 8,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Function for expandable metric card
+  Widget _buildExpandableMetricCard(
+      String label, String value, IconData icon, Color iconColor, String metricKey,
+      {String? note, Widget? chart}) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Column(
+          children: [
+            // The metric card itself
+            Container(
+              margin: EdgeInsets.only(bottom: (expandedState[metricKey] ?? false) ? 0 : 12),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                  bottomLeft: (expandedState[metricKey] ?? false) ? Radius.zero : Radius.circular(12),
+                  bottomRight: (expandedState[metricKey] ?? false) ? Radius.zero : Radius.circular(12),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: InkWell(
+                onTap: chart == null ? null : () {
+                  setState(() {
+                    expandedState[metricKey] = !expandedState[metricKey]!;
+                  });
+                },
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: iconColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: iconColor,
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            value,
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 18,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          if (note != null) ...[
+                            SizedBox(height: 4),
+                            Text(
+                              note,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (chart != null) ...[
+                      Icon(
+                        expandedState[metricKey]! ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        color: Colors.grey[600],
+                        size: 24,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            
+            // The expandable chart section
+            if (chart != null) ...[
+              AnimatedCrossFade(
+                duration: Duration(milliseconds: 300),
+                firstChild: Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: chart,
+                  ),
+                ),
+                secondChild: SizedBox.shrink(),
+                crossFadeState: (expandedState[metricKey] ?? false) ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingGraph() {
+    return Container(
+      height: 280,
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                color: Color(0xffFFA500),
+                strokeWidth: 3,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              "Loading your data...",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
         ),
-        Expanded(child: child),
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
+  Widget _buildEmptyGraph(String message) {
+    return Container(
+      height: 280,
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.insert_chart_outlined_rounded,
+              color: Colors.grey[300],
+              size: 48,
+            ),
+            SizedBox(height: 16),
+            Text(
+              message,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                color: Colors.grey[700],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-
+  // Helper method to create a graph container
+  Widget _buildGraphContainer({
+    required String title,
+    required String subtitle,
+    required double height,
+    required Widget child,
+  }) {
+    return Container(
+      height: height,
+      margin: EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 20,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
 
   Future<void> _generatePdf(Map<String, dynamic> data) async {
     final pdf = pw.Document();
@@ -781,17 +1445,39 @@ Widget _buildGraphContainer({
                   // Physical Metrics Section
                   _buildSectionHeader("Physical Metrics", Icons.monitor_weight),
                   SizedBox(height: 12),
-                  _buildMetricCard("Height", data['Height (cm)'] + " cm",
-                      Icons.height, Colors.blue),
+                  _buildExpandableMetricCard(
+                    "Height", 
+                    data['Height (cm)'] + " cm",
+                    Icons.height, 
+                    Colors.blue, 
+                    "height"
+                  ),
 
                   // Show Weight and Body Fat only if goalType is "High Intensity Cycling"
                   if (goalType == "High Intensity Cycling") ...[
-                    _buildMetricCard("Weight", data['Weight (kg)'] + " kg",
-                        Icons.fitness_center, Colors.green),
-                    _buildMetricCard("BMI", data['BMI'], Icons.speed,
-                        _getBMIColor(double.tryParse(data['BMI']) ?? 0)),
-                    _buildMetricCard("Body Fat", data['Body Fat %'] + "%",
-                        Icons.pie_chart, Colors.purple),
+                    _buildExpandableMetricCard(
+                      "Weight", 
+                      data['Weight (kg)'] + " kg",
+                      Icons.fitness_center, 
+                      Colors.green, 
+                      "weight",
+                      chart: _buildWeightTrackingChart()
+                    ),
+                    _buildExpandableMetricCard(
+                      "BMI", 
+                      data['BMI'], 
+                      Icons.speed,
+                      _getBMIColor(double.tryParse(data['BMI']) ?? 0), 
+                      "bmi"
+                    ),
+                    _buildExpandableMetricCard(
+                      "Body Fat", 
+                      data['Body Fat %'] + "%",
+                      Icons.pie_chart, 
+                      Colors.purple, 
+                      "bodyFat",
+                      chart: _buildBodyFatChart()
+                    ),
                   ],
 
                   SizedBox(height: 24),
@@ -799,34 +1485,49 @@ Widget _buildGraphContainer({
                   // Performance Metrics Section
                   _buildSectionHeader("Performance Metrics", Icons.trending_up),
                   SizedBox(height: 12),
-                  _buildMetricCard(
-                      "Average Heart Rate",
-                      data['Avg. Heart Rate'] + " bpm",
-                      Icons.favorite,
-                      Colors.red),
-                  _buildMetricCard(
-                      "Total Distance",
-                      data['Total Distance (km)'] + " km",
-                      Icons.directions_bike,
-                      Color(0xffFFA500)),
+                  _buildExpandableMetricCard(
+                    "Average Heart Rate",
+                    data['Avg. Heart Rate'] + " bpm",
+                    Icons.favorite,
+                    Colors.red,
+                    "heartRate",
+                    chart: _buildHeartRateChart()
+                  ),
+                  _buildExpandableMetricCard(
+                    "Total Distance",
+                    data['Total Distance (km)'] + " km",
+                    Icons.directions_bike,
+                    Color(0xffFFA500),
+                    "distance"
+                  ),
 
                   // Show Average calories and basal metabolic rate only if goalType is "High Intensity Cycling"
                   if (goalType == "High Intensity Cycling") ...[
-                    _buildMetricCard(
-                        "Average Daily Calories",
-                        data['Avg. Daily Calories'] + " kcal",
-                        Icons.food_bank,
-                        Colors.orange,
-                        note: "Based on food entries this week"),
-                    _buildMetricCard(
-                        "Basal Metabolic Rate",
-                        data['Basal Metabolic Rate'] + " kcal",
-                        Icons.whatshot,
-                        Colors.deepOrange),
+                    _buildExpandableMetricCard(
+                      "Average Daily Calories",
+                      data['Avg. Daily Calories'] + " kcal",
+                      Icons.food_bank,
+                      Colors.orange,
+                      "dailyCalories",
+                      note: "Based on food entries this week"
+                    ),
+                    _buildExpandableMetricCard(
+                      "Basal Metabolic Rate",
+                      data['Basal Metabolic Rate'] + " kcal",
+                      Icons.whatshot,
+                      Colors.deepOrange,
+                      "bmr",
+                      chart: _buildBMRChart()
+                    ),
+                    _buildExpandableMetricCard(
+                      "Total Calories Burned",
+                      data['Total Calories'] + " kcal",
+                      Icons.local_fire_department,
+                      Colors.orange,
+                      "calories",
+                      chart: _buildCaloriesBurnedChart()
+                    ),
                   ],
-
-                  SizedBox(height: 30),
-                  _buildWeightTrackingChart(),
 
                   SizedBox(height: 30),
 
@@ -903,6 +1604,7 @@ Widget _buildGraphContainer({
     ).animate().fadeIn(duration: 400.ms, delay: 200.ms);
   }
 
+  // Original metric card (left for reference)
   Widget _buildMetricCard(
       String label, String value, IconData icon, Color iconColor,
       {String? note}) {
