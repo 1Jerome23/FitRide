@@ -4418,7 +4418,31 @@ Future<void> _deactivateCurrentSubgoal() async {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              // Add the Update Weight & Body Fat button
+              Container(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showUpdateWeightDialog,
+                  icon: const Icon(Icons.update, color: Colors.white),
+                  label: const Text(
+                    "Update Weight & Body Fat",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryOrange,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(

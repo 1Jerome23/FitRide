@@ -2348,102 +2348,145 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
 // Method to set a new cycling subgoal
   void _setCyclingSubgoal(String type, double targetValue) {
-    if (baselineDistance == 0.0) {
-      _calculateBaselines();
-    }
-
-    String title = "";
-    List<String> suggestions = [];
-    List<String> warnings = [];
-    String dataSource = usingPreviousGoal
-        ? "previous goal target"
-        : "your actual cycling performance";
-
-    switch (type) {
-      case "distance":
-        title =
-            "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
-
-        // Generate suggestions
-        suggestions.add(
-            "Start with a proper warm-up to prepare for the longer distance");
-        suggestions.add("Increase your hydration for longer rides");
-        suggestions.add("Plan a route with the target distance in advance");
-
-        if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
-          warnings.add(
-              "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
-        }
-
-        if (healthCondition == "Cardiovascular or Respiratory" &&
-            targetValue > referenceDistance * 1.2) {
-          warnings.add(
-              "With your respiratory condition, consider a more moderate increase in distance.");
-        }
-        break;
-
-      case "pace":
-        double currentPaceMinPerKm = referencePace;
-        title =
-            "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
-
-        suggestions.add("Include interval training in your routine");
-        suggestions.add("Focus on consistent pedaling cadence");
-        suggestions.add(
-            "Make sure your bike is properly maintained for optimal efficiency");
-
-        if (currentPaceMinPerKm > 0 &&
-            targetValue < currentPaceMinPerKm * 0.8) {
-          warnings.add(
-              "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
-        }
-
-        if (healthCondition == "Cardiovascular or Respiratory") {
-          warnings.add(
-              "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
-        }
-        break;
-
-      case "duration":
-        title =
-            "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
-
-        suggestions.add("Build endurance with a steady pace");
-        suggestions.add("Ensure proper nutrition before longer sessions");
-        suggestions.add("Take small breaks if needed during the extended ride");
-
-        if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
-          warnings.add(
-              "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
-        }
-
-        break;
-
-      case "maintain":
-        title = "Maintain current cycling performance";
-
-        suggestions.add("Focus on consistency in your current routine");
-        suggestions.add("Work on technique refinement");
-        suggestions.add("Use this period to establish a sustainable rhythm");
-        break;
-    }
-
-    // Add a note about the data source to the suggestions
-    suggestions.add(
-        "This goal is based on $dataSource from your previous training period.");
-
-    setState(() {
-      hasActiveSubgoal = true;
-      subgoalType = type;
-      subgoalTargetValue = targetValue;
-      subgoalStartDate = DateTime.now();
-      subgoalEndDate = DateTime.now().add(Duration(days: 7));
-      subgoalSuggestions = suggestions;
-      subgoalWarnings = warnings;
-    });
-
-    _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
+  if (baselineDistance == 0.0) {
+    _calculateBaselines();
   }
+
+  String title = "";
+  List<String> suggestions = [];
+  List<String> warnings = [];
+  String dataSource = usingPreviousGoal
+      ? "previous goal target"
+      : "your actual cycling performance";
+
+  // Calculate heart rate impact
+  String hrImpact = _calculateHeartRateImpact(type, targetValue);
+  bool hasHeartRateWarning = hrImpact.contains("⚠️");
+
+  // Get subgoal influence text
+  String influenceText = _getSubgoalInfluenceText(type);
+
+  switch (type) {
+    case "distance":
+      title = "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
+
+      // Generate suggestions
+      suggestions.add("Start with a proper warm-up to prepare for the longer distance");
+      suggestions.add("Increase your hydration for longer rides");
+      suggestions.add("Plan a route with the target distance in advance");
+      suggestions.add("This goal will improve your endurance and increase calorie burn");
+      
+      if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
+        warnings.add(
+            "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
+      }
+
+      if (healthCondition == "Cardiovascular or Respiratory" &&
+          targetValue > referenceDistance * 1.2) {
+        warnings.add(
+            "With your respiratory condition, consider a more moderate increase in distance.");
+      }
+      
+      // Add heart rate specific warning and suggestion
+      if (hasHeartRateWarning) {
+        warnings.add("This goal may push your heart rate above safe levels for your condition. Monitor your heart rate during rides.");
+        suggestions.add("For your cardiovascular condition, maintain a heart rate in zone 2 (${zone2HeartRate} bpm) for most of your ride");
+      }
+
+      // Add influence information
+      suggestions.add("Increasing distance may slightly reduce your average pace initially, but will increase endurance");
+      break;
+
+    case "pace":
+      double currentPaceMinPerKm = referencePace;
+      title = "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
+
+      suggestions.add("Include interval training in your routine");
+      suggestions.add("Focus on consistent pedaling cadence");
+      suggestions.add("Make sure your bike is properly maintained for optimal efficiency");
+      suggestions.add("This goal will improve your cardiovascular fitness and efficiency");
+
+      if (currentPaceMinPerKm > 0 &&
+          targetValue < currentPaceMinPerKm * 0.8) {
+        warnings.add(
+            "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
+      }
+
+      if (healthCondition == "Cardiovascular or Respiratory") {
+        warnings.add(
+            "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
+      }
+      
+      // Add heart rate specific warning and suggestion  
+      if (hasHeartRateWarning) {
+        warnings.add("This pace goal will likely push your heart rate into higher zones. Monitor closely.");
+        suggestions.add("Use a heart rate monitor to stay within safe zones given your health condition");
+      }
+
+      // Add influence information
+      suggestions.add("Improving pace will increase your workout intensity but may reduce maximum distance initially");
+      break;
+
+    case "duration":
+      title = "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
+
+      suggestions.add("Build endurance with a steady pace");
+      suggestions.add("Ensure proper nutrition before longer sessions");
+      suggestions.add("Take small breaks if needed during the extended ride");
+      suggestions.add("This goal will build both physical and mental endurance");
+
+      if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
+        warnings.add(
+            "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
+      }
+      
+      // Check heart rate capacity for longer durations
+      if (hasHeartRateWarning) {
+        warnings.add("Longer durations can stress your cardiovascular system. Start with shorter sessions at this intensity.");
+        suggestions.add("For longer rides, keep heart rate in zone 1-2 (${zone1HeartRate}-${zone2HeartRate} bpm) to maintain endurance safely");
+      }
+
+      // Add influence information
+      suggestions.add("Increasing duration will raise your overall calorie burn and may naturally improve distance");
+      break;
+
+    case "maintain":
+      title = "Maintain current cycling performance";
+
+      suggestions.add("Focus on consistency in your current routine");
+      suggestions.add("Work on technique refinement");
+      suggestions.add("Use this period to establish a sustainable rhythm");
+      suggestions.add("This goal lets your body adapt to current training loads");
+      
+      // Add heart rate suggestion for maintenance
+      suggestions.add("During maintenance periods, aim for primarily zone 2 training (${zone2HeartRate} bpm) to build aerobic efficiency");
+      
+      // Add influence information
+      suggestions.add("Maintaining performance builds consistency and prevents overtraining while allowing recovery");
+      break;
+  }
+
+  // Add a note about the data source to the suggestions
+  suggestions.add("This goal is based on $dataSource from your previous training period.");
+
+  // Add a note about the heart rate zones to help guide training
+  if (type != "maintain" && !hasHeartRateWarning) {
+    suggestions.add("For optimal training, alternate between zone 2 (${zone2HeartRate} bpm) for base building and zone 3 (${zone3HeartRate} bpm) for improvements");
+  }
+
+  setState(() {
+    hasActiveSubgoal = true;
+    subgoalType = type;
+    subgoalTargetValue = targetValue;
+    subgoalStartDate = DateTime.now();
+    subgoalEndDate = DateTime.now().add(Duration(days: 7));
+    subgoalSuggestions = suggestions;
+    subgoalWarnings = warnings;
+  });
+
+  _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
+}
+
 
   Future<void> _fetchFoodDiaryData() async {
     if (userId == null) return;
@@ -3861,127 +3904,200 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   void _showSubgoalConfirmationDialog(String type, double targetValue) {
-    String goalText = "";
-    switch (type) {
-      case "distance":
-        goalText =
-            "increase your weekly average distance to ${targetValue.toStringAsFixed(1)} km";
-        break;
-      case "pace":
-        goalText =
-            "improve your weekly average pace to ${targetValue.toStringAsFixed(1)} min/km";
-        break;
-      case "duration":
-        goalText =
-            "extend your weekly average duration to ${targetValue.toStringAsFixed(0)} minutes";
-        break;
-      case "maintain":
-        goalText = "maintain your current cycling performance levels";
-        break;
-    }
+  String goalText = "";
+  switch (type) {
+    case "distance":
+      goalText = "increase your weekly average distance to ${targetValue.toStringAsFixed(1)} km";
+      break;
+    case "pace":
+      goalText = "improve your weekly average pace to ${targetValue.toStringAsFixed(1)} min/km";
+      break;
+    case "duration":
+      goalText = "extend your weekly average duration to ${targetValue.toStringAsFixed(0)} minutes";
+      break;
+    case "maintain":
+      goalText = "maintain your current cycling performance levels";
+      break;
+  }
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+  // Get influence description
+  String influenceText = _getSubgoalInfluenceText(type);
+  
+  // Calculate heart rate impact
+  String hrImpact = _calculateHeartRateImpact(type, targetValue);
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          "Confirm Your Goal",
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
-          title: Text(
-            "Confirm Your Goal",
-            style: TextStyle(
-              fontFamily: 'Fredoka-SemiBold',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Are you sure you want to $goalText for the next week?",
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  color: Colors.black87,
-                ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Are you sure you want to $goalText for the next week?",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.black87,
               ),
-              SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Color(0xffFFA500).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Color(0xffFFA500).withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      color: Color(0xffFFA500),
-                      size: 20,
-                    ),
-                    SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        "This goal will be used to track your progress for the next 7 days.",
+            ),
+            SizedBox(height: 16),
+            
+            // Influence information
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, size: 16, color: Colors.blue[600]),
+                      SizedBox(width: 8),
+                      Text(
+                        "Goal Impact:",
                         style: TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 13,
-                          color: Colors.grey[800],
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
                         ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    influenceText,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: Colors.blue[800],
+                    ),
+                  ),
+                  
+                  // Heart rate information if available
+                  if (hrImpact.isNotEmpty) ...[
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.favorite, size: 16, color: Colors.red[400]),
+                        SizedBox(width: 8),
+                        Text(
+                          "Heart Rate Impact:",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      hrImpact,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Colors.red[800],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
+            
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xffFFA500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Color(0xffFFA500).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xffFFA500),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      "This goal will be used to track your progress for the next 7 days.",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: Text(
+              "Cancel",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
-          actions: [
-            TextButton(
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextButton(
               child: Text(
-                "Cancel",
+                "Confirm",
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               onPressed: () {
                 Navigator.of(context).pop();
+                _setCyclingSubgoal(type, targetValue);
               },
             ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextButton(
-                child: Text(
-                  "Confirm",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _setCyclingSubgoal(type, targetValue);
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+        ],
+      );
+    },
+  );
+}
 
   void _calculateBaselines() {
     if (activityData.isEmpty) return;
@@ -4053,67 +4169,207 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Widget _buildSubgoalOptionButton(String title, String value, String baseline,
-      Color color, String type, double targetValue) {
-    return InkWell(
-      onTap: () => _showSubgoalConfirmationDialog(type, targetValue),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              spreadRadius: 1,
-              blurRadius: 5,
-              offset: Offset(0, 2),
+    Color color, String type, double targetValue) {
+  
+  // Get influence description based on goal type
+  String influenceText = _getSubgoalInfluenceText(type);
+  
+  // Calculate heart rate impact based on goal type and intensity
+  String hrImpact = _calculateHeartRateImpact(type, targetValue);
+  
+  return InkWell(
+    onTap: () => _showSubgoalConfirmationDialog(type, targetValue),
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'Fredoka-SemiBold',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              baseline,
+            child: Text(
+              title,
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 12,
-                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
             ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            baseline,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 12, color: color),
+              SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  influenceText,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (hrImpact.isNotEmpty) ...[
+            SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.favorite_outline, size: 12, color: Colors.red[400]),
+                SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    hrImpact,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.red[400],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
-    );
+    ),
+  );
+}
+
+String _getSubgoalInfluenceText(String type) {
+  switch (type) {
+    case "distance":
+      return "Longer distances improve endurance and increase calorie burn, may reduce pace.";
+    case "pace":
+      return "Faster pace increases intensity, improves cardiovascular fitness, and efficiency.";
+    case "duration":
+      return "Longer durations build endurance and mental strength, may increase total calorie burn.";
+    case "maintain":
+      return "Consistency builds habits, prevents overtraining, and allows for recovery.";
+    default:
+      return "";
   }
+}
+// Calculate heart rate impact based on goal type and target value
+String _calculateHeartRateImpact(String type, double targetValue) {
+  // Use the user's heart rate zones from the class
+  int maxHR = maxHeartRateCalculated;
+  int z2HR = zone2HeartRate;
+  int z3HR = zone3HeartRate;
+  int z4HR = zone4HeartRate;
+  
+  double targetHRPercent = 0;
+  String impact = "";
+  
+  switch (type) {
+    case "distance":
+      // For distance goals, estimate HR impact based on how much increase from baseline
+      double percentIncrease = (targetValue / referenceDistance - 1) * 100;
+      
+      if (percentIncrease > 20) {
+        targetHRPercent = 0.75; // Z3 territory
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z3)";
+      } else if (percentIncrease > 10) {
+        targetHRPercent = 0.70; // Upper Z2
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
+      } else {
+        targetHRPercent = 0.65; // Lower Z2
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
+      }
+      break;
+      
+    case "pace":
+      // For pace goals (lower is faster), estimate HR impact based on improvement
+      if (referencePace > 0) {
+        double paceImprovement = (1 - targetValue / referencePace) * 100;
+        
+        if (paceImprovement > 10) {
+          targetHRPercent = 0.85; // Z4 territory
+          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z4)";
+        } else if (paceImprovement > 5) {
+          targetHRPercent = 0.80; // Z3 territory
+          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z3)";
+        } else {
+          targetHRPercent = 0.75; // Upper Z2/Lower Z3
+          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2-Z3)";
+        }
+      }
+      break;
+      
+    case "duration":
+      // For duration goals, estimate HR impact based on extended time
+      double percentIncrease = (targetValue / referenceDuration - 1) * 100;
+      
+      if (percentIncrease > 20) {
+        targetHRPercent = 0.70; // Middle Z2
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
+      } else if (percentIncrease > 10) {
+        targetHRPercent = 0.65; // Lower Z2
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
+      } else {
+        targetHRPercent = 0.60; // Z1/Z2 border
+        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z1-Z2)";
+      }
+      break;
+      
+    case "maintain":
+      // No specific HR impact for maintenance
+      impact = "";
+      break;
+  }
+  
+  // Add warning if HR would exceed recommended zones for certain health conditions
+  if (targetHRPercent > 0 && healthCondition == "Cardiovascular or Respiratory") {
+    double safeHRPercent = heartRateLimit != "0" ? 
+      safeParseDouble(heartRateLimit) / maxHR : 0.75;
+      
+    if (targetHRPercent > safeHRPercent) {
+      impact += " ⚠️ May exceed safe HR for your condition";
+    }
+  }
+  
+  return impact;
+}
 
   Future<void> _fetchUserData() async {
     if (userId == null) return;
