@@ -1101,205 +1101,314 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Widget _buildRecommendationCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    List<Color> gradientColors,
-    List<String> recommendations, {
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      // InkWell provides better touch response than GestureDetector
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.15),
-              spreadRadius: 1,
-              blurRadius: 12,
-              offset: Offset(0, 6),
-            ),
-          ],
+  BuildContext context,
+  String title,
+  IconData icon,
+  Color color,
+  List<Color> gradientColors,
+  List<String> recommendations, {
+  required VoidCallback onTap,
+}) {
+  return Container(
+    margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: color.withOpacity(0.15),
+          spreadRadius: 1,
+          blurRadius: 12,
+          offset: Offset(0, 6),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 20),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'Fredoka-SemiBold',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with icon and title
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
             ),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Fredoka-SemiBold',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
 
-            // List view (scrollable)
-            Expanded(
-              child: NotificationListener<OverscrollIndicatorNotification>(
-                onNotification: (overscroll) {
-                  overscroll.disallowIndicator();
-                  return true;
+        // Card swiper for recommendations
+        Expanded(
+          child: _buildRecommendationSwiper(recommendations, color),
+        ),
+
+        // Footer with count indicator
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.05),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
+            border: Border(
+              top: BorderSide(color: color.withOpacity(0.1), width: 1),
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.fullscreen,
+                  size: 16,
+                  color: color,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  "View all ${recommendations.length} in detail",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Card swiper that shows one recommendation at a time
+Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
+  // We'll show at most 3 in the preview
+  final previewItems = recommendations.length > 3 ? 
+      recommendations.sublist(0, 3) : recommendations;
+      
+  return StatefulBuilder(
+    builder: (context, setState) {
+      final PageController pageController = PageController(viewportFraction: 0.85);
+      final ValueNotifier<int> currentIndex = ValueNotifier<int>(0);
+      
+      return Column(
+        children: [
+          Expanded(
+            child: NotificationListener<OverscrollIndicatorNotification>(
+              onNotification: (notification) {
+                notification.disallowIndicator();
+                return true;
+              },
+              child: PageView.builder(
+                controller: pageController,
+                itemCount: previewItems.length,
+                onPageChanged: (index) {
+                  currentIndex.value = index;
                 },
-                child: ListView.builder(
-                  physics: BouncingScrollPhysics(),
-                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  itemCount:
-                      recommendations.length > 3 ? 3 : recommendations.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: color.withOpacity(0.1), width: 1),
+                itemBuilder: (context, index) {
+                  return AnimatedContainer(
+                    duration: Duration(milliseconds: 300),
+                    margin: EdgeInsets.symmetric(
+                      horizontal: 10, 
+                      vertical: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.1),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: color.withOpacity(0.1),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            margin: EdgeInsets.only(top: 2),
-                            child: Icon(
-                              Icons.check_circle_rounded,
-                              size: 18,
+                    ),
+                    child: Stack(
+                      children: [
+                        // Number badge
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
                               color: color,
+                              borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(20),
+                                bottomLeft: Radius.circular(12),
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
                             child: Text(
-                              recommendations[index],
+                              "${index + 1}/${previewItems.length}",
                               style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                color: Colors.black87,
-                                height: 1.4,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                        ),
+                        
+                        // Quote icon decoration
+                        Positioned(
+                          left: 15,
+                          top: 15,
+                          child: Icon(
+                            Icons.format_quote,
+                            size: 24,
+                            color: color.withOpacity(0.2),
+                          ),
+                        ),
+                        
+                        // Recommendation text
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(20, 40, 20, 20),
+                          child: Center(
+                            child: Text(
+                              previewItems[index],
+                              style: TextStyle(
+                                fontSize: 16,
+                                height: 1.6,
+                                color: Colors.black87,
+                                fontFamily: 'Inter',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        
+                        // Swipe indicator
+                        Positioned(
+                          bottom: 10,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.swipe,
+                                size: 16,
+                                color: color.withOpacity(0.5),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                "Swipe",
+                                style: TextStyle(
+                                  color: color.withOpacity(0.5),
+                                  fontSize: 12,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-
-            // Tap indicator
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 8),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.05),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-                border: Border(
-                  top: BorderSide(color: color.withOpacity(0.1), width: 1),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.touch_app_rounded,
-                    size: 16,
-                    color: color,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    recommendations.length > 3
-                        ? "Tap to view all ${recommendations.length} tips"
-                        : "Tap to expand",
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: color,
+          ),
+          
+          // Page indicator dots
+          ValueListenableBuilder<int>(
+            valueListenable: currentIndex,
+            builder: (context, index, _) {
+              return Container(
+                margin: EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    previewItems.length,
+                    (i) => Container(
+                      margin: EdgeInsets.symmetric(horizontal: 3),
+                      width: i == index ? 18 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: i == index ? color : color.withOpacity(0.2),
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   void _showFullscreenOverlay(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    List<Color> gradientColors,
-    List<String> recommendations,
-  ) {
-    // Declare the overlayEntry as late - it will be initialized before use
-    late OverlayEntry overlayEntry;
+  BuildContext context,
+  String title,
+  IconData icon,
+  Color color,
+  List<Color> gradientColors,
+  List<String> recommendations,
+) {
+  late OverlayEntry overlayEntry;
 
-    // Define the builder function separately
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: _AnimatedAutoSizingOverlay(
-          onDismiss: () {
-            overlayEntry.remove();
-          },
-          title: title,
-          icon: icon,
-          color: color,
-          gradientColors: gradientColors,
-          recommendations: recommendations,
-        ),
+  overlayEntry = OverlayEntry(
+    builder: (context) => Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: _AnimatedFullscreenOverlay(
+        onDismiss: () {
+          overlayEntry.remove();
+        },
+        title: title,
+        icon: icon,
+        color: color,
+        gradientColors: gradientColors,
+        recommendations: recommendations,
       ),
-    );
+    ),
+  );
 
-    // Show the overlay
-    Overlay.of(context).insert(overlayEntry);
-  }
+  Overlay.of(context).insert(overlayEntry);
+}
 
 // Helper widget for zone indicators
   Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
@@ -9351,18 +9460,17 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  int _selectedCategory = 0;
 
   @override
   void initState() {
     super.initState();
 
-    // Create animation controller
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
 
-    // Create animations
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
@@ -9377,7 +9485,6 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
       ),
     );
 
-    // Start the animation
     _animationController.forward();
   }
 
@@ -9388,14 +9495,77 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
   }
 
   void _dismiss() {
-    // Reverse the animation and then dismiss
     _animationController.reverse().then((_) {
       widget.onDismiss();
     });
   }
 
+  List<Map<String, dynamic>> _categorizeRecommendations() {
+    // Create categories based on first words or content patterns
+    final List<Map<String, dynamic>> categories = [];
+    final Map<String, List<String>> categorizedItems = {};
+    
+    // Simple categorization based on keywords
+    for (String rec in widget.recommendations) {
+      String category = "General Tips";
+      
+      // Simple keyword detection for categorization
+      if (rec.toLowerCase().contains("aim") || 
+          rec.toLowerCase().contains("goal") || 
+          rec.toLowerCase().contains("target")) {
+        category = "Goals & Targets";
+      } else if (rec.toLowerCase().contains("increase") || 
+                rec.toLowerCase().contains("improve") || 
+                rec.toLowerCase().contains("boost")) {
+        category = "Improvements";
+      } else if (rec.toLowerCase().contains("add") || 
+                rec.toLowerCase().contains("include") || 
+                rec.toLowerCase().contains("try")) {
+        category = "Suggestions";
+      } else if (rec.toLowerCase().contains("avoid") || 
+                rec.toLowerCase().contains("reduce") || 
+                rec.toLowerCase().contains("limit")) {
+        category = "Cautions";
+      }
+      
+      if (!categorizedItems.containsKey(category)) {
+        categorizedItems[category] = [];
+      }
+      categorizedItems[category]!.add(rec);
+    }
+    
+    // Convert to list format
+    categorizedItems.forEach((key, value) {
+      categories.add({
+        'name': key,
+        'items': value,
+      });
+    });
+    
+    // If we only have one category, create artificial divisions
+    if (categories.length == 1) {
+      final items = categories[0]['items'] as List<String>;
+      if (items.length >= 6) {
+        int midpoint = items.length ~/ 2;
+        categories.clear();
+        categories.add({
+          'name': 'Key Recommendations',
+          'items': items.sublist(0, midpoint),
+        });
+        categories.add({
+          'name': 'Additional Tips',
+          'items': items.sublist(midpoint),
+        });
+      }
+    }
+    
+    return categories;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final categories = _categorizeRecommendations();
+    
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -9480,73 +9650,101 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
                           ),
                         ),
 
-                        // Content area - takes all available space
+                        // Category tabs for filtering recommendations
+                        if (categories.length > 1)
+                          Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                topRight: Radius.circular(4),
+                              ),
+                            ),
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: categories.length,
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedCategory = index;
+                                    });
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: Duration(milliseconds: 200),
+                                    margin: EdgeInsets.symmetric(horizontal: 6),
+                                    padding: EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: _selectedCategory == index
+                                          ? widget.color
+                                          : Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: _selectedCategory == index
+                                          ? [
+                                              BoxShadow(
+                                                color: widget.color.withOpacity(0.3),
+                                                blurRadius: 8,
+                                                spreadRadius: 1,
+                                                offset: Offset(0, 2),
+                                              )
+                                            ]
+                                          : null,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      categories[index]['name'],
+                                      style: TextStyle(
+                                        color: _selectedCategory == index
+                                            ? Colors.white
+                                            : Colors.grey[700],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                        // Content area with cards layout instead of list
                         Expanded(
                           child: InkWell(
-                            onTap: () {
-                              // Prevent taps inside content from closing
-                            },
+                            onTap: () {},
                             splashColor: Colors.transparent,
                             highlightColor: Colors.transparent,
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.only(
-                                  bottomLeft: Radius.circular(20),
-                                  bottomRight: Radius.circular(20),
-                                ),
+                                borderRadius: categories.length > 1
+                                    ? BorderRadius.only(
+                                        bottomLeft: Radius.circular(20),
+                                        bottomRight: Radius.circular(20),
+                                      )
+                                    : BorderRadius.only(
+                                        topLeft: Radius.circular(4),
+                                        topRight: Radius.circular(4),
+                                        bottomLeft: Radius.circular(20),
+                                        bottomRight: Radius.circular(20),
+                                      ),
                               ),
-                              child: ListView.builder(
+                              child: GridView.builder(
                                 physics: BouncingScrollPhysics(),
                                 padding: EdgeInsets.all(16),
-                                itemCount: widget.recommendations.length,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 1.0,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                ),
+                                itemCount: categories.isEmpty ? 0 : 
+                                  categories[_selectedCategory]['items'].length,
                                 itemBuilder: (context, index) {
-                                  return Container(
-                                    margin: EdgeInsets.only(bottom: 14),
-                                    padding: EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: widget.color.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                          color: widget.color.withOpacity(0.2),
-                                          width: 1),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: widget.color.withOpacity(0.05),
-                                          spreadRadius: 0,
-                                          blurRadius: 5,
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          margin: EdgeInsets.only(top: 2),
-                                          child: Icon(
-                                            Icons.check_circle_rounded,
-                                            size: 22,
-                                            color: widget.color,
-                                          ),
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            widget.recommendations[index],
-                                            style: TextStyle(
-                                              fontFamily: 'Inter',
-                                              fontSize: 16,
-                                              color: Colors.black87,
-                                              height: 1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                                  final recommendation = categories[_selectedCategory]['items'][index];
+                                  return _buildRecommendationCard(recommendation, index, widget.color);
                                 },
                               ),
                             ),
@@ -9561,6 +9759,122 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRecommendationCard(String recommendation, int index, Color color) {
+    // Generate a random spotlight position for visual interest
+    final double randomX = 0.2 + 0.6 * math.Random().nextDouble();
+    final double randomY = 0.2 + 0.6 * math.Random().nextDouble();
+
+    // List of icons to use randomly
+    final List<IconData> icons = [
+      Icons.lightbulb_outline,
+      Icons.check_circle_outline,
+      Icons.star_outline,
+      Icons.favorite_outline,
+      Icons.local_fire_department_outlined,
+      Icons.water_drop_outlined,
+      Icons.directions_run_outlined,
+      Icons.restaurant_outlined,
+    ];
+    
+    final randomIcon = icons[index % icons.length];
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(randomX, randomY),
+          end: Alignment(randomX - 1, randomY - 1),
+          colors: [
+            color.withOpacity(0.05),
+            Colors.white,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 0,
+          ),
+        ],
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Stack(
+        children: [
+          // Optional subtle pattern for visual interest
+          Positioned(
+            right: -15,
+            bottom: -15,
+            child: Icon(
+              Icons.format_quote,
+              size: 50,
+              color: color.withOpacity(0.05),
+            ),
+          ),
+          
+          // Number badge
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.8),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  "${index + 1}",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Content
+          Padding(
+            padding: EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    randomIcon,
+                    size: 20,
+                    color: color,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Expanded(
+                  child: Text(
+                    recommendation,
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                    maxLines: 7,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
