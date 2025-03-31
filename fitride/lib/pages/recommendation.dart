@@ -9731,21 +9731,41 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
                                         bottomRight: Radius.circular(20),
                                       ),
                               ),
-                              child: GridView.builder(
+                              child: CustomScrollView(
                                 physics: BouncingScrollPhysics(),
-                                padding: EdgeInsets.all(16),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: 1.0,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                ),
-                                itemCount: categories.isEmpty ? 0 : 
-                                  categories[_selectedCategory]['items'].length,
-                                itemBuilder: (context, index) {
-                                  final recommendation = categories[_selectedCategory]['items'][index];
-                                  return _buildRecommendationCard(recommendation, index, widget.color);
-                                },
+                                slivers: [
+                                  SliverPadding(
+                                    padding: EdgeInsets.all(16),
+                                    sliver: SliverGrid(
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: 12,
+                                        crossAxisSpacing: 12,
+                                        // Let the grid items determine their own height
+                                        mainAxisExtent: null,
+                                        childAspectRatio: 0.8, // Default aspect ratio
+                                      ),
+                                      delegate: SliverChildBuilderDelegate(
+                                        (context, index) {
+                                          final recommendation = categories[_selectedCategory]['items'][index];
+                                          return LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              return _buildFlexibleRecommendationCard(
+                                                recommendation, 
+                                                index, 
+                                                widget.color,
+                                                constraints.maxWidth,
+                                              );
+                                            },
+                                          );
+                                        },
+                                        childCount: categories.isEmpty 
+                                          ? 0 
+                                          : categories[_selectedCategory]['items'].length,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -9762,103 +9782,114 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
     );
   }
 
-  Widget _buildRecommendationCard(String recommendation, int index, Color color) {
-    // Generate a random spotlight position for visual interest
-    final double randomX = 0.2 + 0.6 * math.Random().nextDouble();
-    final double randomY = 0.2 + 0.6 * math.Random().nextDouble();
+ Widget _buildFlexibleRecommendationCard(String recommendation, int index, Color color, double width) {
+  // Generate a random spotlight position for visual interest
+  final double randomX = 0.2 + 0.6 * math.Random().nextDouble();
+  final double randomY = 0.2 + 0.6 * math.Random().nextDouble();
 
-    // List of icons to use randomly
-    final List<IconData> icons = [
-      Icons.lightbulb_outline,
-      Icons.check_circle_outline,
-      Icons.star_outline,
-      Icons.favorite_outline,
-      Icons.local_fire_department_outlined,
-      Icons.water_drop_outlined,
-      Icons.directions_run_outlined,
-      Icons.restaurant_outlined,
-    ];
-    
-    final randomIcon = icons[index % icons.length];
-    
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment(randomX, randomY),
-          end: Alignment(randomX - 1, randomY - 1),
-          colors: [
-            color.withOpacity(0.05),
-            Colors.white,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 0,
-          ),
+  // List of icons to use randomly for visual variety
+  final List<IconData> icons = [
+    Icons.lightbulb_outline,
+    Icons.check_circle_outline,
+    Icons.star_outline,
+    Icons.favorite_outline,
+    Icons.local_fire_department_outlined,
+    Icons.water_drop_outlined,
+    Icons.directions_run_outlined,
+    Icons.restaurant_outlined,
+  ];
+  
+  final randomIcon = icons[index % icons.length];
+  
+  // Calculate the approximate height based on text length
+  // This is an estimate to help with initial layout
+  final double estimatedTextHeight = (recommendation.length / 25) * 20.0;
+  final double minCardHeight = 120.0; // Minimum height for any card
+  final double cardHeight = math.max(minCardHeight, estimatedTextHeight + 80); // 80px for padding, icon, etc.
+  
+  return Container(
+    height: cardHeight,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment(randomX, randomY),
+        end: Alignment(randomX - 1, randomY - 1),
+        colors: [
+          color.withOpacity(0.05),
+          Colors.white,
         ],
-        border: Border.all(color: color.withOpacity(0.1)),
       ),
-      child: Stack(
-        children: [
-          // Optional subtle pattern for visual interest
-          Positioned(
-            right: -15,
-            bottom: -15,
-            child: Icon(
-              Icons.format_quote,
-              size: 50,
-              color: color.withOpacity(0.05),
-            ),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: color.withOpacity(0.1),
+          blurRadius: 10,
+          spreadRadius: 0,
+        ),
+      ],
+      border: Border.all(color: color.withOpacity(0.1)),
+    ),
+    child: Stack(
+      children: [
+        // Optional subtle pattern for visual interest
+        Positioned(
+          right: -15,
+          bottom: -15,
+          child: Icon(
+            Icons.format_quote,
+            size: 50,
+            color: color.withOpacity(0.05),
           ),
-          
-          // Number badge
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.8),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  "${index + 1}",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
+        ),
+        
+        // Number badge
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.8),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                "${index + 1}",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
               ),
             ),
           ),
-          
-          // Content
-          Padding(
-            padding: EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    randomIcon,
-                    size: 20,
-                    color: color,
-                  ),
+        ),
+        
+        // Content - wrap in SingleChildScrollView to handle overflow
+        Padding(
+          padding: EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                SizedBox(height: 10),
-                Expanded(
+                child: Icon(
+                  randomIcon,
+                  size: 20,
+                  color: color,
+                ),
+              ),
+              SizedBox(height: 10),
+              
+              // Flexible text that expands to fill available space
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: BouncingScrollPhysics(),
                   child: Text(
                     recommendation,
                     style: TextStyle(
@@ -9866,17 +9897,16 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
                       fontSize: 13,
                       height: 1.4,
                     ),
-                    maxLines: 7,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay>
