@@ -771,37 +771,47 @@ class _RecommendationPageState extends State<RecommendationPage> {
 
   //prinze PSPO
   // Calculate PSPO using the simplified model with better error handling
-double calculatePSPO(double speedKmh, double weightKg, double durationSeconds) {
-  print("PSPO Calculation - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
+  double calculatePSPO(double speedKmh, double weightKg, double durationSeconds) {
+  print("PSPO INPUT VALUES - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
   
   // Validate inputs
   if (speedKmh <= 0) {
-    print("Invalid speed: $speedKmh km/h");
+    print("⚠️ Invalid speed: $speedKmh km/h");
     return 0;
   }
   
   if (weightKg <= 0) {
-    print("Invalid weight: $weightKg kg");
+    print("⚠️ Invalid weight: $weightKg kg");
     return 0;
   }
   
-  // Convert km/h to m/s
-  double speedMs = speedKmh / 3.6;
+  // Simplified power calculation that produces realistic values
+  // This is a simplified approximation that works reasonably well for flat terrain
+  double power = 0;
   
-  // Base coefficient (simplified model)
-  double coefficient = 0.5; // Simplified coefficient for cycling
+  // Speed-based power estimate (simplified model)
+  if (speedKmh < 15) {
+    // Low speed range
+    power = weightKg * 1.5 * speedKmh / 10;
+  } else if (speedKmh < 25) {
+    // Medium speed range
+    power = weightKg * 2.0 * speedKmh / 10;
+  } else {
+    // High speed range
+    power = weightKg * 2.5 * speedKmh / 10;
+  }
   
-  // Calculate power (watts)
-  double power = coefficient * (math.pow(speedMs, 3) * weightKg);
-  print("Calculated raw power: $power W");
+  print("Calculated power based on speed and weight: $power W");
   
   // For endurance calculation, adjust for short durations
   if (durationSeconds < 300) { // Less than 5 minutes
     double durationFactor = durationSeconds / 300;
-    power = power * durationFactor;
-    print("Applied duration factor: $durationFactor, adjusted power: $power W");
+    double adjustedPower = power * durationFactor;
+    print("Short duration adjustment: $power * $durationFactor = $adjustedPower W");
+    return adjustedPower;
   }
   
+  print("Final PSPO: $power W");
   return power;
 }
 //prinze PSPO
@@ -6105,19 +6115,36 @@ void _generateWeightManagementRecommendations() {
     //PSPO-based recommendations
     if (activityData.length >= 2) {
     double weightInKg = safeParseDouble(weight);
+    print("User weight for PSPO recommendation: $weightInKg kg");
     
     // Process activities to calculate PSPO
     List<double> pspoValues = [];
+    print("Starting PSPO calculation for recommendations with ${activityData.length} activities:");
+    
     for (var activity in activityData) {
       double distance = safeParseDouble(activity['distance']);
       double durationSeconds = safeParseDouble(activity['elapsed_time']);
+      double avgSpeed = safeParseDouble(activity['average_speed']);
+      
+      print("Activity data - Distance: $distance km, Duration: $durationSeconds s, Speed: $avgSpeed km/h");
       
       if (distance > 0 && durationSeconds > 0) {
-        double speedKmh = (distance / (durationSeconds / 3600));
+        // If average speed is not available, calculate it
+        double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+        print("Speed used for PSPO: $speedKmh km/h");
+        
+        // Calculate PSPO
         double pspo = calculatePSPO(speedKmh, weightInKg, durationSeconds);
-        pspoValues.add(pspo);
+        print("Calculated PSPO: $pspo W");
+        
+        if (pspo > 0) {
+          pspoValues.add(pspo);
+          print("Added PSPO value to recommendations list, total now: ${pspoValues.length}");
+        }
       }
     }
+    
+    print("Total valid PSPO values: ${pspoValues.length}");
     
     if (pspoValues.length >= 2) {
       // Calculate recent trend
@@ -6126,12 +6153,14 @@ void _generateWeightManagementRecommendations() {
       double maxPSPO = pspoValues.last;
       double pspoPerKg = maxPSPO / weightInKg;
       
-      // Add PSPO-specific recommendations
+      print("PSPO stats - Avg: $avgPSPO W, Max: $maxPSPO W, PSPO/kg: $pspoPerKg W/kg");
+      
+      // PSPO-specific recommendations
       trainingRecommendations.add(
         "Your PSPO (Peak Sustained Power Output) of ${maxPSPO.toStringAsFixed(0)} watts (${pspoPerKg.toStringAsFixed(2)} W/kg) indicates your current endurance capacity."
       );
       
-      // Add appropriate recommendations based on PSPO/kg
+      // Recommendations based on PSPO/kg
       if (pspoPerKg < 2.5) {
         trainingRecommendations.add(
           "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
