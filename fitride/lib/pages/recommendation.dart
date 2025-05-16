@@ -11,6 +11,16 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
+//prinze pspo class
+class ChartData { 
+  final DateTime date;
+  final double pspo;
+  final double pspoPerKg;
+  final double heartRate;
+
+  ChartData(this.date, this.pspo, this.pspoPerKg, this.heartRate);
+}
+
 class CalorieData {
   double weeklyCaloriesBurned = 0.0;
   double weeklyCaloriesConsumed = 0.0;
@@ -758,6 +768,512 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return [];
     }
   }
+
+  //prinze PSPO
+  // Calculate PSPO using the simplified model with better error handling
+double calculatePSPO(double speedKmh, double weightKg, double durationSeconds) {
+  print("PSPO Calculation - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
+  
+  // Validate inputs
+  if (speedKmh <= 0) {
+    print("Invalid speed: $speedKmh km/h");
+    return 0;
+  }
+  
+  if (weightKg <= 0) {
+    print("Invalid weight: $weightKg kg");
+    return 0;
+  }
+  
+  // Convert km/h to m/s
+  double speedMs = speedKmh / 3.6;
+  
+  // Base coefficient (simplified model)
+  double coefficient = 0.5; // Simplified coefficient for cycling
+  
+  // Calculate power (watts)
+  double power = coefficient * (math.pow(speedMs, 3) * weightKg);
+  print("Calculated raw power: $power W");
+  
+  // For endurance calculation, adjust for short durations
+  if (durationSeconds < 300) { // Less than 5 minutes
+    double durationFactor = durationSeconds / 300;
+    power = power * durationFactor;
+    print("Applied duration factor: $durationFactor, adjusted power: $power W");
+  }
+  
+  return power;
+}
+//prinze PSPO
+// Helper method to capitalize strings
+String capitalize(String s) {
+  if (s.isEmpty) return s;
+  return s[0].toUpperCase() + s.substring(1);
+}
+//prinze PSPO
+// Method to save calculated PSPO to Firebase
+Future<void> savePSPOToFirebase(String activityId, double pspo, double pspoPerKg) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('activities')
+        .doc(activityId)
+        .update({
+      'pspo': pspo,
+      'pspo_per_kg': pspoPerKg,
+      'pspo_calculated_at': DateTime.now(),
+    });
+    print("Saved PSPO data to Firebase for activity $activityId");
+  } catch (e) {
+    print("Error saving PSPO data to Firebase: $e");
+  }
+}
+//prinze PSPO
+// Method to build the PSPO graph and analysis
+Widget buildPSPOAnalysisGraph() {
+  print("Starting PSPO analysis...");
+  print("Total activity data count: ${activityData.length}");
+  
+  // Check if we have activity data
+  if (activityData.isEmpty) {
+    return _buildEmptyGraph("No activity data found for PSPO analysis");
+  }
+
+  // Get user weight with fallback
+  double userWeight = safeParseDouble(weight);
+  if (userWeight <= 0) {
+    // Fallback to 70kg if no weight provided
+    userWeight = 70.0;
+    print("No valid weight found, using default: $userWeight kg");
+  } else {
+    print("User weight: $userWeight kg");
+  }
+  
+  // Process activity data to calculate PSPO
+  List<ChartData> chartData = [];
+  
+  // Process all activities chronologically
+  List<Map<String, dynamic>> processableActivities = List.from(activityData);
+  processableActivities.sort((a, b) {
+    if (a['start_date'] == null) return 1;
+    if (b['start_date'] == null) return -1;
+    return a['start_date'].toDate().compareTo(b['start_date'].toDate());
+  });
+  
+  print("Sorted activities count: ${processableActivities.length}");
+  
+  // Direct access to each activity for debugging
+  for (int i = 0; i < math.min(processableActivities.length, 5); i++) {
+    var activity = processableActivities[i];
+    print("Activity #$i data:");
+    print("  - start_date: ${activity['start_date']?.toDate()}");
+    print("  - distance: ${activity['distance']}");
+    print("  - elapsed_time: ${activity['elapsed_time']}");
+    print("  - average_speed: ${activity['average_speed']}");
+    print("  - average_heartrate: ${activity['average_heartrate']}");
+  }
+  
+  // Calculate PSPO for each activity
+  for (var activity in processableActivities) {
+  // Skip activities without start date or ID
+  if (activity['start_date'] == null) {
+    print("Skipping activity - missing start_date");
+    continue;
+  }
+  
+  DateTime activityDate = activity['start_date'].toDate();
+  String activityId = activity['documentId'] ?? ""; // Get document ID if available
+  print("Processing activity from ${activityDate.toString()}");
+  
+  // First check if PSPO already exists in the activity data
+  if (activity.containsKey('pspo') && activity['pspo'] != null && activity['pspo'] > 0) {
+    double storedPSPO = safeParseDouble(activity['pspo']);
+    double storedPSPOPerKg = safeParseDouble(activity['pspo_per_kg']);
+    print("Using stored PSPO from database: $storedPSPO W, $storedPSPOPerKg W/kg");
+    
+    chartData.add(ChartData(
+      activityDate, 
+      storedPSPO, 
+      storedPSPOPerKg, 
+      safeParseDouble(activity['average_heartrate'])
+    ));
+    continue;
+  }
+  
+  // Calculate PSPO if not already stored
+  // [Extract data and calculate PSPO as before]
+  double distance = safeParseDouble(activity['distance']); // km
+  double durationSeconds = safeParseDouble(activity['elapsed_time']); // seconds
+  double avgHeartRate = safeParseDouble(activity['average_heartrate']); // bpm
+  double avgSpeed = safeParseDouble(activity['average_speed']); // km/h
+  
+  // Skip activities with invalid data
+  if (distance <= 0 || durationSeconds <= 0) {
+    print("Skipping activity due to invalid distance or duration");
+    continue;
+  }
+  
+  // Calculate speed in km/h if not provided
+  double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+  
+  // Calculate PSPO
+  double pspo = calculatePSPO(speedKmh, userWeight, durationSeconds);
+  double pspoPerKg = userWeight > 0 ? pspo / userWeight : 0;
+  
+  // Add to chart data
+  chartData.add(ChartData(activityDate, pspo, pspoPerKg, avgHeartRate));
+  
+  // Save to Firebase if we have an activity ID
+  if (activityId.isNotEmpty) {
+    savePSPOToFirebase(activityId, pspo, pspoPerKg);
+    }
+  }
+  
+  // Error case - no valid data points
+  if (chartData.isEmpty) {
+    print("No valid chart data generated");
+    return _buildEmptyGraph("No valid activity data for PSPO analysis");
+  }
+  
+  print("Final chart data points: ${chartData.length}");
+  print("First point - Date: ${chartData.first.date}, PSPO: ${chartData.first.pspo} W");
+  print("Last point - Date: ${chartData.last.date}, PSPO: ${chartData.last.pspo} W");
+  
+  // Analyze trend if we have multiple data points
+  String trendText = "collecting_data";
+  double percentChange = 0.0;
+  List<String> recommendations = [
+    "Research shows that PSPO strongly correlates with endurance performance (r = -0.79). Continue tracking your rides to monitor fitness progression."
+  ];
+  
+  if (chartData.length >= 2) {
+    // Simple trend analysis
+    double firstPSPO = chartData.first.pspo;
+    double lastPSPO = chartData.last.pspo;
+    percentChange = ((lastPSPO - firstPSPO) / firstPSPO) * 100;
+    
+    if (percentChange > 5) {
+      trendText = "improving";
+      recommendations.add("Your power output is improving by ${percentChange.toStringAsFixed(1)}%! Keep following your current training schedule.");
+    } else if (percentChange < -5) {
+      trendText = "declining";
+      recommendations.add("Your power output has decreased by ${(-percentChange).toStringAsFixed(1)}%. Consider shorter, more frequent rides to rebuild endurance.");
+    } else {
+      trendText = "stable";
+      recommendations.add("Your power output is stable. Focus on building endurance by gradually increasing ride duration.");
+    }
+    
+    // Add recommendations based on latest data
+    double latestPSPOPerKg = chartData.last.pspoPerKg;
+    String pspoLevel = "moderate";
+    
+    if (latestPSPOPerKg < 2.5) {
+      pspoLevel = "developing";
+      recommendations.add("Focus on base endurance training with Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation.");
+    } else if (latestPSPOPerKg > 3.5) {
+      pspoLevel = "advanced";
+      recommendations.add("Your strong power-to-weight ratio allows for advanced training. Include periodic high-intensity intervals for further gains.");
+    } else {
+      recommendations.add("Your moderate power output indicates you're ready for mixed training. Combine endurance rides with tempo sessions.");
+    }
+  }
+  
+  // Prepare insight content
+  Color trendColor = Colors.blue[600]!;
+  if (trendText == "improving") trendColor = Colors.green[600]!;
+  if (trendText == "declining") trendColor = Colors.red[600]!;
+  
+  String insightTitle = "Endurance Performance Analysis";
+  String insightSubtitle = chartData.length < 2 
+      ? "Based on your latest activity" 
+      : "Based on your ${chartData.length} activities";
+  
+  if (chartData.length >= 2) {
+    if (trendText == "improving") {
+      insightTitle = "Endurance Performance Improving";
+    } else if (trendText == "declining") {
+      insightTitle = "Endurance Performance Declining";
+    } else {
+      insightTitle = "Endurance Performance Stable";
+    }
+    
+    insightSubtitle = "PSPO trend: ${percentChange.toStringAsFixed(1)}%";
+  }
+  
+  // Build and return the chart
+  return _buildGraphContainer(
+    title: "Peak Sustained Power Analysis",
+    subtitle: "Endurance Performance",
+    height: 650,
+    child: Column(
+      children: [
+        Expanded(
+          child: SfCartesianChart(
+            margin: EdgeInsets.all(10),
+            plotAreaBorderWidth: 0,
+            primaryXAxis: DateTimeAxis(
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            primaryYAxis: NumericAxis(
+              title: AxisTitle(
+                text: 'PSPO (W)',
+                textStyle: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue[700],
+                ),
+              ),
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelStyle: TextStyle(
+                color: Colors.blue[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            axes: <ChartAxis>[
+              NumericAxis(
+                name: 'HeartRate',
+                opposedPosition: true,
+                majorGridLines: MajorGridLines(width: 0),
+                labelFormat: '{value} bpm',
+                labelStyle: TextStyle(
+                  color: Colors.red[700],
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            series: <ChartSeries>[
+              // PSPO series
+              SplineSeries<ChartData, DateTime>(
+                name: 'PSPO (W)',
+                dataSource: chartData,
+                xValueMapper: (ChartData data, _) => data.date,
+                yValueMapper: (ChartData data, _) => data.pspo,
+                color: Colors.blue[600],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  height: 8,
+                  width: 8,
+                  color: Colors.blue[600],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                ),
+              ),
+              
+              // Heartrate series
+              SplineSeries<ChartData, DateTime>(
+                name: 'Heart Rate (bpm)',
+                dataSource: chartData,
+                xValueMapper: (ChartData data, _) => data.date,
+                yValueMapper: (ChartData data, _) => data.heartRate,
+                yAxisName: 'HeartRate',
+                color: Colors.red[500],
+                width: 2,
+                dashArray: <double>[3, 3],
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.diamond,
+                  height: 6,
+                  width: 6,
+                  color: Colors.red[500],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            legend: Legend(
+              isVisible: true,
+              position: LegendPosition.bottom,
+              overflowMode: LegendItemOverflowMode.wrap,
+            ),
+          ),
+        ),
+        
+        // PSPO insight card
+        Container(
+          margin: EdgeInsets.all(10),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: trendColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: trendColor.withOpacity(0.3), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    trendText == 'improving' ? Icons.trending_up : 
+                    trendText == 'declining' ? Icons.trending_down : 
+                    Icons.trending_flat,
+                    color: trendColor,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          insightTitle,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: trendColor,
+                          ),
+                        ),
+                        Text(
+                          insightSubtitle,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              
+              // PSPO metrics
+              if (chartData.isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildPSPOMetricItem(
+                      'Latest PSPO',
+                      '${chartData.last.pspo.toStringAsFixed(0)} W',
+                      Icons.flash_on_rounded,
+                      Colors.orange[700]!,
+                    ),
+                    _buildPSPOMetricItem(
+                      'W/kg Ratio',
+                      chartData.last.pspoPerKg.toStringAsFixed(2),
+                      Icons.fitness_center_rounded,
+                      Colors.purple[700]!,
+                    ),
+                  ],
+                ),
+              
+              // Recommendations section
+              SizedBox(height: 12),
+              Text(
+                "RECOMMENDATIONS",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                  letterSpacing: 1,
+                ),
+              ),
+              SizedBox(height: 8),
+              
+              // Show first recommendation
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lightbulb_outline, size: 16, color: trendColor),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      recommendations.first,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Show additional recommendations count if available
+              if (recommendations.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "✦ ${recommendations.length - 1} more recommendation${recommendations.length > 2 ? 's' : ''}",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: trendColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+//prinze PSPO
+// Helper widget for PSPO metrics
+Widget _buildPSPOMetricItem(String label, String value, IconData icon, Color color) {
+  return Column(
+    children: [
+      Container(
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 16),
+      ),
+      SizedBox(height: 5),
+      Text(
+        value,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+      Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          color: Colors.grey[600],
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildHeartRateSpeedGraph() {
     return FutureBuilder<List<HeartRateSpeedData>>(
@@ -4112,120 +4628,118 @@ class _RecommendationPageState extends State<RecommendationPage> {
     );
   }
 
-  Future<void> _fetchUserData() async {
-    if (userId == null) return;
+//prinze updated start ///////////////////////////////////////////////////
+Future<void> _fetchUserData() async {
+  if (userId == null) return;
 
-    setState(() {
-      _isLoadingGraphs = true;
-    });
+  setState(() {
+    _isLoadingGraphs = true;
+  });
 
+  try {
+    QuerySnapshot goalsQuery = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+
+    DateTime? currentGoalTimestamp;
+
+    if (goalsQuery.docs.isNotEmpty) {
+      DocumentSnapshot goalsDoc = goalsQuery.docs.first;
+      if (goalsDoc['timestamp'] != null) {
+        currentGoalTimestamp = goalsDoc['timestamp'].toDate();
+      }
+      print("Current goal timestamp: $currentGoalTimestamp");
+
+      setState(() {
+        goalType = goalsDoc['goalType'] ?? "-";
+        if (goalType == 'Leisure') {
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
+        } else if (goalType == 'High Intensity Cycling') {
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
+          targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
+          baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
+          baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
+        } else if (goalType == 'Endurance') {
+          targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
+          targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
+        }
+      });
+    }
+    
     try {
-      QuerySnapshot goalsQuery = await FirebaseFirestore.instance
-          .collection('goals')
-          .where('uid', isEqualTo: userId)
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
+      FirebaseAuth auth = FirebaseAuth.instance;
+      User? user = auth.currentUser;
 
-      DateTime? currentGoalTimestamp;
+      if (user != null) {
+        QuerySnapshot athleteSnapshot = await FirebaseFirestore.instance
+            .collection('athletes')
+            .where("app_id", isEqualTo: user.uid)
+            .limit(1)
+            .get();
 
-      if (goalsQuery.docs.isNotEmpty) {
-        DocumentSnapshot goalsDoc = goalsQuery.docs.first;
-        if (goalsDoc['timestamp'] != null) {
-          currentGoalTimestamp = goalsDoc['timestamp'].toDate();
-        }
-        print("Current goal timestamp: $currentGoalTimestamp");
+        if (athleteSnapshot.docs.isNotEmpty) {
+          String stravaUserIdString = athleteSnapshot.docs.first.id;
 
-        setState(() {
-          goalType = goalsDoc['goalType'] ?? "-";
-          if (goalType == 'Leisure') {
-            daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
-            sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
-          } else if (goalType == 'High Intensity Cycling') {
-            daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
-            sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
-            targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
-            baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
-            baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
-          } else if (goalType == 'Endurance') {
-            targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
-            targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
-          }
-        });
-      }
-      try {
-        FirebaseAuth auth = FirebaseAuth.instance;
-        User? user = auth.currentUser;
-
-        if (user != null) {
-          QuerySnapshot athleteSnapshot = await FirebaseFirestore.instance
-              .collection('athletes')
-              .where("app_id", isEqualTo: user.uid)
-              .limit(1)
-              .get();
-
-          if (athleteSnapshot.docs.isNotEmpty) {
-            String stravaUserIdString = athleteSnapshot.docs.first.id;
-
-            setState(() {
-              _stravaUserId = stravaUserIdString;
-            });
-          }
-        }
-      } catch (e) {
-        print("Error fetching Strava User ID: $e");
-      }
-
-      QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('uid', isEqualTo: userId)
-          .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
-          .orderBy('start_date', descending: true)
-          .limit(30)
-          .get();
-
-      if (activitiesQuery.docs.isNotEmpty) {
-        List<Map<String, dynamic>> newActivityData = [];
-
-        for (var doc in activitiesQuery.docs) {
-          var data = doc.data() as Map<String, dynamic>;
-
-          newActivityData.add({
-            "documentId": doc.id,
-            "average_heartrate": data['average_heartrate'],
-            "average_speed": data['average_speed'],
-            "calories_burned": data['calories_burned'],
-            "distance": data['distance'],
-            "elapsed_time": data['elapsed_time'],
-            "name": data['name'],
-            "start_date": data['start_date'],
-            "type": data['type'],
-            "uid": data['uid'],
+          setState(() {
+            _stravaUserId = stravaUserIdString;
           });
         }
-        await _fetchActiveSubgoal();
+      }
+    } catch (e) {
+      print("Error fetching Strava User ID: $e");
+    }
 
-        setState(() {
-          activityData = newActivityData;
-          totalActivities = activityData.length;
+    QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('uid', isEqualTo: userId)
+        .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
+        .orderBy('start_date', descending: true)
+        .limit(30)
+        .get();
 
-          weeklyActivityCount = 0;
-          weeklyDistanceTotal = 0.0;
+    if (activitiesQuery.docs.isNotEmpty) {
+      List<Map<String, dynamic>> newActivityData = [];
 
-          print("what: $hasActiveSubgoal");
+      for (var doc in activitiesQuery.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        
+        // Add document ID to the data
+        data['documentId'] = doc.id;
+        
+        // Add to newActivityData (ONLY ONCE)
+        newActivityData.add(data);
+      }
+      
+      await _fetchActiveSubgoal();
 
-          if (hasActiveSubgoal == true) {
-            for (var activity in activityData) {
-              if (activity['start_date'] != null) {
-                print(activity);
-                DateTime activityDate = activity['start_date'].toDate();
-                if (activityDate.isAfter(subgoalStartDate)) {
-                  weeklyActivityCount++;
-                  weeklyDistanceTotal += safeParseDouble(activity['distance']);
-                }
+      setState(() {
+        activityData = newActivityData;
+        totalActivities = activityData.length;
+
+        weeklyActivityCount = 0;
+        weeklyDistanceTotal = 0.0;
+
+        print("what: $hasActiveSubgoal");
+
+        if (hasActiveSubgoal == true) {
+          for (var activity in activityData) {
+            if (activity['start_date'] != null) {
+              print(activity);
+              DateTime activityDate = activity['start_date'].toDate();
+              if (activityDate.isAfter(subgoalStartDate)) {
+                weeklyActivityCount++;
+                weeklyDistanceTotal += safeParseDouble(activity['distance']);
               }
             }
-          } else {
+          }
+        } 
+        //prinze updated end //////////////////////////////////////////////////////////////////////////
+        else {
             DateTime now = DateTime.now();
             if (now.isBefore(baselineEndDate) &&
                 now.isAfter(
@@ -5586,6 +6100,54 @@ void _generateWeightManagementRecommendations() {
     double zone2HeartRate = (zone2HeartRateLower + zone2HeartRateUpper) / 2;
 
     double latestHeartRate = safeParseDouble(averageHeartrate);
+
+    //prinze PSPO-recoms start
+    //PSPO-based recommendations
+    if (activityData.length >= 2) {
+    double weightInKg = safeParseDouble(weight);
+    
+    // Process activities to calculate PSPO
+    List<double> pspoValues = [];
+    for (var activity in activityData) {
+      double distance = safeParseDouble(activity['distance']);
+      double durationSeconds = safeParseDouble(activity['elapsed_time']);
+      
+      if (distance > 0 && durationSeconds > 0) {
+        double speedKmh = (distance / (durationSeconds / 3600));
+        double pspo = calculatePSPO(speedKmh, weightInKg, durationSeconds);
+        pspoValues.add(pspo);
+      }
+    }
+    
+    if (pspoValues.length >= 2) {
+      // Calculate recent trend
+      pspoValues.sort(); // Sort from lowest to highest
+      double avgPSPO = pspoValues.reduce((a, b) => a + b) / pspoValues.length;
+      double maxPSPO = pspoValues.last;
+      double pspoPerKg = maxPSPO / weightInKg;
+      
+      // Add PSPO-specific recommendations
+      trainingRecommendations.add(
+        "Your PSPO (Peak Sustained Power Output) of ${maxPSPO.toStringAsFixed(0)} watts (${pspoPerKg.toStringAsFixed(2)} W/kg) indicates your current endurance capacity."
+      );
+      
+      // Add appropriate recommendations based on PSPO/kg
+      if (pspoPerKg < 2.5) {
+        trainingRecommendations.add(
+          "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+        );
+      } else if (pspoPerKg < 3.5) {
+        trainingRecommendations.add(
+          "Your moderate PSPO indicates you're ready for tempo training. Add interval sessions with 3-5 minute efforts at ${zone3HeartRate.toInt()} bpm."
+        );
+      } else {
+        trainingRecommendations.add(
+          "Your strong PSPO allows for high-intensity training. Include VO2max intervals (2-3 minute efforts at ${zone4HeartRate.toInt()} bpm) for advanced gains."
+        );
+      }
+    }
+  }
+    //prinze PSPO-recoms end
 
     // Tracking progress and providing feedback
     if (latestDistance > previousDistance &&
@@ -7560,7 +8122,9 @@ void _generateWeightManagementRecommendations() {
       case 'Leisure':
         goalGraphs.add(_buildSessionsPerWeekGraph());
         break;
-      case 'Endurance':
+      //prinze updated endurance
+      case 'Endurance': //pspo prinze
+        goalGraphs.add(buildPSPOAnalysisGraph()); // Use the direct method
         goalGraphs.add(_buildDistancePerSessionGraph());
         goalGraphs.add(_buildDurationPerSessionGraph());
         break;
@@ -7713,12 +8277,13 @@ void _generateWeightManagementRecommendations() {
   }
 
   Widget _buildDistancePerSessionGraph() {
+    print("Building distance graph with ${activityData.length} activities"); //prinze debugger
     List<ActivitySessionData> chartData = [];
     int sessionCount = 1;
 
     for (var activity in activityData.reversed) {
       double distance = safeParseDouble(activity['distance']);
-
+      print("Activity $sessionCount: Distance=$distance"); //prinze debugger
       chartData.add(ActivitySessionData("S$sessionCount", distance));
       sessionCount++;
     }
