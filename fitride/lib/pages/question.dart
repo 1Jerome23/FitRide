@@ -605,7 +605,7 @@ class _QuestionPageState extends State<QuestionPage>
                       ),
                       SizedBox(height: 15),
 
-                      // Gender Dropdown
+                      // Gender Selection
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -618,84 +618,85 @@ class _QuestionPageState extends State<QuestionPage>
                             ),
                           ],
                         ),
-                        padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              "Gender",
-                              style: TextStyle(
-                                fontFamily: "Inter",
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: primaryBlack,
+                            Container(
+                              width: 50,
+                              height: 50,
+                              padding: EdgeInsets.all(15),
+                              child: Image.asset(
+                                "assets/gender.png",
                               ),
                             ),
-                            SizedBox(height: 5),
-                            DropdownButtonFormField<String>(
-                              value: _selectedGender,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: _selectedGender != null
-                                        ? primaryOrange
-                                        : Colors.grey.shade300,
-                                    width: _selectedGender != null ? 2 : 1,
+                            Expanded(
+                              child: Theme(
+                                data: Theme.of(context).copyWith(
+                                  dividerColor: Colors.transparent,
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _selectedGender,
+                                    hint: Padding(
+                                      padding: EdgeInsets.only(left: 4),
+                                      child: Text(
+                                        "Select Gender",
+                                        style: TextStyle(
+                                          fontFamily: "Inter",
+                                          color: primaryGray,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    isExpanded: true,
+                                    alignment: AlignmentDirectional.centerStart,
+                                    icon: Icon(
+                                      Icons.arrow_drop_down_rounded,
+                                      color: _selectedGender != null ? primaryOrange : primaryGray,
+                                      size: 24,
+                                    ),
+                                    dropdownColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(15),
+                                    items: ['Male', 'Female'].map((String gender) {
+                                      return DropdownMenuItem<String>(
+                                        value: gender,
+                                        child: Padding(
+                                          padding: EdgeInsets.only(left: 4),
+                                          child: Text(
+                                            gender,
+                                            style: TextStyle(
+                                              fontFamily: "Inter",
+                                              color: primaryBlack,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setState(() {
+                                        _selectedGender = newValue;
+                                      });
+                                    },
+                                    selectedItemBuilder: (BuildContext context) {
+                                      return ['Male', 'Female'].map<Widget>((String gender) {
+                                        return Padding(
+                                          padding: EdgeInsets.only(left: 4),
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              gender,
+                                              style: TextStyle(
+                                                fontFamily: "Inter",
+                                                color: primaryBlack,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
                                   ),
                                 ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: _selectedGender != null
-                                        ? primaryOrange
-                                        : Colors.grey.shade300,
-                                    width: _selectedGender != null ? 2 : 1,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: primaryOrange,
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: _selectedGender != null,
-                                fillColor: _selectedGender != null
-                                    ? primaryOrange.withOpacity(0.1)
-                                    : Colors.transparent,
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 10),
-                              ),
-                              style: TextStyle(
-                                fontFamily: "Inter",
-                                color: primaryBlack,
-                                fontSize: 14,
-                              ),
-                              dropdownColor: Colors.white,
-                              items: ['Male', 'Female'].map((String gender) {
-                                return DropdownMenuItem<String>(
-                                  value: gender,
-                                  child: Text(gender),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _selectedGender = newValue;
-                                });
-                              },
-                              hint: Text(
-                                "Select your gender",
-                                style: TextStyle(
-                                  fontFamily: "Inter",
-                                  color: primaryGray,
-                                ),
-                              ),
-                              icon: Icon(
-                                Icons.arrow_drop_down,
-                                color: _selectedGender != null
-                                    ? primaryOrange
-                                    : primaryGray,
                               ),
                             ),
                           ],
