@@ -708,6 +708,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<String> healthRecommendations = [];
   List<String> equipmentRecommendations = [];
   List<String> progressRecommendations = [];
+  List<String> pspoRecommendations = []; //prinze new pspo recomm
+
+
 
   @override
   void initState() {
@@ -772,16 +775,28 @@ class _RecommendationPageState extends State<RecommendationPage> {
   //prinze PSPO
   // Calculate PSPO using the simplified model with better error handling
   double calculatePSPO(double speedKmh, double weightKg, double durationSeconds) {
+<<<<<<< Updated upstream
   print("PSPO INPUT VALUES - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
   
   // Validate inputs
   if (speedKmh <= 0) {
     print("⚠️ Invalid speed: $speedKmh km/h");
+=======
+  debugPrint("PSPO INPUT VALUES - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
+  
+  // Validate inputs
+  if (speedKmh <= 0) {
+    debugPrint("⚠️ Invalid speed: $speedKmh km/h");
+>>>>>>> Stashed changes
     return 0;
   }
   
   if (weightKg <= 0) {
+<<<<<<< Updated upstream
     print("⚠️ Invalid weight: $weightKg kg");
+=======
+    debugPrint("⚠️ Invalid weight: $weightKg kg");
+>>>>>>> Stashed changes
     return 0;
   }
   
@@ -801,17 +816,29 @@ class _RecommendationPageState extends State<RecommendationPage> {
     power = weightKg * 2.5 * speedKmh / 10;
   }
   
+<<<<<<< Updated upstream
   print("Calculated power based on speed and weight: $power W");
+=======
+  debugPrint("Calculated power based on speed and weight: $power W"); //only shows in console
+>>>>>>> Stashed changes
   
   // For endurance calculation, adjust for short durations
   if (durationSeconds < 300) { // Less than 5 minutes
     double durationFactor = durationSeconds / 300;
     double adjustedPower = power * durationFactor;
+<<<<<<< Updated upstream
     print("Short duration adjustment: $power * $durationFactor = $adjustedPower W");
     return adjustedPower;
   }
   
   print("Final PSPO: $power W");
+=======
+    debugPrint("Short duration adjustment: $power * $durationFactor = $adjustedPower W");
+    return adjustedPower;
+  }
+  
+  debugPrint("Final PSPO: $power W");
+>>>>>>> Stashed changes
   return power;
 }
 //prinze PSPO
@@ -820,9 +847,72 @@ String capitalize(String s) {
   if (s.isEmpty) return s;
   return s[0].toUpperCase() + s.substring(1);
 }
+<<<<<<< Updated upstream
 //prinze PSPO
 // Method to save calculated PSPO to Firebase
 Future<void> savePSPOToFirebase(String activityId, double pspo, double pspoPerKg) async {
+=======
+
+Future<void> createNewActivity(Map<String, dynamic> activityData) async { //prinze save new activity
+  try {
+    // Create the document in Firebase
+    DocumentReference docRef = await FirebaseFirestore.instance
+        .collection('activities')
+        .add(activityData);
+    
+    // Get the generated document ID
+    String documentId = docRef.id;
+    
+    // Add documentId to the data
+    activityData['documentId'] = documentId;
+    
+    // Update the document with its ID
+    await docRef.update({'documentId': documentId});
+    
+    // Calculate and save PSPO
+    await calculateAndSavePSPO(documentId, activityData);
+    
+    print("Activity created successfully with ID: $documentId");
+  } catch (e) {
+    print("Error creating activity: $e");
+  }
+}
+
+//prinze PSPO
+// Method to save calculated PSPO to Firebase
+Future<void> calculateAndSavePSPO(String activityId, Map<String, dynamic> activityData) async {
+  if (activityId.isEmpty) {
+    print("Cannot save PSPO: Missing activity ID");
+    return;
+  }
+  
+  double distance = safeParseDouble(activityData['distance']);
+  double durationSeconds = safeParseDouble(activityData['elapsed_time']);
+  double avgSpeed = safeParseDouble(activityData['average_speed']);
+  
+  // Skip activities with invalid data
+  if (distance <= 0 || durationSeconds <= 0) {
+    print("Skipping PSPO calculation due to invalid distance or duration");
+    return;
+  }
+  
+  // Get user weight with fallback
+  double userWeight = safeParseDouble(weight);
+  if (userWeight <= 0) {
+    // Fallback to 70kg if no weight provided
+    userWeight = 70.0;
+    print("No valid weight found, using default: $userWeight kg");
+  }
+  
+  // Calculate speed in km/h if not provided
+  double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+  
+  // Calculate PSPO
+  double pspo = calculatePSPO(speedKmh, userWeight, durationSeconds);
+  double pspoPerKg = userWeight > 0 ? pspo / userWeight : 0;
+  
+  // Save to Firebase
+>>>>>>> Stashed changes
   try {
     await FirebaseFirestore.instance
         .collection('activities')
@@ -832,7 +922,11 @@ Future<void> savePSPOToFirebase(String activityId, double pspo, double pspoPerKg
       'pspo_per_kg': pspoPerKg,
       'pspo_calculated_at': DateTime.now(),
     });
+<<<<<<< Updated upstream
     print("Saved PSPO data to Firebase for activity $activityId");
+=======
+    print("Saved PSPO data to Firebase for activity $activityId: $pspo W, $pspoPerKg W/kg");
+>>>>>>> Stashed changes
   } catch (e) {
     print("Error saving PSPO data to Firebase: $e");
   }
@@ -871,6 +965,7 @@ Widget buildPSPOAnalysisGraph() {
   
   print("Sorted activities count: ${processableActivities.length}");
   
+<<<<<<< Updated upstream
   // Direct access to each activity for debugging
   for (int i = 0; i < math.min(processableActivities.length, 5); i++) {
     var activity = processableActivities[i];
@@ -935,6 +1030,58 @@ Widget buildPSPOAnalysisGraph() {
   // Save to Firebase if we have an activity ID
   if (activityId.isNotEmpty) {
     savePSPOToFirebase(activityId, pspo, pspoPerKg);
+=======
+  // Calculate PSPO for each activity
+  for (var activity in processableActivities) {
+    // Skip activities without start date
+    if (activity['start_date'] == null) {
+      print("Skipping activity - missing start_date");
+      continue;
+    }
+    
+    DateTime activityDate = activity['start_date'].toDate();
+    String activityId = activity['documentId'] ?? "";
+    
+    // First check if PSPO already exists in the activity data
+    if (activity.containsKey('pspo') && activity['pspo'] != null && activity['pspo'] > 0) {
+      double storedPSPO = safeParseDouble(activity['pspo']);
+      double storedPSPOPerKg = safeParseDouble(activity['pspo_per_kg']);
+      
+      chartData.add(ChartData(
+        activityDate, 
+        storedPSPO, 
+        storedPSPOPerKg, 
+        safeParseDouble(activity['average_heartrate'])
+      ));
+      continue;
+    }
+    
+    // Calculate PSPO if not already stored
+    double distance = safeParseDouble(activity['distance']);
+    double durationSeconds = safeParseDouble(activity['elapsed_time']);
+    double avgHeartRate = safeParseDouble(activity['average_heartrate']);
+    double avgSpeed = safeParseDouble(activity['average_speed']);
+    
+    // Skip activities with invalid data
+    if (distance <= 0 || durationSeconds <= 0) {
+      print("Skipping activity due to invalid distance or duration");
+      continue;
+    }
+    
+    // Calculate speed in km/h if not provided
+    double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+    
+    // Calculate PSPO
+    double pspo = calculatePSPO(speedKmh, userWeight, durationSeconds);
+    double pspoPerKg = userWeight > 0 ? pspo / userWeight : 0;
+    
+    // Add to chart data
+    chartData.add(ChartData(activityDate, pspo, pspoPerKg, avgHeartRate));
+    
+    // Save to Firebase if we have an activity ID
+    if (activityId.isNotEmpty) {
+      calculateAndSavePSPO(activityId, activity);
+>>>>>>> Stashed changes
     }
   }
   
@@ -945,20 +1092,38 @@ Widget buildPSPOAnalysisGraph() {
   }
   
   print("Final chart data points: ${chartData.length}");
+<<<<<<< Updated upstream
   print("First point - Date: ${chartData.first.date}, PSPO: ${chartData.first.pspo} W");
   print("Last point - Date: ${chartData.last.date}, PSPO: ${chartData.last.pspo} W");
+=======
+  
+  pspoRecommendations.clear();
+
+  pspoRecommendations.add(
+  "The PSPO (Personalized Sustainable Power Output) is a feature that calculates your ideal power level for long rides, helping you pace yourself better. By training at your PSPO, you can gradually build endurance and ride longer without burning out."
+);
+
+// Create a separate list for graph-only recommendations
+List<String> graphRecommendations = [
+  "Research shows that PSPO strongly correlates with endurance performance (r = -0.79). Continue tracking your rides to monitor fitness progression."
+];
+>>>>>>> Stashed changes
   
   // Analyze trend if we have multiple data points
   String trendText = "collecting_data";
   double percentChange = 0.0;
+<<<<<<< Updated upstream
   List<String> recommendations = [
     "Research shows that PSPO strongly correlates with endurance performance (r = -0.79). Continue tracking your rides to monitor fitness progression."
   ];
+=======
+>>>>>>> Stashed changes
   
   if (chartData.length >= 2) {
     // Simple trend analysis
     double firstPSPO = chartData.first.pspo;
     double lastPSPO = chartData.last.pspo;
+<<<<<<< Updated upstream
     percentChange = ((lastPSPO - firstPSPO) / firstPSPO) * 100;
     
     if (percentChange > 5) {
@@ -970,10 +1135,37 @@ Widget buildPSPOAnalysisGraph() {
     } else {
       trendText = "stable";
       recommendations.add("Your power output is stable. Focus on building endurance by gradually increasing ride duration.");
+=======
+    
+    // Calculate percent change with sanity check to avoid extreme values
+    if (firstPSPO > 0) {
+      percentChange = ((lastPSPO - firstPSPO) / firstPSPO) * 100;
+      
+      // Cap percent change to reasonable values (-95% to +400%)
+      percentChange = math.max(-95, math.min(400, percentChange));
+      
+      if (percentChange > 5) {
+        trendText = "improving";
+        pspoRecommendations.add(
+          "Your power output is improving by ${percentChange.toStringAsFixed(1)}%! Keep following your current training schedule."
+        );
+      } else if (percentChange < -5) {
+        trendText = "declining";
+        pspoRecommendations.add(
+          "Your power output has decreased by ${(-percentChange).toStringAsFixed(1)}%. Consider shorter, more frequent rides to rebuild endurance."
+        );
+      } else {
+        trendText = "stable";
+        pspoRecommendations.add(
+          "Your power output is stable. Focus on building endurance by gradually increasing ride duration."
+        );
+      }
+>>>>>>> Stashed changes
     }
     
     // Add recommendations based on latest data
     double latestPSPOPerKg = chartData.last.pspoPerKg;
+<<<<<<< Updated upstream
     String pspoLevel = "moderate";
     
     if (latestPSPOPerKg < 2.5) {
@@ -985,6 +1177,45 @@ Widget buildPSPOAnalysisGraph() {
     } else {
       recommendations.add("Your moderate power output indicates you're ready for mixed training. Combine endurance rides with tempo sessions.");
     }
+=======
+    
+    if (latestPSPOPerKg < 2.5) {
+      pspoRecommendations.add(
+        "Focus on base endurance training with Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+      );
+    } else if (latestPSPOPerKg > 3.5) {
+      pspoRecommendations.add(
+        "Your strong power-to-weight ratio allows for advanced training. Include periodic high-intensity intervals for further gains."
+      );
+    } else {
+      pspoRecommendations.add(
+        "Your moderate power output indicates you're ready for mixed training. Combine endurance rides with tempo sessions."
+      );
+    }
+  } else {
+    // Single activity recommendations
+    double pspoPerKg = chartData.first.pspoPerKg;
+    
+    if (pspoPerKg < 2.5) {
+      pspoRecommendations.add(
+        "Your current PSPO indicates you're in the early stages of development. Focus on building base endurance with consistent Zone 2 training."
+      );
+    } else if (pspoPerKg > 3.5) {
+      pspoRecommendations.add(
+        "Excellent power-to-weight ratio! You have strong endurance capacity. Incorporate high-intensity intervals to further increase your PSPO."
+      );
+    } else {
+      pspoRecommendations.add(
+        "Your power output shows good overall fitness. Mix longer endurance rides with occasional threshold work to improve further."
+      );
+    }
+  }
+  
+  // Debug output to verify recommendations were added
+  print("PSPO Recommendations added: ${pspoRecommendations.length}");
+  for (var rec in pspoRecommendations) {
+    print("PSPO Rec: $rec");
+>>>>>>> Stashed changes
   }
   
   // Prepare insight content
@@ -1008,7 +1239,11 @@ Widget buildPSPOAnalysisGraph() {
     
     insightSubtitle = "PSPO trend: ${percentChange.toStringAsFixed(1)}%";
   }
+<<<<<<< Updated upstream
   
+=======
+
+>>>>>>> Stashed changes
   // Build and return the chart
   return _buildGraphContainer(
     title: "Peak Sustained Power Analysis",
@@ -1206,6 +1441,7 @@ Widget buildPSPOAnalysisGraph() {
               SizedBox(height: 8),
               
               // Show first recommendation
+<<<<<<< Updated upstream
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1226,13 +1462,40 @@ Widget buildPSPOAnalysisGraph() {
               
               // Show additional recommendations count if available
               if (recommendations.length > 1)
+=======
+              if (pspoRecommendations.isNotEmpty)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lightbulb_outline, size: 16, color: trendColor),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        graphRecommendations.first,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              
+              // Show additional recommendations count if available
+              if (graphRecommendations.length > 1) // Use graphRecommendations length
+>>>>>>> Stashed changes
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
+<<<<<<< Updated upstream
                         "✦ ${recommendations.length - 1} more recommendation${recommendations.length > 2 ? 's' : ''}",
+=======
+                        "✦ ${graphRecommendations.length - 1} more recommendation${graphRecommendations.length > 2 ? 's' : ''}",
+>>>>>>> Stashed changes
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
@@ -1250,6 +1513,10 @@ Widget buildPSPOAnalysisGraph() {
     ),
   );
 }
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 //prinze PSPO
 // Helper widget for PSPO metrics
 Widget _buildPSPOMetricItem(String label, String value, IconData icon, Color color) {
@@ -5487,6 +5754,7 @@ Future<void> _fetchUserData() async {
     healthRecommendations = [];
     equipmentRecommendations = [];
     progressRecommendations = [];
+    pspoRecommendations = []; //prinze pspo
 
     // Generate recommendations based on goal type
     switch (goalType) {
@@ -6155,6 +6423,7 @@ void _generateWeightManagementRecommendations() {
       
       print("PSPO stats - Avg: $avgPSPO W, Max: $maxPSPO W, PSPO/kg: $pspoPerKg W/kg");
       
+<<<<<<< Updated upstream
       // PSPO-specific recommendations
       trainingRecommendations.add(
         "Your PSPO (Peak Sustained Power Output) of ${maxPSPO.toStringAsFixed(0)} watts (${pspoPerKg.toStringAsFixed(2)} W/kg) indicates your current endurance capacity."
@@ -6171,6 +6440,19 @@ void _generateWeightManagementRecommendations() {
         );
       } else {
         trainingRecommendations.add(
+=======
+      // Recommendations based on PSPO/kg
+      if (pspoPerKg < 2.5) {
+        pspoRecommendations.add(
+          "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+        );
+      } else if (pspoPerKg < 3.5) {
+        pspoRecommendations.add(
+          "Your moderate PSPO indicates you're ready for tempo training. Add interval sessions with 3-5 minute efforts at ${zone3HeartRate.toInt()} bpm."
+        );
+      } else {
+        pspoRecommendations.add(
+>>>>>>> Stashed changes
           "Your strong PSPO allows for high-intensity training. Include VO2max intervals (2-3 minute efforts at ${zone4HeartRate.toInt()} bpm) for advanced gains."
         );
       }
@@ -7087,6 +7369,16 @@ void _generateWeightManagementRecommendations() {
     List<Map<String, dynamic>> recommendationCategories = [];
     int currentPage = 0;
 
+    if (pspoRecommendations.isNotEmpty && goalType == "Endurance") { //prinze pspo carousel
+  recommendationCategories.add({
+    "title": "PSPO Insights",
+    "icon": Icons.flash_on_rounded,
+    "color": Color(0xFFFF9800), // Orange color
+    "gradientColors": [Color(0xFFFF9800), Color(0xFFE65100)], // Orange gradient
+    "recommendations": pspoRecommendations,
+    });
+  }
+    
     if (trainingRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Training Tips",
@@ -8063,64 +8355,34 @@ void _generateWeightManagementRecommendations() {
   }
 
   Widget _buildGoalBasedGraphs() {
-    if (_isLoadingGraphs) {
-      return _buildLoadingGraph();
-    }
-    if (goalType == '-' || _stravaUserId == null) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _stravaUserId == null ? Icons.link_off : Icons.help_outline,
-                color: Colors.red[400],
-                size: 36,
-              ),
-              SizedBox(height: 18),
-              Text(
-                _stravaUserId == null
-                    ? "No Strava account connected"
-                    : "Goal information not available",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 15,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ],
+  if (_isLoadingGraphs) {
+    return _buildLoadingGraph();
+  }
+  if (goalType == '-' || _stravaUserId == null) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
-        ),
-      );
-    }
-    List<Widget> goalGraphs = [];
-
-    if (activityData.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _stravaUserId == null ? Icons.link_off : Icons.help_outline,
+              color: Colors.red[400],
+              size: 36,
             ),
+<<<<<<< Updated upstream
           ],
         ),
         child: Center(
@@ -8169,141 +8431,155 @@ void _generateWeightManagementRecommendations() {
           Center(
             child: Text(
               "No specific graphs for this goal type",
+=======
+            SizedBox(height: 18),
+            Text(
+              _stravaUserId == null
+                  ? "No Strava account connected"
+                  : "Goal information not available",
+>>>>>>> Stashed changes
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 15,
                 fontFamily: "Inter",
               ),
             ),
-          ),
-        );
-    }
-    if (baselineComparison.isNotEmpty) {
-      goalGraphs.add(_buildBaselineComparisonGraph());
-    }
-
-    if (goalGraphs.length == 1) {
-      return Container(
-        height: 650,
-        child: goalGraphs.first,
-      );
-    }
-
-    return Column(
-      children: [
-        Container(
-          height: 450,
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
-            },
-            children: goalGraphs,
-          ),
+          ],
         ),
-        SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            goalGraphs.length,
-            (index) => Container(
-              margin: EdgeInsets.symmetric(horizontal: 4),
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _currentPage == index
-                    ? Color(0xffFFA500)
-                    : Colors.grey[300],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSessionsPerWeekGraph() {
-    Map<String, int> sessionsPerDay = {
-      'Mon': 0,
-      'Tue': 0,
-      'Wed': 0,
-      'Thu': 0,
-      'Fri': 0,
-      'Sat': 0,
-      'Sun': 0,
-    };
-
-    for (var activity in activityData) {
-      if (activity['start_date'] != null) {
-        Timestamp timestamp = activity['start_date'];
-        DateTime date = timestamp.toDate();
-
-        String dayOfWeek = DateFormat('E').format(date);
-        sessionsPerDay[dayOfWeek] = (sessionsPerDay[dayOfWeek] ?? 0) + 1;
-      }
-    }
-
-    List<SessionData> chartData = sessionsPerDay.entries
-        .map((entry) => SessionData(entry.key, entry.value))
-        .toList();
-
-    return _buildGraphContainer(
-      title: "Weekly Sessions",
-      subtitle: "Leisure activities",
-      child: SfCartesianChart(
-        primaryXAxis: CategoryAxis(
-          majorGridLines: MajorGridLines(width: 0),
-          axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-          labelStyle: TextStyle(
-            color: Colors.grey[700],
-            fontFamily: 'Inter',
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        primaryYAxis: NumericAxis(
-          majorGridLines: MajorGridLines(
-            width: 0.5,
-            color: Colors.grey[200],
-            dashArray: <double>[3, 3],
-          ),
-          axisLine: AxisLine(width: 0),
-          labelFormat: '{value}',
-          labelStyle: TextStyle(
-            color: Colors.grey[700],
-            fontFamily: 'Inter',
-            fontSize: 10,
-          ),
-        ),
-        tooltipBehavior: TooltipBehavior(
-          enable: true,
-          color: Colors.grey[800],
-          textStyle: TextStyle(color: Colors.white, fontSize: 12),
-        ),
-        series: <ChartSeries>[
-          ColumnSeries<SessionData, String>(
-            dataSource: chartData,
-            xValueMapper: (SessionData data, _) => data.day,
-            yValueMapper: (SessionData data, _) => data.count,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-            color: Color(0xffFFA500),
-            dataLabelSettings: DataLabelSettings(
-              isVisible: true,
-              textStyle: TextStyle(
-                color: Colors.black87,
-                fontFamily: 'Inter',
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
+  List<Widget> goalGraphs = [];
+
+  if (activityData.isEmpty) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.insert_chart_outlined_rounded,
+              color: Colors.grey[400],
+              size: 36,
+            ),
+            SizedBox(height: 12),
+            Text(
+              "No activity data available for your goals",
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 15,
+                fontFamily: "Inter",
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  switch (goalType) {
+    case 'Leisure':
+     //goalGraphs.add(_buildSessionsPerWeekGraph()); //prinze unknown commented
+      break;
+    case 'Endurance':
+      // For endurance goals, display PSPO graph first as a separate container
+      goalGraphs.add(buildPSPOAnalysisGraph()); 
+      
+      // Add other endurance-related graphs
+      goalGraphs.add(_buildDistancePerSessionGraph());
+      goalGraphs.add(_buildDurationPerSessionGraph());
+      break;
+    case 'High Intensity Cycling':
+      goalGraphs.add(_buildCalorieWeightCorrelationGraph());
+      goalGraphs.add(_buildPaceCaloriesCorrelationGraph());
+      goalGraphs.add(_buildTemperatureCyclingCorrelationGraph());
+      goalGraphs.add(_buildNutritionActivityGraph());
+      goalGraphs.add(_buildHeartRateSpeedGraph());
+      break;
+    default:
+      goalGraphs.add(
+        Center(
+          child: Text(
+            "No specific graphs for this goal type",
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 15,
+              fontFamily: "Inter",
+            ),
+          ),
+        ),
+      );
+  }
+  if (baselineComparison.isNotEmpty) {
+    goalGraphs.add(_buildBaselineComparisonGraph());
+  }
+
+  // Modified to ensure graphs display properly
+  if (goalGraphs.length == 1) {
+    return Container(
+      height: 650,
+      child: goalGraphs.first,
+    );
+  }
+
+  return Column(
+    children: [
+      // If it's endurance goal, show the PSPO graph with fixed height in its own container
+      if (goalType == 'Endurance') Container(
+        height: 500, // Increase the height for better visibility
+        margin: EdgeInsets.only(bottom: 20),
+        child: goalGraphs[0], // PSPO graph
+      ),
+      
+      // Show remaining graphs in a PageView
+      Container(
+        height: 450,
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              // If endurance, offset the index to account for the separately shown PSPO graph
+              _currentPage = goalType == 'Endurance' ? index + 1 : index;
+            });
+          },
+          // If endurance, skip the first graph (PSPO) which is shown separately
+          children: goalType == 'Endurance' ? goalGraphs.sublist(1) : goalGraphs,
+        ),
+      ),
+      SizedBox(height: 10),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          goalType == 'Endurance' ? goalGraphs.length - 1 : goalGraphs.length,
+          (index) => Container(
+            margin: EdgeInsets.symmetric(horizontal: 4),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _currentPage == (goalType == 'Endurance' ? index + 1 : index)
+                  ? Color(0xffFFA500)
+                  : Colors.grey[300],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildDistancePerSessionGraph() {
     print("Building distance graph with ${activityData.length} activities"); //prinze debugger
@@ -8688,245 +8964,245 @@ void _generateWeightManagementRecommendations() {
     );
   }
 
-  Widget _buildWeeklySummary() {
-    var media = MediaQuery.of(context).size;
+  Widget _buildWeeklySummary() { //prinze updated to show calorie balance on non-endurance only
+  var media = MediaQuery.of(context).size;
 
-    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
-    double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+  double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+  double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
 
-    // Make sure flex values are at least 1 to avoid divide by zero errors
-    int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
-    int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
+  // Make sure flex values are at least 1 to avoid divide by zero errors
+  int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
+  int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
 
-    // Scale down if values are too large to prevent UI overflow
-    if (burnedFlex > 10000 || consumedFlex > 10000) {
-      int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
-      burnedFlex = burnedFlex ~/ divisor;
-      consumedFlex = consumedFlex ~/ divisor;
-    }
+  // Scale down if values are too large to prevent UI overflow
+  if (burnedFlex > 10000 || consumedFlex > 10000) {
+    int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
+    burnedFlex = burnedFlex ~/ divisor;
+    consumedFlex = consumedFlex ~/ divisor;
+  }
 
-    // Calculate a fixed card height that will be safe for all cards
-    double cardHeight = math.min(media.width * 0.45, 180);
+  // Calculate a fixed card height that will be safe for all cards
+  double cardHeight = math.min(media.width * 0.45, 180);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 5, bottom: 15),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Row(
-                  children: [
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        "Weekly Summary",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  "This Week",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Row(
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 5, bottom: 15),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
+            Flexible(
+              child: Row(
+                children: [
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      "Weekly Summary",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Cycling\nSessions",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFFA500).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.directions_bike_rounded,
-                              color: Color(0xffFFA500),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Value display
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) {
-                                  return LinearGradient(
-                                          colors: [
-                                        Color(0xffFFA500),
-                                        Color(0xffFF8C00)
-                                      ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight)
-                                      .createShader(Rect.fromLTRB(
-                                          0, 0, bounds.width, bounds.height));
-                                },
-                                child: Text(
-                                  "$weeklyActivityCount",
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                "of ${daysPerWeek} goal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Progress bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: weeklyActivityCount /
-                              math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
-                          minHeight: 8,
-                          backgroundColor: Colors.grey[200],
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                ],
               ),
             ),
-            Expanded(
-              child: _buildWeeklyCaloriesBurnedCard(cardHeight),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                "This Week",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
+      ),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Cycling\nSessions",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFFA500).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_bike_rounded,
+                            color: Color(0xffFFA500),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
 
-        SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
+                    // Value display
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (bounds) {
+                                return LinearGradient(
+                                        colors: [
+                                      Color(0xffFFA500),
+                                      Color(0xffFF8C00)
+                                    ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight)
+                                    .createShader(Rect.fromLTRB(
+                                        0, 0, bounds.width, bounds.height));
+                              },
+                              child: Text(
+                                "$weeklyActivityCount",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              "of ${daysPerWeek} goal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: weeklyActivityCount /
+                            math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[200],
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                      ),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Heart Rate",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _buildWeeklyCaloriesBurnedCard(cardHeight),
+          ),
+        ],
+      ),
+
+      SizedBox(height: 15),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Heart Rate",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF5900).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.favorite_rounded,
-                              color: Color(0xffFF5900),
-                              size: 18,
-                            ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF5900).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            color: Color(0xffFF5900),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ), //end of prinze update
 
                       // Value display
                       Expanded(
@@ -9162,6 +9438,7 @@ void _generateWeightManagementRecommendations() {
         SizedBox(height: 15),
 
         // Bottom Card - Caloric Balance
+        if (goalType != 'Endurance') 
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
@@ -9178,9 +9455,217 @@ void _generateWeightManagementRecommendations() {
           ),
           child: _buildCaloricBalanceSection(),
         ),
-      ],
-    );
+      
+      // For Endurance goals, show endurance-specific section instead
+      if (goalType == 'Endurance')
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: _buildEnduranceTrendSection(),
+        ),
+    ],
+  );
+}
+
+  Widget _buildEnduranceTrendSection() {
+  // Create a summary of endurance progress
+  double avgDistance = 0;
+  double avgDuration = 0;
+  double avgSpeed = 0;
+  int activityCount = 0;
+  
+  // Calculate average metrics from recent activities
+  for (var activity in activityData) {
+    double distance = safeParseDouble(activity['distance']);
+    double durationSeconds = safeParseDouble(activity['elapsed_time']);
+    double durationMinutes = durationSeconds / 60.0;
+    double speed = safeParseDouble(activity['average_speed']);
+    
+    if (distance > 0 && durationMinutes > 0) {
+      avgDistance += distance;
+      avgDuration += durationMinutes;
+      if (speed > 0) {
+        avgSpeed += speed;
+      } else if (durationMinutes > 0) {
+        // Calculate speed if not provided
+        avgSpeed += (distance / (durationMinutes / 60));
+      }
+      activityCount++;
+    }
   }
+  
+  // Calculate averages
+  if (activityCount > 0) {
+    avgDistance /= activityCount;
+    avgDuration /= activityCount;
+    avgSpeed /= activityCount;
+  }
+  
+  // Format metrics
+  String formattedDistance = avgDistance.toStringAsFixed(1);
+  String formattedDuration = avgDuration.toStringAsFixed(0);
+  String formattedSpeed = avgSpeed.toStringAsFixed(1);
+  
+  // Progress toward endurance target
+  double targetDistanceValue = safeParseDouble(targetDistance);
+  double progressPercent = targetDistanceValue > 0 ? (avgDistance / targetDistanceValue) * 100 : 0;
+  
+  return Padding(
+    padding: const EdgeInsets.all(15),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                "Endurance Progress",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xffFFA500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.timer_outlined,
+                color: Color(0xffFFA500),
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 15),
+        
+        // Endurance metrics cards
+        Row(
+          children: [
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Distance", 
+                "$formattedDistance km", 
+                Icons.straighten_rounded, 
+                Colors.blue[700]!
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Duration", 
+                "$formattedDuration min", 
+                Icons.timer_outlined, 
+                Colors.green[700]!
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Speed", 
+                "$formattedSpeed km/h", 
+                Icons.speed_rounded, 
+                Colors.orange[700]!
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 15),
+        
+        // Target progress
+        if (targetDistanceValue > 0) Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Progress toward target distance (${targetDistanceValue}km)",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progressPercent / 100,
+                minHeight: 10,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  progressPercent >= 100 ? Colors.green[700]! : Color(0xffFFA500)
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "${progressPercent.toStringAsFixed(0)}% of target",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: progressPercent >= 100 ? Colors.green[700] : Color(0xffFFA500),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper widget for endurance metrics
+Widget _buildEnduranceMetricCard(String label, String value, IconData icon, Color color) {
+  return Container(
+    padding: EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.2)),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        SizedBox(height: 5),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 10,
+            color: Colors.grey[700],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCaloricBalanceSection() {
     double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
