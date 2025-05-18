@@ -3969,6 +3969,7 @@ Future<void> _deactivateCurrentSubgoal() async {
         wasCompleted = progress >= 1.0;
       }
 
+      // Update the subgoal status in Firestore
       await FirebaseFirestore.instance
           .collection('cycling_subgoals')
           .doc(doc.id)
@@ -3976,20 +3977,26 @@ Future<void> _deactivateCurrentSubgoal() async {
         'completedSuccessfully': wasCompleted, // Use the actual completion status
       });
 
-      print("Deactivated subgoal: ${doc.id} (Completed successfully: $wasCompleted)");
+      print("Updated subgoal: ${doc.id} (Completed successfully: $wasCompleted)");
     }
 
     final prefs = await SharedPreferences.getInstance();
+    
     // Only set show_subgoal_selection to true if the week has ended
     if (DateTime.now().isAfter(subgoalEndDate) ||
         DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
       await prefs.setBool('show_subgoal_selection', true);
       print("Set show_subgoal_selection flag to true");
+      
+      // Only set hasActiveSubgoal to false if the week has ended
+      setState(() {
+        hasActiveSubgoal = false;
+      });
+      print("Week has ended, set hasActiveSubgoal to false");
+    } else {
+      // Week hasn't ended yet, keep subgoal visible but mark as completed
+      print("Week still ongoing, keeping subgoal card visible despite completion");
     }
-
-    setState(() {
-      hasActiveSubgoal = false;
-    });
   } catch (e) {
     print("Error deactivating subgoal: $e");
   }

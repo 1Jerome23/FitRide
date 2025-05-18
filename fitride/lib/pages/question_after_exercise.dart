@@ -935,7 +935,7 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
           builder: (BuildContext context) {
             return AlertDialog(
               title: Text("Entry Already Exists"),
-              content: Text("You already have a food diary entry for today. Do you want to replace it?"),
+              content: Text("You already have a food diary entry for today. Do you want to replace it?", style: TextStyle(color: Colors.black),),
               actions: [
                 TextButton(
                   child: Text("Cancel", style: TextStyle(color: Colors.grey[700])),
