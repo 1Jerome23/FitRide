@@ -11,6 +11,16 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
+//prinze pspo class
+class ChartData { 
+  final DateTime date;
+  final double pspo;
+  final double pspoPerKg;
+  final double heartRate;
+
+  ChartData(this.date, this.pspo, this.pspoPerKg, this.heartRate);
+}
+
 class CalorieData {
   double weeklyCaloriesBurned = 0.0;
   double weeklyCaloriesConsumed = 0.0;
@@ -698,6 +708,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<String> healthRecommendations = [];
   List<String> equipmentRecommendations = [];
   List<String> progressRecommendations = [];
+  List<String> pspoRecommendations = []; //prinze new pspo recomm
+
+
 
   @override
   void initState() {
@@ -758,6 +771,612 @@ class _RecommendationPageState extends State<RecommendationPage> {
       return [];
     }
   }
+
+  //prinze PSPO
+  // Calculate PSPO using the simplified model with better error handling
+  double calculatePSPO(double speedKmh, double weightKg, double durationSeconds) {
+  debugPrint("PSPO INPUT VALUES - Speed: $speedKmh km/h, Weight: $weightKg kg, Duration: $durationSeconds s");
+  
+  // Validate inputs
+  if (speedKmh <= 0) {
+    debugPrint("⚠️ Invalid speed: $speedKmh km/h");
+    return 0;
+  }
+  
+  if (weightKg <= 0) {
+    debugPrint("⚠️ Invalid weight: $weightKg kg");
+    return 0;
+  }
+  
+  // Simplified power calculation that produces realistic values
+  // This is a simplified approximation that works reasonably well for flat terrain
+  double power = 0;
+  
+  // Speed-based power estimate (simplified model)
+  if (speedKmh < 15) {
+    // Low speed range
+    power = weightKg * 1.5 * speedKmh / 10;
+  } else if (speedKmh < 25) {
+    // Medium speed range
+    power = weightKg * 2.0 * speedKmh / 10;
+  } else {
+    // High speed range
+    power = weightKg * 2.5 * speedKmh / 10;
+  }
+  
+  debugPrint("Calculated power based on speed and weight: $power W"); //only shows in console
+  
+  // For endurance calculation, adjust for short durations
+  if (durationSeconds < 300) { // Less than 5 minutes
+    double durationFactor = durationSeconds / 300;
+    double adjustedPower = power * durationFactor;
+    debugPrint("Short duration adjustment: $power * $durationFactor = $adjustedPower W");
+    return adjustedPower;
+  }
+  
+  debugPrint("Final PSPO: $power W");
+  return power;
+}
+//prinze PSPO
+// Helper method to capitalize strings
+String capitalize(String s) {
+  if (s.isEmpty) return s;
+  return s[0].toUpperCase() + s.substring(1);
+}
+
+Future<void> createNewActivity(Map<String, dynamic> activityData) async { //prinze save new activity
+  try {
+    // Create the document in Firebase
+    DocumentReference docRef = await FirebaseFirestore.instance
+        .collection('activities')
+        .add(activityData);
+    
+    // Get the generated document ID
+    String documentId = docRef.id;
+    
+    // Add documentId to the data
+    activityData['documentId'] = documentId;
+    
+    // Update the document with its ID
+    await docRef.update({'documentId': documentId});
+    
+    // Calculate and save PSPO
+    await calculateAndSavePSPO(documentId, activityData);
+    
+    print("Activity created successfully with ID: $documentId");
+  } catch (e) {
+    print("Error creating activity: $e");
+  }
+}
+
+//prinze PSPO
+// Method to save calculated PSPO to Firebase
+Future<void> calculateAndSavePSPO(String activityId, Map<String, dynamic> activityData) async {
+  if (activityId.isEmpty) {
+    print("Cannot save PSPO: Missing activity ID");
+    return;
+  }
+  
+  double distance = safeParseDouble(activityData['distance']);
+  double durationSeconds = safeParseDouble(activityData['elapsed_time']);
+  double avgSpeed = safeParseDouble(activityData['average_speed']);
+  
+  // Skip activities with invalid data
+  if (distance <= 0 || durationSeconds <= 0) {
+    print("Skipping PSPO calculation due to invalid distance or duration");
+    return;
+  }
+  
+  // Get user weight with fallback
+  double userWeight = safeParseDouble(weight);
+  if (userWeight <= 0) {
+    // Fallback to 70kg if no weight provided
+    userWeight = 70.0;
+    print("No valid weight found, using default: $userWeight kg");
+  }
+  
+  // Calculate speed in km/h if not provided
+  double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+  
+  // Calculate PSPO
+  double pspo = calculatePSPO(speedKmh, userWeight, durationSeconds);
+  double pspoPerKg = userWeight > 0 ? pspo / userWeight : 0;
+  
+  // Save to Firebase
+  try {
+    await FirebaseFirestore.instance
+        .collection('activities')
+        .doc(activityId)
+        .update({
+      'pspo': pspo,
+      'pspo_per_kg': pspoPerKg,
+      'pspo_calculated_at': DateTime.now(),
+    });
+    print("Saved PSPO data to Firebase for activity $activityId: $pspo W, $pspoPerKg W/kg");
+  } catch (e) {
+    print("Error saving PSPO data to Firebase: $e");
+  }
+}
+//prinze PSPO
+// Method to build the PSPO graph and analysis
+Widget buildPSPOAnalysisGraph() {
+  print("Starting PSPO analysis...");
+  print("Total activity data count: ${activityData.length}");
+  
+  // Check if we have activity data
+  if (activityData.isEmpty) {
+    return _buildEmptyGraph("No activity data found for PSPO analysis");
+  }
+
+  // Get user weight with fallback
+  double userWeight = safeParseDouble(weight);
+  if (userWeight <= 0) {
+    // Fallback to 70kg if no weight provided
+    userWeight = 70.0;
+    print("No valid weight found, using default: $userWeight kg");
+  } else {
+    print("User weight: $userWeight kg");
+  }
+  
+  // Process activity data to calculate PSPO
+  List<ChartData> chartData = [];
+  
+  // Process all activities chronologically
+  List<Map<String, dynamic>> processableActivities = List.from(activityData);
+  processableActivities.sort((a, b) {
+    if (a['start_date'] == null) return 1;
+    if (b['start_date'] == null) return -1;
+    return a['start_date'].toDate().compareTo(b['start_date'].toDate());
+  });
+  
+  print("Sorted activities count: ${processableActivities.length}");
+  
+  // Calculate PSPO for each activity
+  for (var activity in processableActivities) {
+    // Skip activities without start date
+    if (activity['start_date'] == null) {
+      print("Skipping activity - missing start_date");
+      continue;
+    }
+    
+    DateTime activityDate = activity['start_date'].toDate();
+    String activityId = activity['documentId'] ?? "";
+    
+    // First check if PSPO already exists in the activity data
+    if (activity.containsKey('pspo') && activity['pspo'] != null && activity['pspo'] > 0) {
+      double storedPSPO = safeParseDouble(activity['pspo']);
+      double storedPSPOPerKg = safeParseDouble(activity['pspo_per_kg']);
+      
+      chartData.add(ChartData(
+        activityDate, 
+        storedPSPO, 
+        storedPSPOPerKg, 
+        safeParseDouble(activity['average_heartrate'])
+      ));
+      continue;
+    }
+    
+    // Calculate PSPO if not already stored
+    double distance = safeParseDouble(activity['distance']);
+    double durationSeconds = safeParseDouble(activity['elapsed_time']);
+    double avgHeartRate = safeParseDouble(activity['average_heartrate']);
+    double avgSpeed = safeParseDouble(activity['average_speed']);
+    
+    // Skip activities with invalid data
+    if (distance <= 0 || durationSeconds <= 0) {
+      print("Skipping activity due to invalid distance or duration");
+      continue;
+    }
+    
+    // Calculate speed in km/h if not provided
+    double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+    
+    // Calculate PSPO
+    double pspo = calculatePSPO(speedKmh, userWeight, durationSeconds);
+    double pspoPerKg = userWeight > 0 ? pspo / userWeight : 0;
+    
+    // Add to chart data
+    chartData.add(ChartData(activityDate, pspo, pspoPerKg, avgHeartRate));
+    
+    // Save to Firebase if we have an activity ID
+    if (activityId.isNotEmpty) {
+      calculateAndSavePSPO(activityId, activity);
+    }
+  }
+  
+  // Error case - no valid data points
+  if (chartData.isEmpty) {
+    print("No valid chart data generated");
+    return _buildEmptyGraph("No valid activity data for PSPO analysis");
+  }
+  
+  print("Final chart data points: ${chartData.length}");
+  
+  pspoRecommendations.clear();
+
+  pspoRecommendations.add(
+  "The PSPO (Personalized Sustainable Power Output) is a feature that calculates your ideal power level for long rides, helping you pace yourself better. By training at your PSPO, you can gradually build endurance and ride longer without burning out."
+);
+
+// Create a separate list for graph-only recommendations
+List<String> graphRecommendations = [
+  "Research shows that PSPO strongly correlates with endurance performance (r = -0.79). Continue tracking your rides to monitor fitness progression."
+];
+  
+  // Analyze trend if we have multiple data points
+  String trendText = "collecting_data";
+  double percentChange = 0.0;
+  
+  if (chartData.length >= 2) {
+    // Simple trend analysis
+    double firstPSPO = chartData.first.pspo;
+    double lastPSPO = chartData.last.pspo;
+    
+    // Calculate percent change with sanity check to avoid extreme values
+    if (firstPSPO > 0) {
+      percentChange = ((lastPSPO - firstPSPO) / firstPSPO) * 100;
+      
+      // Cap percent change to reasonable values (-95% to +400%)
+      percentChange = math.max(-95, math.min(400, percentChange));
+      
+      if (percentChange > 5) {
+        trendText = "improving";
+        pspoRecommendations.add(
+          "Your power output is improving by ${percentChange.toStringAsFixed(1)}%! Keep following your current training schedule."
+        );
+      } else if (percentChange < -5) {
+        trendText = "declining";
+        pspoRecommendations.add(
+          "Your power output has decreased by ${(-percentChange).toStringAsFixed(1)}%. Consider shorter, more frequent rides to rebuild endurance."
+        );
+      } else {
+        trendText = "stable";
+        pspoRecommendations.add(
+          "Your power output is stable. Focus on building endurance by gradually increasing ride duration."
+        );
+      }
+    }
+    
+    // Add recommendations based on latest data
+    double latestPSPOPerKg = chartData.last.pspoPerKg;
+    
+    if (latestPSPOPerKg < 2.5) {
+      pspoRecommendations.add(
+        "Focus on base endurance training with Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+      );
+    } else if (latestPSPOPerKg > 3.5) {
+      pspoRecommendations.add(
+        "Your strong power-to-weight ratio allows for advanced training. Include periodic high-intensity intervals for further gains."
+      );
+    } else {
+      pspoRecommendations.add(
+        "Your moderate power output indicates you're ready for mixed training. Combine endurance rides with tempo sessions."
+      );
+    }
+  } else {
+    // Single activity recommendations
+    double pspoPerKg = chartData.first.pspoPerKg;
+    
+    if (pspoPerKg < 2.5) {
+      pspoRecommendations.add(
+        "Your current PSPO indicates you're in the early stages of development. Focus on building base endurance with consistent Zone 2 training."
+      );
+    } else if (pspoPerKg > 3.5) {
+      pspoRecommendations.add(
+        "Excellent power-to-weight ratio! You have strong endurance capacity. Incorporate high-intensity intervals to further increase your PSPO."
+      );
+    } else {
+      pspoRecommendations.add(
+        "Your power output shows good overall fitness. Mix longer endurance rides with occasional threshold work to improve further."
+      );
+    }
+  }
+  
+  // Debug output to verify recommendations were added
+  print("PSPO Recommendations added: ${pspoRecommendations.length}");
+  for (var rec in pspoRecommendations) {
+    print("PSPO Rec: $rec");
+  }
+  
+  // Prepare insight content
+  Color trendColor = Colors.blue[600]!;
+  if (trendText == "improving") trendColor = Colors.green[600]!;
+  if (trendText == "declining") trendColor = Colors.red[600]!;
+  
+  String insightTitle = "Endurance Performance Analysis";
+  String insightSubtitle = chartData.length < 2 
+      ? "Based on your latest activity" 
+      : "Based on your ${chartData.length} activities";
+  
+  if (chartData.length >= 2) {
+    if (trendText == "improving") {
+      insightTitle = "Endurance Performance Improving";
+    } else if (trendText == "declining") {
+      insightTitle = "Endurance Performance Declining";
+    } else {
+      insightTitle = "Endurance Performance Stable";
+    }
+    
+    insightSubtitle = "PSPO trend: ${percentChange.toStringAsFixed(1)}%";
+  }
+
+  // Build and return the chart
+  return _buildGraphContainer(
+    title: "Peak Sustained Power Analysis",
+    subtitle: "Endurance Performance",
+    height: 650,
+    child: Column(
+      children: [
+        Expanded(
+          child: SfCartesianChart(
+            margin: EdgeInsets.all(10),
+            plotAreaBorderWidth: 0,
+            primaryXAxis: DateTimeAxis(
+              majorGridLines: MajorGridLines(width: 0),
+              minorGridLines: MinorGridLines(width: 0),
+              dateFormat: DateFormat('MM/dd'),
+              intervalType: DateTimeIntervalType.days,
+              labelStyle: TextStyle(
+                color: Colors.grey[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            primaryYAxis: NumericAxis(
+              title: AxisTitle(
+                text: 'PSPO (W)',
+                textStyle: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.blue[700],
+                ),
+              ),
+              majorGridLines: MajorGridLines(
+                width: 0.5,
+                color: Colors.grey[200],
+                dashArray: <double>[3, 3],
+              ),
+              axisLine: AxisLine(width: 0),
+              labelStyle: TextStyle(
+                color: Colors.blue[700],
+                fontFamily: 'Inter',
+                fontSize: 10,
+              ),
+            ),
+            axes: <ChartAxis>[
+              NumericAxis(
+                name: 'HeartRate',
+                opposedPosition: true,
+                majorGridLines: MajorGridLines(width: 0),
+                labelFormat: '{value} bpm',
+                labelStyle: TextStyle(
+                  color: Colors.red[700],
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                ),
+              ),
+            ],
+            series: <ChartSeries>[
+              // PSPO series
+              SplineSeries<ChartData, DateTime>(
+                name: 'PSPO (W)',
+                dataSource: chartData,
+                xValueMapper: (ChartData data, _) => data.date,
+                yValueMapper: (ChartData data, _) => data.pspo,
+                color: Colors.blue[600],
+                width: 2.5,
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.circle,
+                  height: 8,
+                  width: 8,
+                  color: Colors.blue[600],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                ),
+              ),
+              
+              // Heartrate series
+              SplineSeries<ChartData, DateTime>(
+                name: 'Heart Rate (bpm)',
+                dataSource: chartData,
+                xValueMapper: (ChartData data, _) => data.date,
+                yValueMapper: (ChartData data, _) => data.heartRate,
+                yAxisName: 'HeartRate',
+                color: Colors.red[500],
+                width: 2,
+                dashArray: <double>[3, 3],
+                markerSettings: MarkerSettings(
+                  isVisible: true,
+                  shape: DataMarkerType.diamond,
+                  height: 6,
+                  width: 6,
+                  color: Colors.red[500],
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                ),
+              ),
+            ],
+            tooltipBehavior: TooltipBehavior(
+              enable: true,
+              color: Colors.grey[800],
+              textStyle: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            legend: Legend(
+              isVisible: true,
+              position: LegendPosition.bottom,
+              overflowMode: LegendItemOverflowMode.wrap,
+            ),
+          ),
+        ),
+        
+        // PSPO insight card
+        Container(
+          margin: EdgeInsets.all(10),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: trendColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: trendColor.withOpacity(0.3), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    trendText == 'improving' ? Icons.trending_up : 
+                    trendText == 'declining' ? Icons.trending_down : 
+                    Icons.trending_flat,
+                    color: trendColor,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          insightTitle,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: trendColor,
+                          ),
+                        ),
+                        Text(
+                          insightSubtitle,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              
+              // PSPO metrics
+              if (chartData.isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildPSPOMetricItem(
+                      'Latest PSPO',
+                      '${chartData.last.pspo.toStringAsFixed(0)} W',
+                      Icons.flash_on_rounded,
+                      Colors.orange[700]!,
+                    ),
+                    _buildPSPOMetricItem(
+                      'W/kg Ratio',
+                      chartData.last.pspoPerKg.toStringAsFixed(2),
+                      Icons.fitness_center_rounded,
+                      Colors.purple[700]!,
+                    ),
+                  ],
+                ),
+              
+              // Recommendations section
+              SizedBox(height: 12),
+              Text(
+                "RECOMMENDATIONS",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                  letterSpacing: 1,
+                ),
+              ),
+              SizedBox(height: 8),
+              
+              // Show first recommendation
+              if (pspoRecommendations.isNotEmpty)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lightbulb_outline, size: 16, color: trendColor),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        graphRecommendations.first,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              
+              // Show additional recommendations count if available
+              if (graphRecommendations.length > 1) // Use graphRecommendations length
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "✦ ${graphRecommendations.length - 1} more recommendation${graphRecommendations.length > 2 ? 's' : ''}",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: trendColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+//prinze PSPO
+// Helper widget for PSPO metrics
+Widget _buildPSPOMetricItem(String label, String value, IconData icon, Color color) {
+  return Column(
+    children: [
+      Container(
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 16),
+      ),
+      SizedBox(height: 5),
+      Text(
+        value,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+      Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          color: Colors.grey[600],
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildHeartRateSpeedGraph() {
     return FutureBuilder<List<HeartRateSpeedData>>(
@@ -1101,314 +1720,205 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Widget _buildRecommendationCard(
-  BuildContext context,
-  String title,
-  IconData icon,
-  Color color,
-  List<Color> gradientColors,
-  List<String> recommendations, {
-  required VoidCallback onTap,
-}) {
-  return Container(
-    margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      boxShadow: [
-        BoxShadow(
-          color: color.withOpacity(0.15),
-          spreadRadius: 1,
-          blurRadius: 12,
-          offset: Offset(0, 6),
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    List<Color> gradientColors,
+    List<String> recommendations, {
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      // InkWell provides better touch response than GestureDetector
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.15),
+              spreadRadius: 1,
+              blurRadius: 12,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header with icon and title
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
                 ),
-                child: Icon(icon, color: Colors.white, size: 22),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'Fredoka-SemiBold',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 20),
                   ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // List view (scrollable)
+            Expanded(
+              child: NotificationListener<OverscrollIndicatorNotification>(
+                onNotification: (overscroll) {
+                  overscroll.disallowIndicator();
+                  return true;
+                },
+                child: ListView.builder(
+                  physics: BouncingScrollPhysics(),
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  itemCount:
+                      recommendations.length > 3 ? 3 : recommendations.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 12),
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: color.withOpacity(0.1), width: 1),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 18,
+                              color: color,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              recommendations[index],
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-            ],
-          ),
-        ),
-
-        // Card swiper for recommendations
-        Expanded(
-          child: _buildRecommendationSwiper(recommendations, color),
-        ),
-
-        // Footer with count indicator
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.05),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(20),
             ),
-            border: Border(
-              top: BorderSide(color: color.withOpacity(0.1), width: 1),
-            ),
-          ),
-          child: InkWell(
-            onTap: onTap,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.fullscreen,
-                  size: 16,
-                  color: color,
+
+            // Tap indicator
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.05),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
                 ),
-                SizedBox(width: 6),
-                Text(
-                  "View all ${recommendations.length} in detail",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                border: Border(
+                  top: BorderSide(color: color.withOpacity(0.1), width: 1),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.touch_app_rounded,
+                    size: 16,
                     color: color,
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Card swiper that shows one recommendation at a time
-Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
-  // We'll show at most 3 in the preview
-  final previewItems = recommendations.length > 3 ? 
-      recommendations.sublist(0, 3) : recommendations;
-      
-  return StatefulBuilder(
-    builder: (context, setState) {
-      final PageController pageController = PageController(viewportFraction: 0.85);
-      final ValueNotifier<int> currentIndex = ValueNotifier<int>(0);
-      
-      return Column(
-        children: [
-          Expanded(
-            child: NotificationListener<OverscrollIndicatorNotification>(
-              onNotification: (notification) {
-                notification.disallowIndicator();
-                return true;
-              },
-              child: PageView.builder(
-                controller: pageController,
-                itemCount: previewItems.length,
-                onPageChanged: (index) {
-                  currentIndex.value = index;
-                },
-                itemBuilder: (context, index) {
-                  return AnimatedContainer(
-                    duration: Duration(milliseconds: 300),
-                    margin: EdgeInsets.symmetric(
-                      horizontal: 10, 
-                      vertical: 20,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withOpacity(0.1),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: color.withOpacity(0.1),
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Number badge
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: color,
-                              borderRadius: BorderRadius.only(
-                                topRight: Radius.circular(20),
-                                bottomLeft: Radius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              "${index + 1}/${previewItems.length}",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        // Quote icon decoration
-                        Positioned(
-                          left: 15,
-                          top: 15,
-                          child: Icon(
-                            Icons.format_quote,
-                            size: 24,
-                            color: color.withOpacity(0.2),
-                          ),
-                        ),
-                        
-                        // Recommendation text
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(20, 40, 20, 20),
-                          child: Center(
-                            child: Text(
-                              previewItems[index],
-                              style: TextStyle(
-                                fontSize: 16,
-                                height: 1.6,
-                                color: Colors.black87,
-                                fontFamily: 'Inter',
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                        
-                        // Swipe indicator
-                        Positioned(
-                          bottom: 10,
-                          left: 0,
-                          right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.swipe,
-                                size: 16,
-                                color: color.withOpacity(0.5),
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                "Swipe",
-                                style: TextStyle(
-                                  color: color.withOpacity(0.5),
-                                  fontSize: 12,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          
-          // Page indicator dots
-          ValueListenableBuilder<int>(
-            valueListenable: currentIndex,
-            builder: (context, index, _) {
-              return Container(
-                margin: EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    previewItems.length,
-                    (i) => Container(
-                      margin: EdgeInsets.symmetric(horizontal: 3),
-                      width: i == index ? 18 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: i == index ? color : color.withOpacity(0.2),
-                      ),
+                  SizedBox(width: 6),
+                  Text(
+                    recommendations.length > 3
+                        ? "Tap to view all ${recommendations.length} tips"
+                        : "Tap to expand",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: color,
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
-      );
-    },
-  );
-}
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showFullscreenOverlay(
-  BuildContext context,
-  String title,
-  IconData icon,
-  Color color,
-  List<Color> gradientColors,
-  List<String> recommendations,
-) {
-  late OverlayEntry overlayEntry;
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    List<Color> gradientColors,
+    List<String> recommendations,
+  ) {
+    // Declare the overlayEntry as late - it will be initialized before use
+    late OverlayEntry overlayEntry;
 
-  overlayEntry = OverlayEntry(
-    builder: (context) => Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: _AnimatedFullscreenOverlay(
-        onDismiss: () {
-          overlayEntry.remove();
-        },
-        title: title,
-        icon: icon,
-        color: color,
-        gradientColors: gradientColors,
-        recommendations: recommendations,
+    // Define the builder function separately
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: _AnimatedAutoSizingOverlay(
+          onDismiss: () {
+            overlayEntry.remove();
+          },
+          title: title,
+          icon: icon,
+          color: color,
+          gradientColors: gradientColors,
+          recommendations: recommendations,
+        ),
       ),
-    ),
-  );
+    );
 
-  Overlay.of(context).insert(overlayEntry);
-}
+    // Show the overlay
+    Overlay.of(context).insert(overlayEntry);
+  }
 
 // Helper widget for zone indicators
   Widget _buildZoneIndicator(String zoneName, String zoneRange, Color color) {
@@ -2457,145 +2967,102 @@ Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
 
 // Method to set a new cycling subgoal
   void _setCyclingSubgoal(String type, double targetValue) {
-  if (baselineDistance == 0.0) {
-    _calculateBaselines();
+    if (baselineDistance == 0.0) {
+      _calculateBaselines();
+    }
+
+    String title = "";
+    List<String> suggestions = [];
+    List<String> warnings = [];
+    String dataSource = usingPreviousGoal
+        ? "previous goal target"
+        : "your actual cycling performance";
+
+    switch (type) {
+      case "distance":
+        title =
+            "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
+
+        // Generate suggestions
+        suggestions.add(
+            "Start with a proper warm-up to prepare for the longer distance");
+        suggestions.add("Increase your hydration for longer rides");
+        suggestions.add("Plan a route with the target distance in advance");
+
+        if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
+          warnings.add(
+              "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
+        }
+
+        if (healthCondition == "Cardiovascular or Respiratory" &&
+            targetValue > referenceDistance * 1.2) {
+          warnings.add(
+              "With your respiratory condition, consider a more moderate increase in distance.");
+        }
+        break;
+
+      case "pace":
+        double currentPaceMinPerKm = referencePace;
+        title =
+            "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
+
+        suggestions.add("Include interval training in your routine");
+        suggestions.add("Focus on consistent pedaling cadence");
+        suggestions.add(
+            "Make sure your bike is properly maintained for optimal efficiency");
+
+        if (currentPaceMinPerKm > 0 &&
+            targetValue < currentPaceMinPerKm * 0.8) {
+          warnings.add(
+              "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
+        }
+
+        if (healthCondition == "Cardiovascular or Respiratory") {
+          warnings.add(
+              "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
+        }
+        break;
+
+      case "duration":
+        title =
+            "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
+
+        suggestions.add("Build endurance with a steady pace");
+        suggestions.add("Ensure proper nutrition before longer sessions");
+        suggestions.add("Take small breaks if needed during the extended ride");
+
+        if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
+          warnings.add(
+              "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
+        }
+
+        break;
+
+      case "maintain":
+        title = "Maintain current cycling performance";
+
+        suggestions.add("Focus on consistency in your current routine");
+        suggestions.add("Work on technique refinement");
+        suggestions.add("Use this period to establish a sustainable rhythm");
+        break;
+    }
+
+    // Add a note about the data source to the suggestions
+    suggestions.add(
+        "This goal is based on $dataSource from your previous training period.");
+
+    setState(() {
+      hasActiveSubgoal = true;
+      subgoalType = type;
+      subgoalTargetValue = targetValue;
+      subgoalStartDate = DateTime.now();
+      subgoalEndDate = DateTime.now().add(Duration(days: 7));
+      subgoalSuggestions = suggestions;
+      subgoalWarnings = warnings;
+    });
+
+    _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
   }
-
-  String title = "";
-  List<String> suggestions = [];
-  List<String> warnings = [];
-  String dataSource = usingPreviousGoal
-      ? "previous goal target"
-      : "your actual cycling performance";
-
-  // Calculate heart rate impact
-  String hrImpact = _calculateHeartRateImpact(type, targetValue);
-  bool hasHeartRateWarning = hrImpact.contains("⚠️");
-
-  // Get subgoal influence text
-  String influenceText = _getSubgoalInfluenceText(type);
-
-  switch (type) {
-    case "distance":
-      title = "Increase cycling distance to ${targetValue.toStringAsFixed(1)} km";
-
-      // Generate suggestions
-      suggestions.add("Start with a proper warm-up to prepare for the longer distance");
-      suggestions.add("Increase your hydration for longer rides");
-      suggestions.add("Plan a route with the target distance in advance");
-      suggestions.add("This goal will improve your endurance and increase calorie burn");
-      
-      if (targetValue > referenceDistance * 1.3 && referenceDistance > 0) {
-        warnings.add(
-            "This is a ${((targetValue / referenceDistance - 1) * 100).toStringAsFixed(0)}% increase from your ${usingPreviousGoal ? "previous goal" : "average performance"}. Consider a more gradual progression.");
-      }
-
-      if (healthCondition == "Cardiovascular or Respiratory" &&
-          targetValue > referenceDistance * 1.2) {
-        warnings.add(
-            "With your respiratory condition, consider a more moderate increase in distance.");
-      }
-      
-      // Add heart rate specific warning and suggestion
-      if (hasHeartRateWarning) {
-        warnings.add("This goal may push your heart rate above safe levels for your condition. Monitor your heart rate during rides.");
-        suggestions.add("For your cardiovascular condition, maintain a heart rate in zone 2 (${zone2HeartRate} bpm) for most of your ride");
-      }
-
-      // Add influence information
-      suggestions.add("Increasing distance may slightly reduce your average pace initially, but will increase endurance");
-      break;
-
-    case "pace":
-      double currentPaceMinPerKm = referencePace;
-      title = "Improve cycling pace to ${targetValue.toStringAsFixed(1)} min/km";
-
-      suggestions.add("Include interval training in your routine");
-      suggestions.add("Focus on consistent pedaling cadence");
-      suggestions.add("Make sure your bike is properly maintained for optimal efficiency");
-      suggestions.add("This goal will improve your cardiovascular fitness and efficiency");
-
-      if (currentPaceMinPerKm > 0 &&
-          targetValue < currentPaceMinPerKm * 0.8) {
-        warnings.add(
-            "This is a ${((1 - targetValue / currentPaceMinPerKm) * 100).toStringAsFixed(0)}% speed increase based on your ${usingPreviousGoal ? "previous goal" : "current pace"}, which may be challenging. Consider a gradual approach.");
-      }
-
-      if (healthCondition == "Cardiovascular or Respiratory") {
-        warnings.add(
-            "With your cardiovascular condition, consult a healthcare provider before significantly increasing intensity.");
-      }
-      
-      // Add heart rate specific warning and suggestion  
-      if (hasHeartRateWarning) {
-        warnings.add("This pace goal will likely push your heart rate into higher zones. Monitor closely.");
-        suggestions.add("Use a heart rate monitor to stay within safe zones given your health condition");
-      }
-
-      // Add influence information
-      suggestions.add("Improving pace will increase your workout intensity but may reduce maximum distance initially");
-      break;
-
-    case "duration":
-      title = "Extend cycling duration to ${targetValue.toStringAsFixed(0)} minutes";
-
-      suggestions.add("Build endurance with a steady pace");
-      suggestions.add("Ensure proper nutrition before longer sessions");
-      suggestions.add("Take small breaks if needed during the extended ride");
-      suggestions.add("This goal will build both physical and mental endurance");
-
-      if (targetValue > referenceDuration * 1.5 && referenceDuration > 0) {
-        warnings.add(
-            "This is a ${((targetValue / referenceDuration - 1) * 100).toStringAsFixed(0)}% increase in duration from your ${usingPreviousGoal ? "previous goal" : "average rides"}, which may lead to fatigue. Consider a more gradual approach.");
-      }
-      
-      // Check heart rate capacity for longer durations
-      if (hasHeartRateWarning) {
-        warnings.add("Longer durations can stress your cardiovascular system. Start with shorter sessions at this intensity.");
-        suggestions.add("For longer rides, keep heart rate in zone 1-2 (${zone1HeartRate}-${zone2HeartRate} bpm) to maintain endurance safely");
-      }
-
-      // Add influence information
-      suggestions.add("Increasing duration will raise your overall calorie burn and may naturally improve distance");
-      break;
-
-    case "maintain":
-      title = "Maintain current cycling performance";
-
-      suggestions.add("Focus on consistency in your current routine");
-      suggestions.add("Work on technique refinement");
-      suggestions.add("Use this period to establish a sustainable rhythm");
-      suggestions.add("This goal lets your body adapt to current training loads");
-      
-      // Add heart rate suggestion for maintenance
-      suggestions.add("During maintenance periods, aim for primarily zone 2 training (${zone2HeartRate} bpm) to build aerobic efficiency");
-      
-      // Add influence information
-      suggestions.add("Maintaining performance builds consistency and prevents overtraining while allowing recovery");
-      break;
-  }
-
-  // Add a note about the data source to the suggestions
-  suggestions.add("This goal is based on $dataSource from your previous training period.");
-
-  // Add a note about the heart rate zones to help guide training
-  if (type != "maintain" && !hasHeartRateWarning) {
-    suggestions.add("For optimal training, alternate between zone 2 (${zone2HeartRate} bpm) for base building and zone 3 (${zone3HeartRate} bpm) for improvements");
-  }
-
-  setState(() {
-    hasActiveSubgoal = true;
-    subgoalType = type;
-    subgoalTargetValue = targetValue;
-    subgoalStartDate = DateTime.now();
-    subgoalEndDate = DateTime.now().add(Duration(days: 7));
-    subgoalSuggestions = suggestions;
-    subgoalWarnings = warnings;
-  });
-
-  _saveCyclingSubgoalToFirestore(type, targetValue, suggestions, warnings);
-}
-
 
   Future<void> _fetchFoodDiaryData() async {
     if (userId == null) return;
@@ -2961,27 +3428,24 @@ Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
             "Your ${(-weightChange).toStringAsFixed(1)} kg weight loss, if continued, may compromise endurance performance. Ensure adequate fueling with ${recommendedCarbGrams.toInt()}g carbs daily to sustain your ${weeklyDistanceTotal.toInt()} km weekly training load.");
       }
     }
-
-    // Hydration advice based on actual training data
-    double avgRideTime = 0;
-    int timeDataPoints = 0;
-    for (var activity in activityData) {
-      double time =
-          safeParseDouble(activity['elapsed_time']) / 60; // convert to minutes
-      if (time > 0) {
-        avgRideTime += time;
-        timeDataPoints++;
-      }
-    }
-    if (timeDataPoints > 0) {
-      avgRideTime /= timeDataPoints;
-      double recommendedFluidPerRide =
-          (avgRideTime / 60) * 750; // 750ml per hour
+        // Hydration based on Holland et al. (2017) hydration research
+        if (latestWeight > 0) {
+      // Hydration needs based on body weight
+      double shortRideHydrationRate = 0.175; // midpoint of 0.15-0.20 range for 1-2 hour rides
+      double longRideHydrationRate = 0.205; // midpoint of 0.14-0.27 range for 2+ hour rides
+      
+      // Calculate total fluid recommendations (ml) for different ride durations
+      int oneHourRideFluid = (shortRideHydrationRate * latestWeight * 60).round();
+      int twoHourRideFluid = (shortRideHydrationRate * latestWeight * 120).round();
+      int threeHourRideFluid = (longRideHydrationRate * latestWeight * 180).round();
+      
       nutritionRecommendations.add(
-          "For your average ${avgRideTime.toInt()}-minute rides, consume approximately ${recommendedFluidPerRide.toInt()} ml of fluid. Stay hydrated with 2-3 liters of water daily plus electrolytes when training in hot conditions.");
+        "Based on your ${latestWeight.toStringAsFixed(1)} kg body weight, consume approximately ${oneHourRideFluid} ml of fluid for 1-hour rides and ${twoHourRideFluid} ml for 2-hour rides. For longer rides exceeding 2 hours, increase to ${threeHourRideFluid} ml (${(longRideHydrationRate * latestWeight).toStringAsFixed(1)} ml/min). High-intensity sessions under 1 hour may require less fluid to avoid performance decreases."
+      );
     } else {
       nutritionRecommendations.add(
-          "Stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of cycling.");
+        "Stay well-hydrated with 2-3 liters of water daily, plus additional 500-750ml per hour of moderate-intensity cycling. For high-intensity sessions under 1 hour, excessive hydration can be counterproductive - focus on proper pre-ride hydration instead."
+      );
     }
   }
 
@@ -4013,200 +4477,127 @@ Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
   }
 
   void _showSubgoalConfirmationDialog(String type, double targetValue) {
-  String goalText = "";
-  switch (type) {
-    case "distance":
-      goalText = "increase your weekly average distance to ${targetValue.toStringAsFixed(1)} km";
-      break;
-    case "pace":
-      goalText = "improve your weekly average pace to ${targetValue.toStringAsFixed(1)} min/km";
-      break;
-    case "duration":
-      goalText = "extend your weekly average duration to ${targetValue.toStringAsFixed(0)} minutes";
-      break;
-    case "maintain":
-      goalText = "maintain your current cycling performance levels";
-      break;
-  }
+    String goalText = "";
+    switch (type) {
+      case "distance":
+        goalText =
+            "increase your weekly average distance to ${targetValue.toStringAsFixed(1)} km";
+        break;
+      case "pace":
+        goalText =
+            "improve your weekly average pace to ${targetValue.toStringAsFixed(1)} min/km";
+        break;
+      case "duration":
+        goalText =
+            "extend your weekly average duration to ${targetValue.toStringAsFixed(0)} minutes";
+        break;
+      case "maintain":
+        goalText = "maintain your current cycling performance levels";
+        break;
+    }
 
-  // Get influence description
-  String influenceText = _getSubgoalInfluenceText(type);
-  
-  // Calculate heart rate impact
-  String hrImpact = _calculateHeartRateImpact(type, targetValue);
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          "Confirm Your Goal",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Are you sure you want to $goalText for the next week?",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.black87,
-              ),
+          title: Text(
+            "Confirm Your Goal",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
-            SizedBox(height: 16),
-            
-            // Influence information
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.lightbulb_outline, size: 16, color: Colors.blue[600]),
-                      SizedBox(width: 8),
-                      Text(
-                        "Goal Impact:",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    influenceText,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: Colors.blue[800],
-                    ),
-                  ),
-                  
-                  // Heart rate information if available
-                  if (hrImpact.isNotEmpty) ...[
-                    SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.favorite, size: 16, color: Colors.red[400]),
-                        SizedBox(width: 8),
-                        Text(
-                          "Heart Rate Impact:",
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      hrImpact,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: Colors.red[800],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Color(0xffFFA500).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Color(0xffFFA500).withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: Color(0xffFFA500),
-                    size: 20,
-                  ),
-                  SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      "This goal will be used to track your progress for the next 7 days.",
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: Text(
-              "Cancel",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextButton(
-              child: Text(
-                "Confirm",
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Are you sure you want to $goalText for the next week?",
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xffFFA500).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Color(0xffFFA500).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Color(0xffFFA500),
+                      size: 20,
+                    ),
+                    SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        "This goal will be used to track your progress for the next 7 days.",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "Cancel",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[700],
                 ),
               ),
               onPressed: () {
                 Navigator.of(context).pop();
-                _setCyclingSubgoal(type, targetValue);
               },
             ),
-          ),
-        ],
-      );
-    },
-  );
-}
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextButton(
+                child: Text(
+                  "Confirm",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _setCyclingSubgoal(type, targetValue);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _calculateBaselines() {
     if (activityData.isEmpty) return;
@@ -4278,322 +4669,180 @@ Widget _buildRecommendationSwiper(List<String> recommendations, Color color) {
   }
 
   Widget _buildSubgoalOptionButton(String title, String value, String baseline,
-    Color color, String type, double targetValue) {
-  
-  // Get influence description based on goal type
-  String influenceText = _getSubgoalInfluenceText(type);
-  
-  // Calculate heart rate impact based on goal type and intensity
-  String hrImpact = _calculateHeartRateImpact(type, targetValue);
-  
-  return InkWell(
-    onTap: () => _showSubgoalConfirmationDialog(type, targetValue),
-    child: Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+      Color color, String type, double targetValue) {
+    return InkWell(
+      onTap: () => _showSubgoalConfirmationDialog(type, targetValue),
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: Offset(0, 2),
             ),
-            child: Text(
-              title,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Fredoka-SemiBold',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              baseline,
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: color,
+                color: Colors.grey[600],
               ),
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Fredoka-SemiBold',
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            baseline,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.info_outline, size: 12, color: color),
-              SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  influenceText,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (hrImpact.isNotEmpty) ...[
-            SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.favorite_outline, size: 12, color: Colors.red[400]),
-                SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    hrImpact,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.red[400],
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-String _getSubgoalInfluenceText(String type) {
-  switch (type) {
-    case "distance":
-      return "Longer distances improve endurance and increase calorie burn, may reduce pace.";
-    case "pace":
-      return "Faster pace increases intensity, improves cardiovascular fitness, and efficiency.";
-    case "duration":
-      return "Longer durations build endurance and mental strength, may increase total calorie burn.";
-    case "maintain":
-      return "Consistency builds habits, prevents overtraining, and allows for recovery.";
-    default:
-      return "";
-  }
-}
-// Calculate heart rate impact based on goal type and target value
-String _calculateHeartRateImpact(String type, double targetValue) {
-  // Use the user's heart rate zones from the class
-  int maxHR = maxHeartRateCalculated;
-  int z2HR = zone2HeartRate;
-  int z3HR = zone3HeartRate;
-  int z4HR = zone4HeartRate;
-  
-  double targetHRPercent = 0;
-  String impact = "";
-  
-  switch (type) {
-    case "distance":
-      // For distance goals, estimate HR impact based on how much increase from baseline
-      double percentIncrease = (targetValue / referenceDistance - 1) * 100;
-      
-      if (percentIncrease > 20) {
-        targetHRPercent = 0.75; // Z3 territory
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z3)";
-      } else if (percentIncrease > 10) {
-        targetHRPercent = 0.70; // Upper Z2
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
-      } else {
-        targetHRPercent = 0.65; // Lower Z2
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
+//prinze updated start ///////////////////////////////////////////////////
+Future<void> _fetchUserData() async {
+  if (userId == null) return;
+
+  setState(() {
+    _isLoadingGraphs = true;
+  });
+
+  try {
+    QuerySnapshot goalsQuery = await FirebaseFirestore.instance
+        .collection('goals')
+        .where('uid', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+
+    DateTime? currentGoalTimestamp;
+
+    if (goalsQuery.docs.isNotEmpty) {
+      DocumentSnapshot goalsDoc = goalsQuery.docs.first;
+      if (goalsDoc['timestamp'] != null) {
+        currentGoalTimestamp = goalsDoc['timestamp'].toDate();
       }
-      break;
-      
-    case "pace":
-      // For pace goals (lower is faster), estimate HR impact based on improvement
-      if (referencePace > 0) {
-        double paceImprovement = (1 - targetValue / referencePace) * 100;
-        
-        if (paceImprovement > 10) {
-          targetHRPercent = 0.85; // Z4 territory
-          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z4)";
-        } else if (paceImprovement > 5) {
-          targetHRPercent = 0.80; // Z3 territory
-          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z3)";
-        } else {
-          targetHRPercent = 0.75; // Upper Z2/Lower Z3
-          impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2-Z3)";
+      print("Current goal timestamp: $currentGoalTimestamp");
+
+      setState(() {
+        goalType = goalsDoc['goalType'] ?? "-";
+        if (goalType == 'Leisure') {
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
+        } else if (goalType == 'High Intensity Cycling') {
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
+          sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
+          targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
+          baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
+          baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
+        } else if (goalType == 'Endurance') {
+          targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
+          targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
         }
-      }
-      break;
-      
-    case "duration":
-      // For duration goals, estimate HR impact based on extended time
-      double percentIncrease = (targetValue / referenceDuration - 1) * 100;
-      
-      if (percentIncrease > 20) {
-        targetHRPercent = 0.70; // Middle Z2
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
-      } else if (percentIncrease > 10) {
-        targetHRPercent = 0.65; // Lower Z2
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z2)";
-      } else {
-        targetHRPercent = 0.60; // Z1/Z2 border
-        impact = "Expected HR: ~${(maxHR * targetHRPercent).toInt()} bpm (Z1-Z2)";
-      }
-      break;
-      
-    case "maintain":
-      // No specific HR impact for maintenance
-      impact = "";
-      break;
-  }
-  
-  // Add warning if HR would exceed recommended zones for certain health conditions
-  if (targetHRPercent > 0 && healthCondition == "Cardiovascular or Respiratory") {
-    double safeHRPercent = heartRateLimit != "0" ? 
-      safeParseDouble(heartRateLimit) / maxHR : 0.75;
-      
-    if (targetHRPercent > safeHRPercent) {
-      impact += " ⚠️ May exceed safe HR for your condition";
+      });
     }
-  }
-  
-  return impact;
-}
-
-  Future<void> _fetchUserData() async {
-    if (userId == null) return;
-
-    setState(() {
-      _isLoadingGraphs = true;
-    });
-
+    
     try {
-      QuerySnapshot goalsQuery = await FirebaseFirestore.instance
-          .collection('goals')
-          .where('uid', isEqualTo: userId)
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
+      FirebaseAuth auth = FirebaseAuth.instance;
+      User? user = auth.currentUser;
 
-      DateTime? currentGoalTimestamp;
+      if (user != null) {
+        QuerySnapshot athleteSnapshot = await FirebaseFirestore.instance
+            .collection('athletes')
+            .where("app_id", isEqualTo: user.uid)
+            .limit(1)
+            .get();
 
-      if (goalsQuery.docs.isNotEmpty) {
-        DocumentSnapshot goalsDoc = goalsQuery.docs.first;
-        if (goalsDoc['timestamp'] != null) {
-          currentGoalTimestamp = goalsDoc['timestamp'].toDate();
-        }
-        print("Current goal timestamp: $currentGoalTimestamp");
+        if (athleteSnapshot.docs.isNotEmpty) {
+          String stravaUserIdString = athleteSnapshot.docs.first.id;
 
-        setState(() {
-          goalType = goalsDoc['goalType'] ?? "-";
-          if (goalType == 'Leisure') {
-            daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
-            sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
-          } else if (goalType == 'High Intensity Cycling') {
-            daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
-            sessionDuration = goalsDoc['sessionDuration']?.toString() ?? "0";
-            targetWeight = goalsDoc['targetWeight']?.toString() ?? "0";
-            baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
-            baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
-          } else if (goalType == 'Endurance') {
-            targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
-            targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
-          }
-        });
-      }
-      try {
-        FirebaseAuth auth = FirebaseAuth.instance;
-        User? user = auth.currentUser;
-
-        if (user != null) {
-          QuerySnapshot athleteSnapshot = await FirebaseFirestore.instance
-              .collection('athletes')
-              .where("app_id", isEqualTo: user.uid)
-              .limit(1)
-              .get();
-
-          if (athleteSnapshot.docs.isNotEmpty) {
-            String stravaUserIdString = athleteSnapshot.docs.first.id;
-
-            setState(() {
-              _stravaUserId = stravaUserIdString;
-            });
-          }
-        }
-      } catch (e) {
-        print("Error fetching Strava User ID: $e");
-      }
-
-      QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('uid', isEqualTo: userId)
-          .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
-          .orderBy('start_date', descending: true)
-          .limit(30)
-          .get();
-
-      if (activitiesQuery.docs.isNotEmpty) {
-        List<Map<String, dynamic>> newActivityData = [];
-
-        for (var doc in activitiesQuery.docs) {
-          var data = doc.data() as Map<String, dynamic>;
-
-          newActivityData.add({
-            "documentId": doc.id,
-            "average_heartrate": data['average_heartrate'],
-            "average_speed": data['average_speed'],
-            "calories_burned": data['calories_burned'],
-            "distance": data['distance'],
-            "elapsed_time": data['elapsed_time'],
-            "name": data['name'],
-            "start_date": data['start_date'],
-            "type": data['type'],
-            "uid": data['uid'],
+          setState(() {
+            _stravaUserId = stravaUserIdString;
           });
         }
-        await _fetchActiveSubgoal();
+      }
+    } catch (e) {
+      print("Error fetching Strava User ID: $e");
+    }
 
-        setState(() {
-          activityData = newActivityData;
-          totalActivities = activityData.length;
+    QuerySnapshot activitiesQuery = await FirebaseFirestore.instance
+        .collection('activities')
+        .where('uid', isEqualTo: userId)
+        .where('start_date', isGreaterThanOrEqualTo: currentGoalTimestamp)
+        .orderBy('start_date', descending: true)
+        .limit(30)
+        .get();
 
-          weeklyActivityCount = 0;
-          weeklyDistanceTotal = 0.0;
+    if (activitiesQuery.docs.isNotEmpty) {
+      List<Map<String, dynamic>> newActivityData = [];
 
-          print("what: $hasActiveSubgoal");
+      for (var doc in activitiesQuery.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        
+        // Add document ID to the data
+        data['documentId'] = doc.id;
+        
+        // Add to newActivityData (ONLY ONCE)
+        newActivityData.add(data);
+      }
+      
+      await _fetchActiveSubgoal();
 
-          if (hasActiveSubgoal == true) {
-            for (var activity in activityData) {
-              if (activity['start_date'] != null) {
-                print(activity);
-                DateTime activityDate = activity['start_date'].toDate();
-                if (activityDate.isAfter(subgoalStartDate)) {
-                  weeklyActivityCount++;
-                  weeklyDistanceTotal += safeParseDouble(activity['distance']);
-                }
+      setState(() {
+        activityData = newActivityData;
+        totalActivities = activityData.length;
+
+        weeklyActivityCount = 0;
+        weeklyDistanceTotal = 0.0;
+
+        print("what: $hasActiveSubgoal");
+
+        if (hasActiveSubgoal == true) {
+          for (var activity in activityData) {
+            if (activity['start_date'] != null) {
+              print(activity);
+              DateTime activityDate = activity['start_date'].toDate();
+              if (activityDate.isAfter(subgoalStartDate)) {
+                weeklyActivityCount++;
+                weeklyDistanceTotal += safeParseDouble(activity['distance']);
               }
             }
-          } else {
+          }
+        } 
+        //prinze updated end //////////////////////////////////////////////////////////////////////////
+        else {
             DateTime now = DateTime.now();
             if (now.isBefore(baselineEndDate) &&
                 now.isAfter(
@@ -5331,6 +5580,7 @@ String _calculateHeartRateImpact(String type, double targetValue) {
     healthRecommendations = [];
     equipmentRecommendations = [];
     progressRecommendations = [];
+    pspoRecommendations = []; //prinze pspo
 
     // Generate recommendations based on goal type
     switch (goalType) {
@@ -5955,6 +6205,68 @@ void _generateWeightManagementRecommendations() {
 
     double latestHeartRate = safeParseDouble(averageHeartrate);
 
+    //prinze PSPO-recoms start
+    //PSPO-based recommendations
+    if (activityData.length >= 2) {
+    double weightInKg = safeParseDouble(weight);
+    print("User weight for PSPO recommendation: $weightInKg kg");
+    
+    // Process activities to calculate PSPO
+    List<double> pspoValues = [];
+    print("Starting PSPO calculation for recommendations with ${activityData.length} activities:");
+    
+    for (var activity in activityData) {
+      double distance = safeParseDouble(activity['distance']);
+      double durationSeconds = safeParseDouble(activity['elapsed_time']);
+      double avgSpeed = safeParseDouble(activity['average_speed']);
+      
+      print("Activity data - Distance: $distance km, Duration: $durationSeconds s, Speed: $avgSpeed km/h");
+      
+      if (distance > 0 && durationSeconds > 0) {
+        // If average speed is not available, calculate it
+        double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+        print("Speed used for PSPO: $speedKmh km/h");
+        
+        // Calculate PSPO
+        double pspo = calculatePSPO(speedKmh, weightInKg, durationSeconds);
+        print("Calculated PSPO: $pspo W");
+        
+        if (pspo > 0) {
+          pspoValues.add(pspo);
+          print("Added PSPO value to recommendations list, total now: ${pspoValues.length}");
+        }
+      }
+    }
+    
+    print("Total valid PSPO values: ${pspoValues.length}");
+    
+    if (pspoValues.length >= 2) {
+      // Calculate recent trend
+      pspoValues.sort(); // Sort from lowest to highest
+      double avgPSPO = pspoValues.reduce((a, b) => a + b) / pspoValues.length;
+      double maxPSPO = pspoValues.last;
+      double pspoPerKg = maxPSPO / weightInKg;
+      
+      print("PSPO stats - Avg: $avgPSPO W, Max: $maxPSPO W, PSPO/kg: $pspoPerKg W/kg");
+      
+      // Recommendations based on PSPO/kg
+      if (pspoPerKg < 2.5) {
+        pspoRecommendations.add(
+          "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+        );
+      } else if (pspoPerKg < 3.5) {
+        pspoRecommendations.add(
+          "Your moderate PSPO indicates you're ready for tempo training. Add interval sessions with 3-5 minute efforts at ${zone3HeartRate.toInt()} bpm."
+        );
+      } else {
+        pspoRecommendations.add(
+          "Your strong PSPO allows for high-intensity training. Include VO2max intervals (2-3 minute efforts at ${zone4HeartRate.toInt()} bpm) for advanced gains."
+        );
+      }
+    }
+  }
+    //prinze PSPO-recoms end
+
     // Tracking progress and providing feedback
     if (latestDistance > previousDistance &&
         latestDistance > 0 &&
@@ -6187,35 +6499,6 @@ void _generateWeightManagementRecommendations() {
       // Nutrition recommendations - updated based on research and Myles C's advice
       healthRecommendations.add(
           "Pre-ride nutrition: Eat a light meal (like a banana or boiled eggs) 30-60 minutes before riding. Never start on an empty stomach. Post-ride: consume a 3:1 carb:protein ratio within 30 minutes.");
-
-      // Updated based on Holland et al. (2017) hydration research
-      if (currentDistanceValue > 30) {
-        double rideHours = currentDurationValue / 60;
-        double weightInKg = safeParseDouble(weight);
-
-        if (rideHours >= 1 && rideHours <= 2) {
-          // For 1-2 hour moderate-intensity rides
-          double recommendedFluidRate = 0.175; // midpoint of 0.15-0.20 range
-          double totalFluidRecommendation =
-              recommendedFluidRate * weightInKg * rideHours * 60;
-
-          healthRecommendations.add(
-              "For your ${rideHours.toStringAsFixed(1)}-hour moderate rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid (${(recommendedFluidRate * weightInKg).toStringAsFixed(1)} ml/min) for optimal performance.");
-        } else if (rideHours > 2) {
-          // For rides longer than 2 hours
-          double recommendedFluidRate = 0.205; // midpoint of 0.14-0.27 range
-          double totalFluidRecommendation =
-              recommendedFluidRate * weightInKg * rideHours * 60;
-
-          healthRecommendations.add(
-              "For your ${rideHours.toStringAsFixed(1)}-hour rides, consume approximately ${totalFluidRecommendation.toInt()} ml of fluid total and 60-90g of carbohydrates per hour from multiple sources to maintain energy levels.");
-        } else if (rideHours < 1 &&
-            latestAverageHeartrate > thresholdZoneLower) {
-          // For high-intensity rides under 1 hour
-          healthRecommendations.add(
-              "For high-intensity rides under 1 hour, excessive hydration can be counterproductive. Focus on pre-ride hydration instead of drinking large amounts during the ride.");
-        }
-      }
 
       // Recovery recommendations
       if (daysSinceLastActivity < 1 && weeklyActivityCount > 5) {
@@ -6893,6 +7176,16 @@ void _generateWeightManagementRecommendations() {
     List<Map<String, dynamic>> recommendationCategories = [];
     int currentPage = 0;
 
+    if (pspoRecommendations.isNotEmpty && goalType == "Endurance") { //prinze pspo carousel
+  recommendationCategories.add({
+    "title": "PSPO Insights",
+    "icon": Icons.flash_on_rounded,
+    "color": Color(0xFFFF9800), // Orange color
+    "gradientColors": [Color(0xFFFF9800), Color(0xFFE65100)], // Orange gradient
+    "recommendations": pspoRecommendations,
+    });
+  }
+    
     if (trainingRecommendations.isNotEmpty) {
       recommendationCategories.add({
         "title": "Training Tips",
@@ -7869,253 +8162,189 @@ void _generateWeightManagementRecommendations() {
   }
 
   Widget _buildGoalBasedGraphs() {
-    if (_isLoadingGraphs) {
-      return _buildLoadingGraph();
-    }
-    if (goalType == '-' || _stravaUserId == null) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _stravaUserId == null ? Icons.link_off : Icons.help_outline,
-                color: Colors.red[400],
-                size: 36,
-              ),
-              SizedBox(height: 18),
-              Text(
-                _stravaUserId == null
-                    ? "No Strava account connected"
-                    : "Goal information not available",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 15,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ],
+  if (_isLoadingGraphs) {
+    return _buildLoadingGraph();
+  }
+  if (goalType == '-' || _stravaUserId == null) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
-        ),
-      );
-    }
-    List<Widget> goalGraphs = [];
-
-    if (activityData.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _stravaUserId == null ? Icons.link_off : Icons.help_outline,
+              color: Colors.red[400],
+              size: 36,
             ),
-          ],
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.insert_chart_outlined_rounded,
-                color: Colors.grey[400],
-                size: 36,
-              ),
-              SizedBox(height: 12),
-              Text(
-                "No activity data available for your goals",
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 15,
-                  fontFamily: "Inter",
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    switch (goalType) {
-      case 'Leisure':
-        goalGraphs.add(_buildSessionsPerWeekGraph());
-        break;
-      case 'Endurance':
-        goalGraphs.add(_buildDistancePerSessionGraph());
-        goalGraphs.add(_buildDurationPerSessionGraph());
-        break;
-      case 'High Intensity Cycling':
-        goalGraphs.add(_buildCalorieWeightCorrelationGraph());
-        goalGraphs.add(_buildPaceCaloriesCorrelationGraph());
-        goalGraphs.add(_buildTemperatureCyclingCorrelationGraph());
-        goalGraphs.add(_buildNutritionActivityGraph());
-        goalGraphs.add(_buildHeartRateSpeedGraph());
-        break;
-      default:
-        goalGraphs.add(
-          Center(
-            child: Text(
-              "No specific graphs for this goal type",
+            SizedBox(height: 18),
+            Text(
+              _stravaUserId == null
+                  ? "No Strava account connected"
+                  : "Goal information not available",
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 15,
                 fontFamily: "Inter",
               ),
             ),
-          ),
-        );
-    }
-    if (baselineComparison.isNotEmpty) {
-      goalGraphs.add(_buildBaselineComparisonGraph());
-    }
-
-    if (goalGraphs.length == 1) {
-      return Container(
-        height: 650,
-        child: goalGraphs.first,
-      );
-    }
-
-    return Column(
-      children: [
-        Container(
-          height: 450,
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
-            },
-            children: goalGraphs,
-          ),
+          ],
         ),
-        SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            goalGraphs.length,
-            (index) => Container(
-              margin: EdgeInsets.symmetric(horizontal: 4),
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _currentPage == index
-                    ? Color(0xffFFA500)
-                    : Colors.grey[300],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
+  List<Widget> goalGraphs = [];
 
-  Widget _buildSessionsPerWeekGraph() {
-    Map<String, int> sessionsPerDay = {
-      'Mon': 0,
-      'Tue': 0,
-      'Wed': 0,
-      'Thu': 0,
-      'Fri': 0,
-      'Sat': 0,
-      'Sun': 0,
-    };
-
-    for (var activity in activityData) {
-      if (activity['start_date'] != null) {
-        Timestamp timestamp = activity['start_date'];
-        DateTime date = timestamp.toDate();
-
-        String dayOfWeek = DateFormat('E').format(date);
-        sessionsPerDay[dayOfWeek] = (sessionsPerDay[dayOfWeek] ?? 0) + 1;
-      }
-    }
-
-    List<SessionData> chartData = sessionsPerDay.entries
-        .map((entry) => SessionData(entry.key, entry.value))
-        .toList();
-
-    return _buildGraphContainer(
-      title: "Weekly Sessions",
-      subtitle: "Leisure activities",
-      child: SfCartesianChart(
-        primaryXAxis: CategoryAxis(
-          majorGridLines: MajorGridLines(width: 0),
-          axisLine: AxisLine(width: 1, color: Colors.grey[200]),
-          labelStyle: TextStyle(
-            color: Colors.grey[700],
-            fontFamily: 'Inter',
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        primaryYAxis: NumericAxis(
-          majorGridLines: MajorGridLines(
-            width: 0.5,
-            color: Colors.grey[200],
-            dashArray: <double>[3, 3],
-          ),
-          axisLine: AxisLine(width: 0),
-          labelFormat: '{value}',
-          labelStyle: TextStyle(
-            color: Colors.grey[700],
-            fontFamily: 'Inter',
-            fontSize: 10,
-          ),
-        ),
-        tooltipBehavior: TooltipBehavior(
-          enable: true,
-          color: Colors.grey[800],
-          textStyle: TextStyle(color: Colors.white, fontSize: 12),
-        ),
-        series: <ChartSeries>[
-          ColumnSeries<SessionData, String>(
-            dataSource: chartData,
-            xValueMapper: (SessionData data, _) => data.day,
-            yValueMapper: (SessionData data, _) => data.count,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-            color: Color(0xffFFA500),
-            dataLabelSettings: DataLabelSettings(
-              isVisible: true,
-              textStyle: TextStyle(
-                color: Colors.black87,
-                fontFamily: 'Inter',
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+  if (activityData.isEmpty) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.insert_chart_outlined_rounded,
+              color: Colors.grey[400],
+              size: 36,
+            ),
+            SizedBox(height: 12),
+            Text(
+              "No activity data available for your goals",
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 15,
+                fontFamily: "Inter",
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  switch (goalType) {
+    case 'Leisure':
+     //goalGraphs.add(_buildSessionsPerWeekGraph()); //prinze unknown commented
+      break;
+    case 'Endurance':
+      // For endurance goals, display PSPO graph first as a separate container
+      goalGraphs.add(buildPSPOAnalysisGraph()); 
+      
+      // Add other endurance-related graphs
+      goalGraphs.add(_buildDistancePerSessionGraph());
+      goalGraphs.add(_buildDurationPerSessionGraph());
+      break;
+    case 'High Intensity Cycling':
+      goalGraphs.add(_buildCalorieWeightCorrelationGraph());
+      goalGraphs.add(_buildPaceCaloriesCorrelationGraph());
+      goalGraphs.add(_buildTemperatureCyclingCorrelationGraph());
+      goalGraphs.add(_buildNutritionActivityGraph());
+      goalGraphs.add(_buildHeartRateSpeedGraph());
+      break;
+    default:
+      goalGraphs.add(
+        Center(
+          child: Text(
+            "No specific graphs for this goal type",
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 15,
+              fontFamily: "Inter",
+            ),
+          ),
+        ),
+      );
+  }
+  if (baselineComparison.isNotEmpty) {
+    goalGraphs.add(_buildBaselineComparisonGraph());
+  }
+
+  // Modified to ensure graphs display properly
+  if (goalGraphs.length == 1) {
+    return Container(
+      height: 650,
+      child: goalGraphs.first,
+    );
+  }
+
+  return Column(
+    children: [
+      // If it's endurance goal, show the PSPO graph with fixed height in its own container
+      if (goalType == 'Endurance') Container(
+        height: 500, // Increase the height for better visibility
+        margin: EdgeInsets.only(bottom: 20),
+        child: goalGraphs[0], // PSPO graph
+      ),
+      
+      // Show remaining graphs in a PageView
+      Container(
+        height: 450,
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              // If endurance, offset the index to account for the separately shown PSPO graph
+              _currentPage = goalType == 'Endurance' ? index + 1 : index;
+            });
+          },
+          // If endurance, skip the first graph (PSPO) which is shown separately
+          children: goalType == 'Endurance' ? goalGraphs.sublist(1) : goalGraphs,
+        ),
+      ),
+      SizedBox(height: 10),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          goalType == 'Endurance' ? goalGraphs.length - 1 : goalGraphs.length,
+          (index) => Container(
+            margin: EdgeInsets.symmetric(horizontal: 4),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _currentPage == (goalType == 'Endurance' ? index + 1 : index)
+                  ? Color(0xffFFA500)
+                  : Colors.grey[300],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
   Widget _buildDistancePerSessionGraph() {
+    print("Building distance graph with ${activityData.length} activities"); //prinze debugger
     List<ActivitySessionData> chartData = [];
     int sessionCount = 1;
 
     for (var activity in activityData.reversed) {
       double distance = safeParseDouble(activity['distance']);
-
+      print("Activity $sessionCount: Distance=$distance"); //prinze debugger
       chartData.add(ActivitySessionData("S$sessionCount", distance));
       sessionCount++;
     }
@@ -8491,245 +8720,245 @@ void _generateWeightManagementRecommendations() {
     );
   }
 
-  Widget _buildWeeklySummary() {
-    var media = MediaQuery.of(context).size;
+  Widget _buildWeeklySummary() { //prinze updated to show calorie balance on non-endurance only
+  var media = MediaQuery.of(context).size;
 
-    double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
-    double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
+  double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
+  double weeklyCaloriesConsumed = _calculateWeeklyCaloriesConsumed();
 
-    // Make sure flex values are at least 1 to avoid divide by zero errors
-    int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
-    int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
+  // Make sure flex values are at least 1 to avoid divide by zero errors
+  int burnedFlex = math.max(1, weeklyCaloriesBurned.toInt());
+  int consumedFlex = math.max(1, weeklyCaloriesConsumed.toInt());
 
-    // Scale down if values are too large to prevent UI overflow
-    if (burnedFlex > 10000 || consumedFlex > 10000) {
-      int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
-      burnedFlex = burnedFlex ~/ divisor;
-      consumedFlex = consumedFlex ~/ divisor;
-    }
+  // Scale down if values are too large to prevent UI overflow
+  if (burnedFlex > 10000 || consumedFlex > 10000) {
+    int divisor = math.max(burnedFlex, consumedFlex) ~/ 1000;
+    burnedFlex = burnedFlex ~/ divisor;
+    consumedFlex = consumedFlex ~/ divisor;
+  }
 
-    // Calculate a fixed card height that will be safe for all cards
-    double cardHeight = math.min(media.width * 0.45, 180);
+  // Calculate a fixed card height that will be safe for all cards
+  double cardHeight = math.min(media.width * 0.45, 180);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 5, bottom: 15),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Row(
-                  children: [
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        "Weekly Summary",
-                        style: TextStyle(
-                          fontFamily: 'Fredoka-SemiBold',
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xffFFA500), Color(0xffFF8C00)],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  "This Week",
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Row(
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 5, bottom: 15),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
+            Flexible(
+              child: Row(
+                children: [
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      "Weekly Summary",
+                      style: TextStyle(
+                        fontFamily: 'Fredoka-SemiBold',
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Cycling\nSessions",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFFA500).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.directions_bike_rounded,
-                              color: Color(0xffFFA500),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Value display
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) {
-                                  return LinearGradient(
-                                          colors: [
-                                        Color(0xffFFA500),
-                                        Color(0xffFF8C00)
-                                      ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight)
-                                      .createShader(Rect.fromLTRB(
-                                          0, 0, bounds.width, bounds.height));
-                                },
-                                child: Text(
-                                  "$weeklyActivityCount",
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                "of ${daysPerWeek} goal",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Progress bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: weeklyActivityCount /
-                              math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
-                          minHeight: 8,
-                          backgroundColor: Colors.grey[200],
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                ],
               ),
             ),
-            Expanded(
-              child: _buildWeeklyCaloriesBurnedCard(cardHeight),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xffFFA500), Color(0xffFF8C00)],
+                ),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                "This Week",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
+      ),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Cycling\nSessions",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFFA500).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_bike_rounded,
+                            color: Color(0xffFFA500),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
 
-        SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
+                    // Value display
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (bounds) {
+                                return LinearGradient(
+                                        colors: [
+                                      Color(0xffFFA500),
+                                      Color(0xffFF8C00)
+                                    ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight)
+                                    .createShader(Rect.fromLTRB(
+                                        0, 0, bounds.width, bounds.height));
+                              },
+                              child: Text(
+                                "$weeklyActivityCount",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              "of ${daysPerWeek} goal",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: weeklyActivityCount /
+                            math.max(1, (int.tryParse(daysPerWeek) ?? 7)),
+                        minHeight: 8,
+                        backgroundColor: Colors.grey[200],
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xffFFA500)),
+                      ),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Heart Rate",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _buildWeeklyCaloriesBurnedCard(cardHeight),
+          ),
+        ],
+      ),
+
+      SizedBox(height: 15),
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: cardHeight,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            "Heart Rate",
+                            style: TextStyle(
+                              fontFamily: 'Fredoka-SemiBold',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF5900).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.favorite_rounded,
-                              color: Color(0xffFF5900),
-                              size: 18,
-                            ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Color(0xffFF5900).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            color: Color(0xffFF5900),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ), //end of prinze update
 
                       // Value display
                       Expanded(
@@ -8965,6 +9194,7 @@ void _generateWeightManagementRecommendations() {
         SizedBox(height: 15),
 
         // Bottom Card - Caloric Balance
+        if (goalType != 'Endurance') 
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
@@ -8981,9 +9211,217 @@ void _generateWeightManagementRecommendations() {
           ),
           child: _buildCaloricBalanceSection(),
         ),
-      ],
-    );
+      
+      // For Endurance goals, show endurance-specific section instead
+      if (goalType == 'Endurance')
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: _buildEnduranceTrendSection(),
+        ),
+    ],
+  );
+}
+
+  Widget _buildEnduranceTrendSection() {
+  // Create a summary of endurance progress
+  double avgDistance = 0;
+  double avgDuration = 0;
+  double avgSpeed = 0;
+  int activityCount = 0;
+  
+  // Calculate average metrics from recent activities
+  for (var activity in activityData) {
+    double distance = safeParseDouble(activity['distance']);
+    double durationSeconds = safeParseDouble(activity['elapsed_time']);
+    double durationMinutes = durationSeconds / 60.0;
+    double speed = safeParseDouble(activity['average_speed']);
+    
+    if (distance > 0 && durationMinutes > 0) {
+      avgDistance += distance;
+      avgDuration += durationMinutes;
+      if (speed > 0) {
+        avgSpeed += speed;
+      } else if (durationMinutes > 0) {
+        // Calculate speed if not provided
+        avgSpeed += (distance / (durationMinutes / 60));
+      }
+      activityCount++;
+    }
   }
+  
+  // Calculate averages
+  if (activityCount > 0) {
+    avgDistance /= activityCount;
+    avgDuration /= activityCount;
+    avgSpeed /= activityCount;
+  }
+  
+  // Format metrics
+  String formattedDistance = avgDistance.toStringAsFixed(1);
+  String formattedDuration = avgDuration.toStringAsFixed(0);
+  String formattedSpeed = avgSpeed.toStringAsFixed(1);
+  
+  // Progress toward endurance target
+  double targetDistanceValue = safeParseDouble(targetDistance);
+  double progressPercent = targetDistanceValue > 0 ? (avgDistance / targetDistanceValue) * 100 : 0;
+  
+  return Padding(
+    padding: const EdgeInsets.all(15),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                "Endurance Progress",
+                style: TextStyle(
+                  fontFamily: 'Fredoka-SemiBold',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xffFFA500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.timer_outlined,
+                color: Color(0xffFFA500),
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 15),
+        
+        // Endurance metrics cards
+        Row(
+          children: [
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Distance", 
+                "$formattedDistance km", 
+                Icons.straighten_rounded, 
+                Colors.blue[700]!
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Duration", 
+                "$formattedDuration min", 
+                Icons.timer_outlined, 
+                Colors.green[700]!
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _buildEnduranceMetricCard(
+                "Avg Speed", 
+                "$formattedSpeed km/h", 
+                Icons.speed_rounded, 
+                Colors.orange[700]!
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 15),
+        
+        // Target progress
+        if (targetDistanceValue > 0) Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Progress toward target distance (${targetDistanceValue}km)",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progressPercent / 100,
+                minHeight: 10,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  progressPercent >= 100 ? Colors.green[700]! : Color(0xffFFA500)
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "${progressPercent.toStringAsFixed(0)}% of target",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: progressPercent >= 100 ? Colors.green[700] : Color(0xffFFA500),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper widget for endurance metrics
+Widget _buildEnduranceMetricCard(String label, String value, IconData icon, Color color) {
+  return Container(
+    padding: EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.2)),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        SizedBox(height: 5),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'Fredoka-SemiBold',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 10,
+            color: Colors.grey[700],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCaloricBalanceSection() {
     double weeklyCaloriesBurned = _calculateWeeklyCaloriesBurned();
@@ -9460,17 +9898,18 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
-  int _selectedCategory = 0;
 
   @override
   void initState() {
     super.initState();
 
+    // Create animation controller
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
 
+    // Create animations
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
@@ -9485,6 +9924,7 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
       ),
     );
 
+    // Start the animation
     _animationController.forward();
   }
 
@@ -9495,77 +9935,14 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
   }
 
   void _dismiss() {
+    // Reverse the animation and then dismiss
     _animationController.reverse().then((_) {
       widget.onDismiss();
     });
   }
 
-  List<Map<String, dynamic>> _categorizeRecommendations() {
-    // Create categories based on first words or content patterns
-    final List<Map<String, dynamic>> categories = [];
-    final Map<String, List<String>> categorizedItems = {};
-    
-    // Simple categorization based on keywords
-    for (String rec in widget.recommendations) {
-      String category = "General Tips";
-      
-      // Simple keyword detection for categorization
-      if (rec.toLowerCase().contains("aim") || 
-          rec.toLowerCase().contains("goal") || 
-          rec.toLowerCase().contains("target")) {
-        category = "Goals & Targets";
-      } else if (rec.toLowerCase().contains("increase") || 
-                rec.toLowerCase().contains("improve") || 
-                rec.toLowerCase().contains("boost")) {
-        category = "Improvements";
-      } else if (rec.toLowerCase().contains("add") || 
-                rec.toLowerCase().contains("include") || 
-                rec.toLowerCase().contains("try")) {
-        category = "Suggestions";
-      } else if (rec.toLowerCase().contains("avoid") || 
-                rec.toLowerCase().contains("reduce") || 
-                rec.toLowerCase().contains("limit")) {
-        category = "Cautions";
-      }
-      
-      if (!categorizedItems.containsKey(category)) {
-        categorizedItems[category] = [];
-      }
-      categorizedItems[category]!.add(rec);
-    }
-    
-    // Convert to list format
-    categorizedItems.forEach((key, value) {
-      categories.add({
-        'name': key,
-        'items': value,
-      });
-    });
-    
-    // If we only have one category, create artificial divisions
-    if (categories.length == 1) {
-      final items = categories[0]['items'] as List<String>;
-      if (items.length >= 6) {
-        int midpoint = items.length ~/ 2;
-        categories.clear();
-        categories.add({
-          'name': 'Key Recommendations',
-          'items': items.sublist(0, midpoint),
-        });
-        categories.add({
-          'name': 'Additional Tips',
-          'items': items.sublist(midpoint),
-        });
-      }
-    }
-    
-    return categories;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final categories = _categorizeRecommendations();
-    
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -9650,122 +10027,74 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
                           ),
                         ),
 
-                        // Category tabs for filtering recommendations
-                        if (categories.length > 1)
-                          Container(
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(4),
-                                topRight: Radius.circular(4),
-                              ),
-                            ),
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: categories.length,
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedCategory = index;
-                                    });
-                                  },
-                                  child: AnimatedContainer(
-                                    duration: Duration(milliseconds: 200),
-                                    margin: EdgeInsets.symmetric(horizontal: 6),
-                                    padding: EdgeInsets.symmetric(horizontal: 16),
-                                    decoration: BoxDecoration(
-                                      color: _selectedCategory == index
-                                          ? widget.color
-                                          : Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: _selectedCategory == index
-                                          ? [
-                                              BoxShadow(
-                                                color: widget.color.withOpacity(0.3),
-                                                blurRadius: 8,
-                                                spreadRadius: 1,
-                                                offset: Offset(0, 2),
-                                              )
-                                            ]
-                                          : null,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      categories[index]['name'],
-                                      style: TextStyle(
-                                        color: _selectedCategory == index
-                                            ? Colors.white
-                                            : Colors.grey[700],
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-
-                        // Content area with cards layout instead of list
+                        // Content area - takes all available space
                         Expanded(
                           child: InkWell(
-                            onTap: () {},
+                            onTap: () {
+                              // Prevent taps inside content from closing
+                            },
                             splashColor: Colors.transparent,
                             highlightColor: Colors.transparent,
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: categories.length > 1
-                                    ? BorderRadius.only(
-                                        bottomLeft: Radius.circular(20),
-                                        bottomRight: Radius.circular(20),
-                                      )
-                                    : BorderRadius.only(
-                                        topLeft: Radius.circular(4),
-                                        topRight: Radius.circular(4),
-                                        bottomLeft: Radius.circular(20),
-                                        bottomRight: Radius.circular(20),
-                                      ),
+                                borderRadius: BorderRadius.only(
+                                  bottomLeft: Radius.circular(20),
+                                  bottomRight: Radius.circular(20),
+                                ),
                               ),
-                              child: CustomScrollView(
+                              child: ListView.builder(
                                 physics: BouncingScrollPhysics(),
-                                slivers: [
-                                  SliverPadding(
+                                padding: EdgeInsets.all(16),
+                                itemCount: widget.recommendations.length,
+                                itemBuilder: (context, index) {
+                                  return Container(
+                                    margin: EdgeInsets.only(bottom: 14),
                                     padding: EdgeInsets.all(16),
-                                    sliver: SliverGrid(
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        mainAxisSpacing: 12,
-                                        crossAxisSpacing: 12,
-                                        // Let the grid items determine their own height
-                                        mainAxisExtent: null,
-                                        childAspectRatio: 0.8, // Default aspect ratio
-                                      ),
-                                      delegate: SliverChildBuilderDelegate(
-                                        (context, index) {
-                                          final recommendation = categories[_selectedCategory]['items'][index];
-                                          return LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              return _buildFlexibleRecommendationCard(
-                                                recommendation, 
-                                                index, 
-                                                widget.color,
-                                                constraints.maxWidth,
-                                              );
-                                            },
-                                          );
-                                        },
-                                        childCount: categories.isEmpty 
-                                          ? 0 
-                                          : categories[_selectedCategory]['items'].length,
-                                      ),
+                                    decoration: BoxDecoration(
+                                      color: widget.color.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: widget.color.withOpacity(0.2),
+                                          width: 1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: widget.color.withOpacity(0.05),
+                                          spreadRadius: 0,
+                                          blurRadius: 5,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          margin: EdgeInsets.only(top: 2),
+                                          child: Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 22,
+                                            color: widget.color,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            widget.recommendations[index],
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 16,
+                                              color: Colors.black87,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -9781,132 +10110,6 @@ class _AnimatedFullscreenOverlayState extends State<_AnimatedFullscreenOverlay>
       },
     );
   }
-
- Widget _buildFlexibleRecommendationCard(String recommendation, int index, Color color, double width) {
-  // Generate a random spotlight position for visual interest
-  final double randomX = 0.2 + 0.6 * math.Random().nextDouble();
-  final double randomY = 0.2 + 0.6 * math.Random().nextDouble();
-
-  // List of icons to use randomly for visual variety
-  final List<IconData> icons = [
-    Icons.lightbulb_outline,
-    Icons.check_circle_outline,
-    Icons.star_outline,
-    Icons.favorite_outline,
-    Icons.local_fire_department_outlined,
-    Icons.water_drop_outlined,
-    Icons.directions_run_outlined,
-    Icons.restaurant_outlined,
-  ];
-  
-  final randomIcon = icons[index % icons.length];
-  
-  // Calculate the approximate height based on text length
-  // This is an estimate to help with initial layout
-  final double estimatedTextHeight = (recommendation.length / 25) * 20.0;
-  final double minCardHeight = 120.0; // Minimum height for any card
-  final double cardHeight = math.max(minCardHeight, estimatedTextHeight + 80); // 80px for padding, icon, etc.
-  
-  return Container(
-    height: cardHeight,
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment(randomX, randomY),
-        end: Alignment(randomX - 1, randomY - 1),
-        colors: [
-          color.withOpacity(0.05),
-          Colors.white,
-        ],
-      ),
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: color.withOpacity(0.1),
-          blurRadius: 10,
-          spreadRadius: 0,
-        ),
-      ],
-      border: Border.all(color: color.withOpacity(0.1)),
-    ),
-    child: Stack(
-      children: [
-        // Optional subtle pattern for visual interest
-        Positioned(
-          right: -15,
-          bottom: -15,
-          child: Icon(
-            Icons.format_quote,
-            size: 50,
-            color: color.withOpacity(0.05),
-          ),
-        ),
-        
-        // Number badge
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.8),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                "${index + 1}",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        ),
-        
-        // Content - wrap in SingleChildScrollView to handle overflow
-        Padding(
-          padding: EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icon
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  randomIcon,
-                  size: 20,
-                  color: color,
-                ),
-              ),
-              SizedBox(height: 10),
-              
-              // Flexible text that expands to fill available space
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: BouncingScrollPhysics(),
-                  child: Text(
-                    recommendation,
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
 }
 
 class _AnimatedAutoSizingOverlayState extends State<_AnimatedAutoSizingOverlay>
