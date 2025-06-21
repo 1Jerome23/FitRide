@@ -817,6 +817,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     _weekStartDate = DateTime.now();
     _weekEndDate = DateTime.now().add(Duration(days: 7));
     _fetchSubgoalDetails();
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      checkAndUpdateBaselineComplete(uid);
+    }
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 5));
 
@@ -5045,6 +5049,61 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       },
     );
   }
+
+  Future<void> checkAndUpdateBaselineComplete(String userId) async {
+  final firestore = FirebaseFirestore.instance;
+
+  try {
+    // Step 1: Get the user's goal document
+    final goalSnapshot = await firestore
+        .collection('goals')
+        .doc(userId)
+        .get();
+
+    if (!goalSnapshot.exists) {
+      print('Goal document not found for user $userId');
+      return;
+    }
+
+    int daysPerWeek = goalSnapshot.data()?['DaysPerWeek'] ?? 0;
+
+    // Step 2: Define baseline week range (example: last 7 days)
+    DateTime weekStart = _goalCreationDate;
+    DateTime weekEnd = weekStart.add(Duration(days: 6));
+
+    // Step 3: Query user activities within baseline week
+    final activitySnapshot = await firestore
+        .collection('activities')
+        .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(weekEnd))
+        .get();
+
+    // Step 4: Count unique days the user was active
+    Set<String> activeDays = {};
+
+    for (var doc in activitySnapshot.docs) {
+      DateTime date = (doc['date'] as Timestamp).toDate();
+      String dateString = "${date.year}-${date.month}-${date.day}";
+      activeDays.add(dateString);
+    }
+
+    print('Active days: ${activeDays.length} / Goal: $daysPerWeek');
+
+    // Step 5: Update baseline_complete if condition met
+    if (activeDays.length >= daysPerWeek) {
+      await firestore.collection('goals').doc(userId).update({
+        'baseline_complete': true,
+      });
+      print('Baseline marked as complete ✅');
+    } else {
+      print('Baseline not yet complete ❌');
+    }
+
+  } catch (e) {
+    print('Error checking baseline: $e');
+  }
+}
 
 // Helper method to build consistent input fields with fully rounded icon backgrounds
   Widget _buildInputField({
