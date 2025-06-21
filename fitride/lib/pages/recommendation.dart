@@ -92,8 +92,8 @@ class CalorieData {
     }
     // Default fallback - use last 7 days
   else {
-      weekStartDate = now;
-      weekEndDate = now.add(const Duration(days: 6));
+      weekStartDate = now.subtract(const Duration(days: 6));
+      weekEndDate = now;
     }
 
     print(
@@ -4770,6 +4770,9 @@ Future<void> _fetchUserData() async {
         } else if (goalType == 'Endurance') {
           targetDistance = goalsDoc['targetDistance']?.toString() ?? "0";
           targetDuration = goalsDoc['targetDuration']?.toString() ?? "0";
+          baselineStartDate = goalsDoc['baseline_StartDate']?.toDate();
+          baselineEndDate = goalsDoc['baseline_EndDate']?.toDate();
+          daysPerWeek = goalsDoc['daysPerWeek']?.toString() ?? "0";
         }
       });
     }
