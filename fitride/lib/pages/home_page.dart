@@ -2703,7 +2703,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       );
                     },
-                    child: Padding(
+                    
+                    child: (_userGoal == "High Intensity Cycling"
+                    ? Padding(
                       padding: const EdgeInsets.only(left: 5, bottom: 15),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2773,7 +2775,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ),
                         ],
                       ),
-                    ),
+                    )
+                    : SizedBox.shrink()),
                   ),
 
                   TweenAnimationBuilder(
@@ -2789,7 +2792,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       );
                     },
-                    child: _buildMealsHistory(),
+                    child: _userGoal == 'High Intensity Cycling'
+                        ? _buildMealsHistory()
+                        : SizedBox.shrink(),
+                    
                   ),
 
                   SizedBox(height: 25),

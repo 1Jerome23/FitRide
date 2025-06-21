@@ -162,74 +162,73 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   late DateTime _weekStartDate;
   late DateTime _weekEndDate;
 
- Future<void> _fetchAllWeeklyGoalData() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null || userGoal == null) return;
+  Future<void> _fetchAllWeeklyGoalData() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
 
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    _currentWeekNumber = getCurrentWeekNumber();
-    print("Current week number: $_currentWeekNumber");
-
-    String goalId = userGoal!['id'] ?? "";
-    if (goalId.isEmpty) {
-      print("Goal ID is empty");
-      return;
-    }
-
-    // First, fetch existing weekly progress data from Firebase
-    QuerySnapshot weeklySnapshot = await FirebaseFirestore.instance
-        .collection('weekly_progress')
-        .where('uid', isEqualTo: uid)
-        .where('goalId', isEqualTo: goalId)
-        .orderBy('weekNumber', descending: false)
-        .get();
-
-    _weeklyGoalData.clear();
-
-    for (var doc in weeklySnapshot.docs) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      int weekNum = data['weekNumber'] ?? 0;
-
-      if (weekNum > 0) {
-        data['docId'] = doc.id;
-        _weeklyGoalData[weekNum] = data;
-        print("Loaded existing weekly data for week $weekNum");
-      }
-    }
-
-    // Now fetch and map weight data by week
-    await _fetchAndMapWeightDataByWeek();
-
-    // Fetch and map activities data by week
-    await _fetchAndMapActivitiesDataByWeek();
-
-    // Initialize current week if it doesn't exist
-    if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
-      _initializeWeekData(uid, goalId, _currentWeekNumber);
-    }
-
-    // Save all updated data to Firebase
-    for (int weekNum in _weeklyGoalData.keys) {
-      await _saveWeeklyProgressToFirestore(_weeklyGoalData[weekNum]!);
-    }
-
-    // Fetch subgoal data if needed
-    if (hasActiveSubgoal) {
-      await _fetchWeeklySubgoalData(uid, goalId);
-    }
-
-  } catch (e) {
-    print("Error fetching weekly data: $e");
-  } finally {
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
+
+    try {
+      _currentWeekNumber = getCurrentWeekNumber();
+      print("Current week number: $_currentWeekNumber");
+
+      String goalId = userGoal!['id'] ?? "";
+      if (goalId.isEmpty) {
+        print("Goal ID is empty");
+        return;
+      }
+
+      // First, fetch existing weekly progress data from Firebase
+      QuerySnapshot weeklySnapshot = await FirebaseFirestore.instance
+          .collection('weekly_progress')
+          .where('uid', isEqualTo: uid)
+          .where('goalId', isEqualTo: goalId)
+          .orderBy('weekNumber', descending: false)
+          .get();
+
+      _weeklyGoalData.clear();
+
+      for (var doc in weeklySnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        int weekNum = data['weekNumber'] ?? 0;
+
+        if (weekNum > 0) {
+          data['docId'] = doc.id;
+          _weeklyGoalData[weekNum] = data;
+          print("Loaded existing weekly data for week $weekNum");
+        }
+      }
+
+      // Now fetch and map weight data by week
+      await _fetchAndMapWeightDataByWeek();
+
+      // Fetch and map activities data by week
+      await _fetchAndMapActivitiesDataByWeek();
+
+      // Initialize current week if it doesn't exist
+      if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+        _initializeWeekData(uid, goalId, _currentWeekNumber);
+      }
+
+      // Save all updated data to Firebase
+      for (int weekNum in _weeklyGoalData.keys) {
+        await _saveWeeklyProgressToFirestore(_weeklyGoalData[weekNum]!);
+      }
+
+      // Fetch subgoal data if needed
+      if (hasActiveSubgoal) {
+        await _fetchWeeklySubgoalData(uid, goalId);
+      }
+    } catch (e) {
+      print("Error fetching weekly data: $e");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
-}
 
 // Initialize data structure for the current week
   void _initializeCurrentWeekData(String uid, String goalId) {
@@ -337,265 +336,266 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   }
 
   Future<void> _updateWeeklyProgressData() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null || userGoal == null) return;
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
 
-  // Ensure we have the current week's data
-  if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
-    String goalId = userGoal!['id'] ?? "";
-    _initializeCurrentWeekData(uid, goalId);
-  }
+    // Ensure we have the current week's data
+    if (!_weeklyGoalData.containsKey(_currentWeekNumber)) {
+      String goalId = userGoal!['id'] ?? "";
+      _initializeCurrentWeekData(uid, goalId);
+    }
 
-  // Get the current week's data
-  Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
+    // Get the current week's data
+    Map<String, dynamic> weekData = _weeklyGoalData[_currentWeekNumber]!;
 
-  // Update common fields
-  weekData['sessionsCompleted'] = _weeklyActivities.length;
-  weekData['totalDuration'] = _totalWeeklyDuration;
-  weekData['totalDistance'] = _totalWeeklyDistance;
-  weekData['uniqueDays'] = _uniqueDays.toList();
+    // Update common fields
+    weekData['sessionsCompleted'] = _weeklyActivities.length;
+    weekData['totalDuration'] = _totalWeeklyDuration;
+    weekData['totalDistance'] = _totalWeeklyDistance;
+    weekData['uniqueDays'] = _uniqueDays.toList();
 
-  // Update goal-specific fields
-  switch (userGoal!['goalType']) {
-    case 'Leisure':
-      weekData['dayProgress'] = _weeklyDaysProgress;
-      break;
-
-    case 'High Intensity Cycling':
-      // Only update end weight if current weight is valid
-      if (_currentUserWeight > 0) {
-        weekData['weekEndWeight'] = _currentUserWeight;
-      }
-
-      // Calculate calories burned from activities
-      double totalCalories = 0.0;
-      for (var activity in _weeklyActivities) {
-        if (activity.containsKey('calories_burned')) {
-          totalCalories += safeParseDouble(activity['calories_burned']);
-        }
-      }
-      weekData['caloriesBurned'] = totalCalories;
-
-      // Calculate weight loss progress
-      if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
-        weekData['weeklyWeightChange'] =
-            weekData['weekEndWeight'] - weekData['weekStartWeight'];
-      }
-      break;
-
-    case 'Endurance':
-      weekData['bestDistance'] = _bestDistance;
-
-      // Calculate pace if we have valid duration and distance
-      if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
-        double pace =
-            _getBestActivityDuration() / _bestDistance; // minutes per km
-        weekData['bestPace'] = pace;
-      }
-
-      if (_bestDistanceDate != null) {
-        weekData['bestDistanceDate'] = _bestDistanceDate;
-      }
-      break;
-  }
-
-  // Update subgoal progress if there's an active subgoal
-  if (hasActiveSubgoal) {
-    weekData['subgoalType'] = subgoalType;
-    weekData['subgoalTargetValue'] = subgoalTargetValue;
-
-    // Set current value based on subgoal type
-    switch (subgoalType) {
-      case "distance":
-        // Use actual average for all completed activities
-        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDistance / _weeklyActivities.length;
+    // Update goal-specific fields
+    switch (userGoal!['goalType']) {
+      case 'Leisure':
+        weekData['dayProgress'] = _weeklyDaysProgress;
         break;
 
-      case "pace":
-        // Calculate average pace for all completed activities
-        if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
-          double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
-          weekData['subgoalCurrentValue'] = avgPace;
+      case 'High Intensity Cycling':
+        // Only update end weight if current weight is valid
+        if (_currentUserWeight > 0) {
+          weekData['weekEndWeight'] = _currentUserWeight;
+        }
+
+        // Calculate calories burned from activities
+        double totalCalories = 0.0;
+        for (var activity in _weeklyActivities) {
+          if (activity.containsKey('calories_burned')) {
+            totalCalories += safeParseDouble(activity['calories_burned']);
+          }
+        }
+        weekData['caloriesBurned'] = totalCalories;
+
+        // Calculate weight loss progress
+        if (weekData['weekStartWeight'] > 0 && weekData['weekEndWeight'] > 0) {
+          weekData['weeklyWeightChange'] =
+              weekData['weekEndWeight'] - weekData['weekStartWeight'];
         }
         break;
 
-      case "duration":
-        // Use actual average for all completed activities
-        weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
-            ? 0.0
-            : _totalWeeklyDuration / _weeklyActivities.length;
-        break;
+      case 'Endurance':
+        weekData['bestDistance'] = _bestDistance;
 
-      case "maintain":
-        // Just count the number of activities as a progress indicator
-        weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+        // Calculate pace if we have valid duration and distance
+        if (_bestDistance > 0 && _getBestActivityDuration() > 0) {
+          double pace =
+              _getBestActivityDuration() / _bestDistance; // minutes per km
+          weekData['bestPace'] = pace;
+        }
+
+        if (_bestDistanceDate != null) {
+          weekData['bestDistanceDate'] = _bestDistanceDate;
+        }
         break;
     }
 
-    // Calculate progress percentage for the subgoal
-    if (weekData['subgoalBaseline'] != null &&
-        weekData['subgoalTargetValue'] != null &&
-        weekData['subgoalCurrentValue'] != null) {
-      double baseline = weekData['subgoalBaseline'];
-      double target = weekData['subgoalTargetValue'];
-      double current = weekData['subgoalCurrentValue'];
+    // Update subgoal progress if there's an active subgoal
+    if (hasActiveSubgoal) {
+      weekData['subgoalType'] = subgoalType;
+      weekData['subgoalTargetValue'] = subgoalTargetValue;
 
-      // Different calculation based on subgoal type
-      if (subgoalType == "pace") {
-        // For pace, lower is better (improvement is baseline → target where baseline > target)
-        if (baseline > target) {
-          double progress = (baseline - current) / (baseline - target);
-          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+      // Set current value based on subgoal type
+      switch (subgoalType) {
+        case "distance":
+          // Use actual average for all completed activities
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDistance / _weeklyActivities.length;
+          break;
+
+        case "pace":
+          // Calculate average pace for all completed activities
+          if (_totalWeeklyDistance > 0 && _totalWeeklyDuration > 0) {
+            double avgPace = _totalWeeklyDuration / _totalWeeklyDistance;
+            weekData['subgoalCurrentValue'] = avgPace;
+          }
+          break;
+
+        case "duration":
+          // Use actual average for all completed activities
+          weekData['subgoalCurrentValue'] = _weeklyActivities.isEmpty
+              ? 0.0
+              : _totalWeeklyDuration / _weeklyActivities.length;
+          break;
+
+        case "maintain":
+          // Just count the number of activities as a progress indicator
+          weekData['subgoalCurrentValue'] = _weeklyActivities.length.toDouble();
+          break;
+      }
+
+      // Calculate progress percentage for the subgoal
+      if (weekData['subgoalBaseline'] != null &&
+          weekData['subgoalTargetValue'] != null &&
+          weekData['subgoalCurrentValue'] != null) {
+        double baseline = weekData['subgoalBaseline'];
+        double target = weekData['subgoalTargetValue'];
+        double current = weekData['subgoalCurrentValue'];
+
+        // Different calculation based on subgoal type
+        if (subgoalType == "pace") {
+          // For pace, lower is better (improvement is baseline → target where baseline > target)
+          if (baseline > target) {
+            double progress = (baseline - current) / (baseline - target);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
+        } else {
+          // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
+          if (target > baseline) {
+            double progress = (current - baseline) / (target - baseline);
+            weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
+          }
         }
+      }
+    }
+
+    // Save to Firestore - Uncomment this line to save the data
+    await _saveWeeklyProgressToFirestore(weekData);
+
+    // Check if the subgoal has been completed
+    if (hasActiveSubgoal &&
+        weekData['subgoalProgress'] != null &&
+        weekData['subgoalProgress'] >= 1.0) {
+      QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .where('completedSuccessfully', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (subgoalQuery.docs.isNotEmpty) {
+        _showSubgoalCompletionDialog();
+      }
+    }
+  }
+
+  Future<void> _saveWeeklyProgressToFirestore(
+      Map<String, dynamic> weekData) async {
+    try {
+      // Check if this document already exists (by docId)
+      if (weekData.containsKey('docId')) {
+        // Update existing document
+        await FirebaseFirestore.instance
+            .collection('weekly_progress')
+            .doc(weekData['docId'])
+            .update(weekData);
+
+        print("Updated weekly progress for week ${weekData['weekNumber']}");
       } else {
-        // For distance and duration, higher is better (improvement is baseline → target where baseline < target)
-        if (target > baseline) {
-          double progress = (current - baseline) / (target - baseline);
-          weekData['subgoalProgress'] = progress.clamp(0.0, 1.0);
-        }
+        // Create new document
+        DocumentReference docRef = await FirebaseFirestore.instance
+            .collection('weekly_progress')
+            .add(weekData);
+
+        // Store the doc ID for future updates
+        weekData['docId'] = docRef.id;
+
+        print(
+            "Created new weekly progress record for week ${weekData['weekNumber']}");
       }
+    } catch (e) {
+      print("Error saving weekly progress: $e");
     }
   }
-
-  // Save to Firestore - Uncomment this line to save the data
-  await _saveWeeklyProgressToFirestore(weekData);
-
-  // Check if the subgoal has been completed
-  if (hasActiveSubgoal &&
-      weekData['subgoalProgress'] != null &&
-      weekData['subgoalProgress'] >= 1.0) {
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: uid)
-        .where('completedSuccessfully', isEqualTo: true)
-        .limit(1)
-        .get();
-
-    if (subgoalQuery.docs.isNotEmpty) {
-      _showSubgoalCompletionDialog();
-    }
-  }
-}
-
-Future<void> _saveWeeklyProgressToFirestore(Map<String, dynamic> weekData) async {
-  try {
-    // Check if this document already exists (by docId)
-    if (weekData.containsKey('docId')) {
-      // Update existing document
-      await FirebaseFirestore.instance
-          .collection('weekly_progress')
-          .doc(weekData['docId'])
-          .update(weekData);
-
-      print("Updated weekly progress for week ${weekData['weekNumber']}");
-    } else {
-      // Create new document
-      DocumentReference docRef = await FirebaseFirestore.instance
-          .collection('weekly_progress')
-          .add(weekData);
-
-      // Store the doc ID for future updates
-      weekData['docId'] = docRef.id;
-
-      print("Created new weekly progress record for week ${weekData['weekNumber']}");
-    }
-  } catch (e) {
-    print("Error saving weekly progress: $e");
-  }
-}
-
 
 // Add method to get week-over-week progress comparison
   Map<String, dynamic> getWeekOverWeekProgress() {
-  Map<String, dynamic> comparison = {};
+    Map<String, dynamic> comparison = {};
 
-  // Current week data
-  Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
+    // Current week data
+    Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
 
-  // Previous week data
-  Map<String, dynamic>? previousWeekData =
-      _weeklyGoalData[_currentWeekNumber - 1];
+    // Previous week data
+    Map<String, dynamic>? previousWeekData =
+        _weeklyGoalData[_currentWeekNumber - 1];
 
-  if (currentWeekData == null) {
-    return {'hasComparison': false};
-  }
-
-  comparison['hasComparison'] = previousWeekData != null;
-  comparison['currentWeek'] = _currentWeekNumber;
-
-  // Common metrics for all goal types
-  comparison['currentSessionsCount'] =
-      currentWeekData['sessionsCompleted'] ?? 0;
-  comparison['currentTotalDuration'] =
-      currentWeekData['totalDuration'] ?? 0.0;
-  comparison['currentTotalDistance'] =
-      currentWeekData['totalDistance'] ?? 0.0;
-  comparison['currentUniqueDays'] =
-      currentWeekData['uniqueDays']?.length ?? 0;
-
-  if (previousWeekData != null) {
-    // Add previous week data
-    comparison['previousSessionsCount'] =
-        previousWeekData['sessionsCompleted'] ?? 0;
-    comparison['previousTotalDuration'] =
-        previousWeekData['totalDuration'] ?? 0.0;
-    comparison['previousTotalDistance'] =
-        previousWeekData['totalDistance'] ?? 0.0;
-    comparison['previousUniqueDays'] =
-        previousWeekData['uniqueDays']?.length ?? 0;
-
-    // Calculate changes
-    comparison['sessionsChange'] = (comparison['currentSessionsCount'] -
-        comparison['previousSessionsCount']);
-    comparison['durationChange'] = (comparison['currentTotalDuration'] -
-        comparison['previousTotalDuration']);
-    comparison['distanceChange'] = (comparison['currentTotalDistance'] -
-        comparison['previousTotalDistance']);
-    comparison['daysChange'] =
-        (comparison['currentUniqueDays'] - comparison['previousUniqueDays']);
-
-    // Goal-specific comparisons
-    if (userGoal?['goalType'] == 'High Intensity Cycling') {
-      comparison['currentWeight'] = currentWeekData['weekEndWeight'] ?? 0.0;
-      comparison['previousWeight'] = previousWeekData['weekEndWeight'] ?? 0.0;
-      comparison['weightChange'] =
-          comparison['currentWeight'] - comparison['previousWeight'];
-
-      comparison['currentCaloriesBurned'] =
-          currentWeekData['caloriesBurned'] ?? 0.0;
-      comparison['previousCaloriesBurned'] =
-          previousWeekData['caloriesBurned'] ?? 0.0;
-      comparison['caloriesChange'] = comparison['currentCaloriesBurned'] -
-          comparison['previousCaloriesBurned'];
-    } else if (userGoal?['goalType'] == 'Endurance') {
-      comparison['currentBestDistance'] =
-          currentWeekData['bestDistance'] ?? 0.0;
-      comparison['previousBestDistance'] =
-          previousWeekData['bestDistance'] ?? 0.0;
-      comparison['bestDistanceChange'] = comparison['currentBestDistance'] -
-          comparison['previousBestDistance'];
-
-      comparison['currentBestPace'] = currentWeekData['bestPace'] ?? 0.0;
-      comparison['previousBestPace'] = previousWeekData['bestPace'] ?? 0.0;
-      comparison['bestPaceChange'] =
-          comparison['currentBestPace'] - comparison['previousBestPace'];
+    if (currentWeekData == null) {
+      return {'hasComparison': false};
     }
+
+    comparison['hasComparison'] = previousWeekData != null;
+    comparison['currentWeek'] = _currentWeekNumber;
+
+    // Common metrics for all goal types
+    comparison['currentSessionsCount'] =
+        currentWeekData['sessionsCompleted'] ?? 0;
+    comparison['currentTotalDuration'] =
+        currentWeekData['totalDuration'] ?? 0.0;
+    comparison['currentTotalDistance'] =
+        currentWeekData['totalDistance'] ?? 0.0;
+    comparison['currentUniqueDays'] =
+        currentWeekData['uniqueDays']?.length ?? 0;
+
+    if (previousWeekData != null) {
+      // Add previous week data
+      comparison['previousSessionsCount'] =
+          previousWeekData['sessionsCompleted'] ?? 0;
+      comparison['previousTotalDuration'] =
+          previousWeekData['totalDuration'] ?? 0.0;
+      comparison['previousTotalDistance'] =
+          previousWeekData['totalDistance'] ?? 0.0;
+      comparison['previousUniqueDays'] =
+          previousWeekData['uniqueDays']?.length ?? 0;
+
+      // Calculate changes
+      comparison['sessionsChange'] = (comparison['currentSessionsCount'] -
+          comparison['previousSessionsCount']);
+      comparison['durationChange'] = (comparison['currentTotalDuration'] -
+          comparison['previousTotalDuration']);
+      comparison['distanceChange'] = (comparison['currentTotalDistance'] -
+          comparison['previousTotalDistance']);
+      comparison['daysChange'] =
+          (comparison['currentUniqueDays'] - comparison['previousUniqueDays']);
+
+      // Goal-specific comparisons
+      if (userGoal?['goalType'] == 'High Intensity Cycling') {
+        comparison['currentWeight'] = currentWeekData['weekEndWeight'] ?? 0.0;
+        comparison['previousWeight'] = previousWeekData['weekEndWeight'] ?? 0.0;
+        comparison['weightChange'] =
+            comparison['currentWeight'] - comparison['previousWeight'];
+
+        comparison['currentCaloriesBurned'] =
+            currentWeekData['caloriesBurned'] ?? 0.0;
+        comparison['previousCaloriesBurned'] =
+            previousWeekData['caloriesBurned'] ?? 0.0;
+        comparison['caloriesChange'] = comparison['currentCaloriesBurned'] -
+            comparison['previousCaloriesBurned'];
+      } else if (userGoal?['goalType'] == 'Endurance') {
+        comparison['currentBestDistance'] =
+            currentWeekData['bestDistance'] ?? 0.0;
+        comparison['previousBestDistance'] =
+            previousWeekData['bestDistance'] ?? 0.0;
+        comparison['bestDistanceChange'] = comparison['currentBestDistance'] -
+            comparison['previousBestDistance'];
+
+        comparison['currentBestPace'] = currentWeekData['bestPace'] ?? 0.0;
+        comparison['previousBestPace'] = previousWeekData['bestPace'] ?? 0.0;
+        comparison['bestPaceChange'] =
+            comparison['currentBestPace'] - comparison['previousBestPace'];
+      }
+    }
+
+    return comparison;
   }
-
-  return comparison;
-}
-
 
 // Method to get all active subgoals for the current week
-List<Map<String, dynamic>> getCurrentWeekSubgoals() {
-  if (!_weeklySubgoalData.containsKey(_currentWeekNumber)) {
-    return [];
+  List<Map<String, dynamic>> getCurrentWeekSubgoals() {
+    if (!_weeklySubgoalData.containsKey(_currentWeekNumber)) {
+      return [];
+    }
+
+    return _weeklySubgoalData[_currentWeekNumber]!;
   }
 
-  return _weeklySubgoalData[_currentWeekNumber]!;
-}
   // Method to fetch active subgoal when loading the page
   Future<void> _fetchActiveSubgoal() async {
     String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -657,97 +657,113 @@ List<Map<String, dynamic>> getCurrentWeekSubgoals() {
   }
 
   Future<void> _fetchReferenceValuesFromPreviousSubgoal(String uid) async {
-  try {
-    // Query for recently completed subgoals (end date in the past)
-    QuerySnapshot completedSubgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: uid)
-        .where('endDate', isLessThan: DateTime.now())
-        .orderBy('endDate', descending: true)
-        .limit(1)
-        .get();
-
-    if (completedSubgoalQuery.docs.isNotEmpty) {
-      DocumentSnapshot completedSubgoal = completedSubgoalQuery.docs.first;
-      var subgoalData = completedSubgoal.data() as Map<String, dynamic>;
-
-      // Get the subgoal date range to fetch relevant activities
-      DateTime startDate = (subgoalData['startDate'] as Timestamp).toDate();
-      DateTime endDate = (subgoalData['endDate'] as Timestamp).toDate();
-      String completedType = subgoalData['subgoalType'];
-      
-      // Fetch activities within the previous subgoal's time period
-      QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('uid', isEqualTo: uid)
-          .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-          .where('start_date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+    try {
+      // Query for recently completed subgoals (end date in the past)
+      QuerySnapshot completedSubgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .where('endDate', isLessThan: DateTime.now())
+          .orderBy('endDate', descending: true)
+          .limit(1)
           .get();
-      
-      // Calculate actual performance metrics from these activities
-      double actualTotalDistance = 0.0;
-      double actualTotalDuration = 0.0; // in minutes
-      List<double> paces = [];
-      
-      for (var doc in activitiesSnapshot.docs) {
-        var activityData = doc.data() as Map<String, dynamic>;
-        
-        double distance = safeParseDouble(activityData['distance']);
-        double durationSeconds = safeParseDouble(activityData['elapsed_time']);
-        double durationMinutes = durationSeconds / 60.0;
-        
-        if (distance > 0) actualTotalDistance += distance;
-        if (durationMinutes > 0) actualTotalDuration += durationMinutes;
-        
-        // Calculate pace (minutes per km) for this activity
-        if (distance > 0 && durationMinutes > 0) {
-          double pace = durationMinutes / distance;
-          paces.add(pace);
-        }
-      }
-      
-      // Calculate averages if there were activities
-      int activityCount = activitiesSnapshot.docs.length;
-      double actualAvgDistance = activityCount > 0 ? actualTotalDistance / activityCount : 0.0;
-      double actualAvgDuration = activityCount > 0 ? actualTotalDuration / activityCount : 0.0;
-      double actualAvgPace = 0.0;
-      
-      if (paces.isNotEmpty) {
-        actualAvgPace = paces.reduce((a, b) => a + b) / paces.length;
-      }
 
-      setState(() {
-        if (activityCount > 0) {
-          // Use actual performance metrics if we have activities
-          referenceDistance = actualAvgDistance;
-          referencePace = actualAvgPace;
-          referenceDuration = actualAvgDuration;
-          usingPreviousGoal = false; // We're using actual performance, not previous goal
-        } else {
-          // If no activities found, fall back to previous subgoal target values
-          if (completedType == "distance") {
-            referenceDistance = subgoalData['targetValue'];
-            referencePace = baselinePace;
-            referenceDuration = baselineDuration;
-          } else if (completedType == "pace") {
-            referenceDistance = baselineDistance;
-            referencePace = subgoalData['targetValue'];
-            referenceDuration = baselineDuration;
-          } else if (completedType == "duration") {
-            referenceDistance = baselineDistance;
-            referencePace = baselinePace;
-            referenceDuration = subgoalData['targetValue'];
-          } else if (completedType == "maintain") {
-            // For maintain goals, use the baseline values
-            referenceDistance = baselineDistance;
-            referencePace = baselinePace;
-            referenceDuration = baselineDuration;
+      if (completedSubgoalQuery.docs.isNotEmpty) {
+        DocumentSnapshot completedSubgoal = completedSubgoalQuery.docs.first;
+        var subgoalData = completedSubgoal.data() as Map<String, dynamic>;
+
+        // Get the subgoal date range to fetch relevant activities
+        DateTime startDate = (subgoalData['startDate'] as Timestamp).toDate();
+        DateTime endDate = (subgoalData['endDate'] as Timestamp).toDate();
+        String completedType = subgoalData['subgoalType'];
+
+        // Fetch activities within the previous subgoal's time period
+        QuerySnapshot activitiesSnapshot = await FirebaseFirestore.instance
+            .collection('activities')
+            .where('uid', isEqualTo: uid)
+            .where('start_date',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+            .where('start_date',
+                isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+            .get();
+
+        // Calculate actual performance metrics from these activities
+        double actualTotalDistance = 0.0;
+        double actualTotalDuration = 0.0; // in minutes
+        List<double> paces = [];
+
+        for (var doc in activitiesSnapshot.docs) {
+          var activityData = doc.data() as Map<String, dynamic>;
+
+          double distance = safeParseDouble(activityData['distance']);
+          double durationSeconds =
+              safeParseDouble(activityData['elapsed_time']);
+          double durationMinutes = durationSeconds / 60.0;
+
+          if (distance > 0) actualTotalDistance += distance;
+          if (durationMinutes > 0) actualTotalDuration += durationMinutes;
+
+          // Calculate pace (minutes per km) for this activity
+          if (distance > 0 && durationMinutes > 0) {
+            double pace = durationMinutes / distance;
+            paces.add(pace);
           }
-          usingPreviousGoal = true;
         }
-      });
-    } else {
-      // No completed subgoal found, use baseline values
+
+        // Calculate averages if there were activities
+        int activityCount = activitiesSnapshot.docs.length;
+        double actualAvgDistance =
+            activityCount > 0 ? actualTotalDistance / activityCount : 0.0;
+        double actualAvgDuration =
+            activityCount > 0 ? actualTotalDuration / activityCount : 0.0;
+        double actualAvgPace = 0.0;
+
+        if (paces.isNotEmpty) {
+          actualAvgPace = paces.reduce((a, b) => a + b) / paces.length;
+        }
+
+        setState(() {
+          if (activityCount > 0) {
+            // Use actual performance metrics if we have activities
+            referenceDistance = actualAvgDistance;
+            referencePace = actualAvgPace;
+            referenceDuration = actualAvgDuration;
+            usingPreviousGoal =
+                false; // We're using actual performance, not previous goal
+          } else {
+            // If no activities found, fall back to previous subgoal target values
+            if (completedType == "distance") {
+              referenceDistance = subgoalData['targetValue'];
+              referencePace = baselinePace;
+              referenceDuration = baselineDuration;
+            } else if (completedType == "pace") {
+              referenceDistance = baselineDistance;
+              referencePace = subgoalData['targetValue'];
+              referenceDuration = baselineDuration;
+            } else if (completedType == "duration") {
+              referenceDistance = baselineDistance;
+              referencePace = baselinePace;
+              referenceDuration = subgoalData['targetValue'];
+            } else if (completedType == "maintain") {
+              // For maintain goals, use the baseline values
+              referenceDistance = baselineDistance;
+              referencePace = baselinePace;
+              referenceDuration = baselineDuration;
+            }
+            usingPreviousGoal = true;
+          }
+        });
+      } else {
+        // No completed subgoal found, use baseline values
+        setState(() {
+          referenceDistance = baselineDistance;
+          referencePace = baselinePace;
+          referenceDuration = baselineDuration;
+          usingPreviousGoal = false;
+        });
+      }
+    } catch (e) {
+      print("Error fetching reference values: $e");
+      // Fallback to baseline values in case of error
       setState(() {
         referenceDistance = baselineDistance;
         referencePace = baselinePace;
@@ -755,18 +771,7 @@ List<Map<String, dynamic>> getCurrentWeekSubgoals() {
         usingPreviousGoal = false;
       });
     }
-  } catch (e) {
-    print("Error fetching reference values: $e");
-    // Fallback to baseline values in case of error
-    setState(() {
-      referenceDistance = baselineDistance;
-      referencePace = baselinePace;
-      referenceDuration = baselineDuration;
-      usingPreviousGoal = false;
-    });
   }
-}
-
 
   Map<String, dynamic>? getProgressForWeek(int weekNumber) {
     return _weeklyProgressData[weekNumber];
@@ -946,120 +951,126 @@ List<Map<String, dynamic>> getCurrentWeekSubgoals() {
   }
 
   Future<void> _fetchWeeklyProgressData() async {
-  setState(() {
-    _isLoadingWeeklyData = true;
-  });
-
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) {
     setState(() {
-      _isLoadingWeeklyData = false;
+      _isLoadingWeeklyData = true;
     });
-    return;
+
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() {
+        _isLoadingWeeklyData = false;
+      });
+      return;
+    }
+
+    try {
+      // Get the current week number
+      int currentWeek = getCurrentWeekNumber();
+
+      // Fetch progress data for all weeks up to the current one
+      QuerySnapshot progressSnapshot = await FirebaseFirestore.instance
+          .collection('weekly_progress')
+          .where('uid', isEqualTo: uid)
+          .where('goalId', isEqualTo: userGoal?['id'])
+          .get();
+
+      // Clear existing data
+      _weeklyProgressData.clear();
+
+      // Process the results
+      for (var doc in progressSnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        int weekNum = data['weekNumber'] ?? 0;
+
+        if (weekNum > 0) {
+          // Store docId for later reference (needed for updates)
+          data['docId'] = doc.id;
+          _weeklyProgressData[weekNum] = data;
+        }
+      }
+
+      // If week 1 data doesn't exist, initialize it
+      if (!_weeklyProgressData.containsKey(1)) {
+        // Calculate week 1 date range
+        DateTime week1Start = _goalCreationDate;
+        DateTime week1End = week1Start
+            .add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+
+        _weeklyProgressData[1] = {
+          'uid': uid,
+          'goalId': userGoal?['id'],
+          'weekNumber': 1,
+          'weekStartDate': week1Start,
+          'weekEndDate': week1End,
+          'sessionsCompleted': 0,
+          'totalDuration': 0.0,
+          'subgoalType': '',
+          'subgoalStartValue': 0.0,
+          'subgoalCurrentValue': 0.0,
+          'subgoalTargetValue': 0.0,
+        };
+
+        // Initialize goal-specific data for week 1
+        if (userGoal?['goalType'] == 'High Intensity Cycling') {
+          _weeklyProgressData[1]!['weekStartWeight'] =
+              userGoal?['initialWeight'] ?? 0.0;
+          _weeklyProgressData[1]!['weekEndWeight'] =
+              userGoal?['initialWeight'] ?? 0.0;
+          _weeklyProgressData[1]!['caloriesBurned'] = 0.0;
+        } else if (userGoal?['goalType'] == 'Endurance') {
+          _weeklyProgressData[1]!['bestDistance'] = 0.0;
+          _weeklyProgressData[1]!['bestPace'] = 0.0;
+        }
+
+        // Save the initial week 1 data to Firestore
+        await _saveWeeklyProgressToFirestore(_weeklyProgressData[1]!);
+      }
+
+      // If current week data doesn't exist, initialize it
+      if (!_weeklyProgressData.containsKey(currentWeek)) {
+        DateTime weekStart = _getWeekStartDate();
+        DateTime weekEnd = _getWeekEndDate();
+
+        _weeklyProgressData[currentWeek] = {
+          'uid': uid,
+          'goalId': userGoal?['id'],
+          'weekNumber': currentWeek,
+          'weekStartDate': weekStart,
+          'weekEndDate': weekEnd,
+          'sessionsCompleted': 0,
+          'totalDuration': 0.0,
+          'subgoalType': subgoalType,
+          'subgoalStartValue': 0.0,
+          'subgoalCurrentValue': 0.0,
+          'subgoalTargetValue': subgoalTargetValue,
+        };
+
+        // Initialize goal-specific data
+        if (userGoal?['goalType'] == 'High Intensity Cycling') {
+          _weeklyProgressData[currentWeek]!['weekStartWeight'] =
+              _currentUserWeight;
+          _weeklyProgressData[currentWeek]!['weekEndWeight'] =
+              _currentUserWeight;
+          _weeklyProgressData[currentWeek]!['caloriesBurned'] = 0.0;
+        } else if (userGoal?['goalType'] == 'Endurance') {
+          _weeklyProgressData[currentWeek]!['bestDistance'] = 0.0;
+          _weeklyProgressData[currentWeek]!['bestPace'] = 0.0;
+        }
+
+        // Save the initial current week data to Firestore
+        await _saveWeeklyProgressToFirestore(_weeklyProgressData[currentWeek]!);
+      }
+
+      print(
+          "Weekly progress data loaded. Weeks available: ${_weeklyProgressData.keys.toList()}");
+    } catch (e) {
+      print("Error fetching weekly progress data: $e");
+    } finally {
+      setState(() {
+        _isLoadingWeeklyData = false;
+      });
+    }
   }
-
-  try {
-    // Get the current week number
-    int currentWeek = getCurrentWeekNumber();
-
-    // Fetch progress data for all weeks up to the current one
-    QuerySnapshot progressSnapshot = await FirebaseFirestore.instance
-        .collection('weekly_progress')
-        .where('uid', isEqualTo: uid)
-        .where('goalId', isEqualTo: userGoal?['id'])
-        .get();
-
-    // Clear existing data
-    _weeklyProgressData.clear();
-
-    // Process the results
-    for (var doc in progressSnapshot.docs) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      int weekNum = data['weekNumber'] ?? 0;
-
-      if (weekNum > 0) {
-        // Store docId for later reference (needed for updates)
-        data['docId'] = doc.id;
-        _weeklyProgressData[weekNum] = data;
-      }
-    }
-
-    // If week 1 data doesn't exist, initialize it
-    if (!_weeklyProgressData.containsKey(1)) {
-      // Calculate week 1 date range
-      DateTime week1Start = _goalCreationDate;
-      DateTime week1End = week1Start.add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
-
-      _weeklyProgressData[1] = {
-        'uid': uid,
-        'goalId': userGoal?['id'],
-        'weekNumber': 1,
-        'weekStartDate': week1Start,
-        'weekEndDate': week1End,
-        'sessionsCompleted': 0,
-        'totalDuration': 0.0,
-        'subgoalType': '',
-        'subgoalStartValue': 0.0,
-        'subgoalCurrentValue': 0.0,
-        'subgoalTargetValue': 0.0,
-      };
-
-      // Initialize goal-specific data for week 1
-      if (userGoal?['goalType'] == 'High Intensity Cycling') {
-        _weeklyProgressData[1]!['weekStartWeight'] = userGoal?['initialWeight'] ?? 0.0;
-        _weeklyProgressData[1]!['weekEndWeight'] = userGoal?['initialWeight'] ?? 0.0;
-        _weeklyProgressData[1]!['caloriesBurned'] = 0.0;
-      } else if (userGoal?['goalType'] == 'Endurance') {
-        _weeklyProgressData[1]!['bestDistance'] = 0.0;
-        _weeklyProgressData[1]!['bestPace'] = 0.0;
-      }
-
-      // Save the initial week 1 data to Firestore
-      await _saveWeeklyProgressToFirestore(_weeklyProgressData[1]!);
-    }
-
-    // If current week data doesn't exist, initialize it
-    if (!_weeklyProgressData.containsKey(currentWeek)) {
-      DateTime weekStart = _getWeekStartDate();
-      DateTime weekEnd = _getWeekEndDate();
-
-      _weeklyProgressData[currentWeek] = {
-        'uid': uid,
-        'goalId': userGoal?['id'],
-        'weekNumber': currentWeek,
-        'weekStartDate': weekStart,
-        'weekEndDate': weekEnd,
-        'sessionsCompleted': 0,
-        'totalDuration': 0.0,
-        'subgoalType': subgoalType,
-        'subgoalStartValue': 0.0,
-        'subgoalCurrentValue': 0.0,
-        'subgoalTargetValue': subgoalTargetValue,
-      };
-
-      // Initialize goal-specific data
-      if (userGoal?['goalType'] == 'High Intensity Cycling') {
-        _weeklyProgressData[currentWeek]!['weekStartWeight'] = _currentUserWeight;
-        _weeklyProgressData[currentWeek]!['weekEndWeight'] = _currentUserWeight;
-        _weeklyProgressData[currentWeek]!['caloriesBurned'] = 0.0;
-      } else if (userGoal?['goalType'] == 'Endurance') {
-        _weeklyProgressData[currentWeek]!['bestDistance'] = 0.0;
-        _weeklyProgressData[currentWeek]!['bestPace'] = 0.0;
-      }
-
-      // Save the initial current week data to Firestore
-      await _saveWeeklyProgressToFirestore(_weeklyProgressData[currentWeek]!);
-    }
-
-    print("Weekly progress data loaded. Weeks available: ${_weeklyProgressData.keys.toList()}");
-  } catch (e) {
-    print("Error fetching weekly progress data: $e");
-  } finally {
-    setState(() {
-      _isLoadingWeeklyData = false;
-    });
-  }
-}
 
   Future<void> _loadUserGoalAndActivities() async {
     setState(() {
@@ -1393,133 +1404,81 @@ List<Map<String, dynamic>> getCurrentWeekSubgoals() {
     }
   }
 
-void _showWeeklyProgressHistory() {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text(
-          "Weekly Progress History",
-          style: TextStyle(
-            fontFamily: 'Fredoka-SemiBold',
-            fontSize: 22,
-            color: primaryBlack,
+  void _showWeeklyProgressHistory() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-        content: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6,
+          title: const Text(
+            "Weekly Progress History",
+            style: TextStyle(
+              fontFamily: 'Fredoka-SemiBold',
+              fontSize: 22,
+              color: primaryBlack,
+            ),
           ),
-          child: FutureBuilder(
-            future: _fetchAllWeeklyGoalData(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator(color: primaryOrange));
-              }
-              
-              // Create a list of all weeks from 1 to current week
-              int currentWeek = getCurrentWeekNumber();
-              List<int> allWeeks = List.generate(currentWeek, (index) => index + 1);
-              
-              return ListView.builder(
-                shrinkWrap: true,
-                itemCount: allWeeks.length,
-                itemBuilder: (context, index) {
-                  final weekNum = allWeeks[index];
-                  
-                  // Get week data, or create default data if it doesn't exist
-                  Map<String, dynamic> weekData = _weeklyGoalData[weekNum] ?? {
-                    'weekNumber': weekNum,
-                    'sessionsCompleted': 0,
-                    'totalDuration': 0.0,
-                    'totalDistance': 0.0,
-                    'uniqueDays': [],
-                    'caloriesBurned': 0.0,
-                    'weekStartWeight': 0.0,
-                    'weekEndWeight': 0.0,
-                    'bestDistance': 0.0,
-                    'bestPace': 0.0,
-                  };
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: FutureBuilder(
+              future: _fetchAllWeeklyGoalData(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                      child: CircularProgressIndicator(color: primaryOrange));
+                }
 
-                  // Calculate week dates
-                  DateTime weekStart = _goalCreationDate.add(Duration(days: 7 * (weekNum - 1)));
-                  DateTime weekEnd = weekStart.add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+                // Create a list of all weeks from 1 to current week
+                int currentWeek = getCurrentWeekNumber();
+                List<int> allWeeks =
+                    List.generate(currentWeek, (index) => index + 1);
 
-                  // Format week date range
-                  final dateRangeStr = "${DateFormat('MMM d').format(weekStart)} - ${DateFormat('MMM d').format(weekEnd)}";
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: allWeeks.length,
+                  itemBuilder: (context, index) {
+                    final weekNum = allWeeks[index];
 
-                  // Display different data based on goal type
-                  Widget progressContent;
+                    // Get week data, or create default data if it doesn't exist
+                    Map<String, dynamic> weekData = _weeklyGoalData[weekNum] ??
+                        {
+                          'weekNumber': weekNum,
+                          'sessionsCompleted': 0,
+                          'totalDuration': 0.0,
+                          'totalDistance': 0.0,
+                          'uniqueDays': [],
+                          'caloriesBurned': 0.0,
+                          'weekStartWeight': 0.0,
+                          'weekEndWeight': 0.0,
+                          'bestDistance': 0.0,
+                          'bestPace': 0.0,
+                        };
 
-                  switch (userGoal?['goalType']) {
-                    case 'Leisure':
-                      progressContent = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            "Active Days: ${(weekData['uniqueDays'] ?? []).length}",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      );
-                      break;
+                    // Calculate week dates
+                    DateTime weekStart = _goalCreationDate
+                        .add(Duration(days: 7 * (weekNum - 1)));
+                    DateTime weekEnd = weekStart.add(
+                        Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
 
-                    case 'High Intensity Cycling':
-                      final startWeight = weekData['weekStartWeight'] ?? 0.0;
-                      final endWeight = weekData['weekEndWeight'] ?? 0.0;
-                      final weightChange = endWeight - startWeight;
+                    // Format week date range
+                    final dateRangeStr =
+                        "${DateFormat('MMM d').format(weekStart)} - ${DateFormat('MMM d').format(weekEnd)}";
 
-                      progressContent = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (startWeight > 0 || endWeight > 0) ...[
+                    // Display different data based on goal type
+                    Widget progressContent;
+
+                    switch (userGoal?['goalType']) {
+                      case 'Leisure':
+                        progressContent = Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              "Weight: ${startWeight > 0 ? startWeight.toStringAsFixed(1) : 'N/A'} → ${endWeight > 0 ? endWeight.toStringAsFixed(1) : 'N/A'} kg",
+                              "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
                               style: TextStyle(
                                 fontFamily: 'Inter',
                                 fontSize: 14,
@@ -1527,74 +1486,89 @@ void _showWeeklyProgressHistory() {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            if (startWeight > 0 && endWeight > 0)
+                            Text(
+                              "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              "Active Days: ${(weekData['uniqueDays'] ?? []).length}",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        );
+                        break;
+
+                      case 'High Intensity Cycling':
+                        final startWeight = weekData['weekStartWeight'] ?? 0.0;
+                        final endWeight = weekData['weekEndWeight'] ?? 0.0;
+                        final weightChange = endWeight - startWeight;
+
+                        progressContent = Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (startWeight > 0 || endWeight > 0) ...[
                               Text(
-                                "Change: ${weightChange >= 0 ? '+' : ''}${weightChange.toStringAsFixed(1)} kg",
+                                "Weight: ${startWeight > 0 ? startWeight.toStringAsFixed(1) : 'N/A'} → ${endWeight > 0 ? endWeight.toStringAsFixed(1) : 'N/A'} kg",
                                 style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 14,
-                                  color: weightChange <= 0 ? Colors.green[700] : Colors.red[700],
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                          ] else ...[
-                            Text(
-                              "Weight: No data recorded",
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontStyle: FontStyle.italic,
+                              if (startWeight > 0 && endWeight > 0)
+                                Text(
+                                  "Change: ${weightChange >= 0 ? '+' : ''}${weightChange.toStringAsFixed(1)} kg",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: weightChange <= 0
+                                        ? Colors.green[700]
+                                        : Colors.red[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ] else ...[
+                              Text(
+                                "Weight: No data recorded",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  fontStyle: FontStyle.italic,
+                                ),
                               ),
-                            ),
-                          ],
-                          Text(
-                            "Calories Burned: ${(weekData['caloriesBurned'] ?? 0.0).toStringAsFixed(0)}",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      );
-                      break;
-
-                    case 'Endurance':
-                      progressContent = Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            "Best Distance: ${(weekData['bestDistance'] ?? 0.0).toStringAsFixed(1)} km",
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 14,
-                              color: Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (weekData['bestPace'] != null && weekData['bestPace'] > 0)
+                            ],
                             Text(
-                              "Best Pace: ${(weekData['bestPace'] ?? 0.0).toStringAsFixed(1)} min/km",
+                              "Calories Burned: ${(weekData['caloriesBurned'] ?? 0.0).toStringAsFixed(0)}",
                               style: TextStyle(
                                 fontFamily: 'Inter',
                                 fontSize: 14,
@@ -1602,358 +1576,416 @@ void _showWeeklyProgressHistory() {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                        ],
-                      );
-                      break;
+                          ],
+                        );
+                        break;
 
-                    default:
-                      progressContent = Text(
-                        "No data available",
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          color: Colors.black,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      );
-                  }
-
-                  // Check if this week has any meaningful data
-                  bool hasData = (weekData['sessionsCompleted'] ?? 0) > 0 || 
-                                 (weekData['weekStartWeight'] ?? 0.0) > 0 || 
-                                 (weekData['weekEndWeight'] ?? 0.0) > 0;
-
-                  // Highlight for Week 1 (baseline week) and current week
-                  bool isBaselineWeek = weekNum == 1;
-                  bool isCurrentWeek = weekNum == getCurrentWeekNumber();
-
-                  // Returns the card for each week
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 10),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isCurrentWeek
-                          ? primaryOrange.withOpacity(0.1)
-                          : isBaselineWeek
-                              ? Colors.blue.shade50
-                              : hasData
-                                  ? Colors.grey.shade100
-                                  : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isCurrentWeek
-                            ? primaryOrange
-                            : isBaselineWeek
-                                ? Colors.blue.shade300
-                                : hasData
-                                    ? Colors.grey.shade300
-                                    : Colors.grey.shade200,
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      case 'Endurance':
+                        progressContent = Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  "Week $weekNum",
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: primaryBlack),
-                                ),
-                                if (isBaselineWeek) 
-                                  Container(
-                                    margin: EdgeInsets.only(left: 8),
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.blue.shade300),
-                                    ),
-                                    child: Text(
-                                      "Baseline",
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue.shade800,
-                                      ),
-                                    ),
-                                  ),
-                                if (isCurrentWeek)
-                                  Container(
-                                    margin: EdgeInsets.only(left: 8),
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: primaryOrange.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: primaryOrange),
-                                    ),
-                                    child: Text(
-                                      "Current",
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: primaryOrange,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
                             Text(
-                              dateRangeStr,
+                              "Sessions: ${weekData['sessionsCompleted'] ?? 0}",
                               style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
+                            Text(
+                              "Total Duration: ${(weekData['totalDuration'] ?? 0.0).toStringAsFixed(1)} mins",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              "Best Distance: ${(weekData['bestDistance'] ?? 0.0).toStringAsFixed(1)} km",
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 14,
+                                color: Colors.black,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (weekData['bestPace'] != null &&
+                                weekData['bestPace'] > 0)
+                              Text(
+                                "Best Pace: ${(weekData['bestPace'] ?? 0.0).toStringAsFixed(1)} min/km",
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                           ],
+                        );
+                        break;
+
+                      default:
+                        progressContent = Text(
+                          "No data available",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            color: Colors.black,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        );
+                    }
+
+                    // Check if this week has any meaningful data
+                    bool hasData = (weekData['sessionsCompleted'] ?? 0) > 0 ||
+                        (weekData['weekStartWeight'] ?? 0.0) > 0 ||
+                        (weekData['weekEndWeight'] ?? 0.0) > 0;
+
+                    // Highlight for Week 1 (baseline week) and current week
+                    bool isBaselineWeek = weekNum == 1;
+                    bool isCurrentWeek = weekNum == getCurrentWeekNumber();
+
+                    // Returns the card for each week
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCurrentWeek
+                            ? primaryOrange.withOpacity(0.1)
+                            : isBaselineWeek
+                                ? Colors.blue.shade50
+                                : hasData
+                                    ? Colors.grey.shade100
+                                    : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isCurrentWeek
+                              ? primaryOrange
+                              : isBaselineWeek
+                                  ? Colors.blue.shade300
+                                  : hasData
+                                      ? Colors.grey.shade300
+                                      : Colors.grey.shade200,
+                          width: 1,
                         ),
-                        SizedBox(height: 8),
-                        progressContent,
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text(
-              "Close",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                color: primaryGray,
-              ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Week $weekNum",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: primaryBlack),
+                                  ),
+                                  if (isBaselineWeek)
+                                    Container(
+                                      margin: EdgeInsets.only(left: 8),
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade100,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: Colors.blue.shade300),
+                                      ),
+                                      child: Text(
+                                        "Baseline",
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue.shade800,
+                                        ),
+                                      ),
+                                    ),
+                                  if (isCurrentWeek)
+                                    Container(
+                                      margin: EdgeInsets.only(left: 8),
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: primaryOrange.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border:
+                                            Border.all(color: primaryOrange),
+                                      ),
+                                      child: Text(
+                                        "Current",
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryOrange,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              Text(
+                                dateRangeStr,
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          progressContent,
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
-        ],
-      );
-    },
-  );
-}
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                "Close",
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  color: primaryGray,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-Future<void> _fetchAndMapWeightDataByWeek() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null || userGoal == null) return;
+  Future<void> _fetchAndMapWeightDataByWeek() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
 
-  try {
-    // Fetch all weight data for the user with timestamps
-    QuerySnapshot userDataSnapshot = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: uid)
-        .where('timestamp', isGreaterThan: Timestamp.fromDate(_goalCreationDate))
-        .orderBy('timestamp', descending: false)
-        .get();
+    try {
+      // Fetch all weight data for the user with timestamps
+      QuerySnapshot userDataSnapshot = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: uid)
+          .where('timestamp',
+              isGreaterThan: Timestamp.fromDate(_goalCreationDate))
+          .orderBy('timestamp', descending: false)
+          .get();
 
-    // Map weight data to weeks
-    for (var doc in userDataSnapshot.docs) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      
-      if (data['weight'] != null && data['timestamp'] != null) {
-        DateTime weightDate = (data['timestamp'] as Timestamp).toDate();
-        double weight = safeParseDouble(data['weight']);
-        
-        // Calculate which week this weight entry belongs to
-        int weekNumber = _calculateWeekNumber(weightDate);
-        
+      // Map weight data to weeks
+      for (var doc in userDataSnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+        if (data['weight'] != null && data['timestamp'] != null) {
+          DateTime weightDate = (data['timestamp'] as Timestamp).toDate();
+          double weight = safeParseDouble(data['weight']);
+
+          // Calculate which week this weight entry belongs to
+          int weekNumber = _calculateWeekNumber(weightDate);
+
+          // Initialize week data if it doesn't exist
+          if (!_weeklyGoalData.containsKey(weekNumber)) {
+            String goalId = userGoal!['id'] ?? "";
+            _initializeWeekData(uid, goalId, weekNumber);
+          }
+
+          // Update the weight for that week
+          if (_weeklyGoalData.containsKey(weekNumber)) {
+            // If this is the first weight entry for the week, set it as start weight
+            if (_weeklyGoalData[weekNumber]!['weekStartWeight'] == null ||
+                _weeklyGoalData[weekNumber]!['weekStartWeight'] == 0.0) {
+              _weeklyGoalData[weekNumber]!['weekStartWeight'] = weight;
+            }
+
+            // Always update the end weight to the latest weight for that week
+            _weeklyGoalData[weekNumber]!['weekEndWeight'] = weight;
+
+            print(
+                "Updated weight for week $weekNumber: start=${_weeklyGoalData[weekNumber]!['weekStartWeight']}, end=${_weeklyGoalData[weekNumber]!['weekEndWeight']}");
+          }
+        }
+      }
+    } catch (e) {
+      print("Error fetching weight data by week: $e");
+    }
+  }
+
+  void _initializeWeekData(String uid, String goalId, int weekNumber) {
+    DateTime weekStart =
+        _goalCreationDate.add(Duration(days: 7 * (weekNumber - 1)));
+    DateTime weekEnd =
+        weekStart.add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+
+    Map<String, dynamic> weekData = {
+      'uid': uid,
+      'goalId': goalId,
+      'weekNumber': weekNumber,
+      'weekStartDate': Timestamp.fromDate(weekStart),
+      'weekEndDate': Timestamp.fromDate(weekEnd),
+      'timestamp': FieldValue.serverTimestamp(),
+      'sessionsCompleted': 0,
+      'totalDuration': 0.0,
+      'totalDistance': 0.0,
+      'uniqueDays': [],
+      'caloriesBurned': 0.0,
+    };
+
+    if (userGoal?['goalType'] == 'High Intensity Cycling') {
+      weekData['weekStartWeight'] = 0.0;
+      weekData['weekEndWeight'] = 0.0;
+      weekData['targetWeight'] = targetWeight;
+      weekData['initialWeight'] = userGoal?['initialWeight'] ?? 0.0;
+    } else if (userGoal?['goalType'] == 'Endurance') {
+      weekData['bestDistance'] = 0.0;
+      weekData['bestPace'] = 0.0;
+      weekData['targetDistance'] = userGoal?['targetDistance'] ?? 0.0;
+    } else if (userGoal?['goalType'] == 'Leisure') {
+      weekData['targetDaysPerWeek'] = userGoal?['daysPerWeek'] ?? 3;
+      weekData['targetDuration'] = userGoal?['sessionDuration'] ?? 30.0;
+    }
+
+    _weeklyGoalData[weekNumber] = weekData;
+  }
+
+  Future<void> _fetchAndMapActivitiesDataByWeek() async {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || userGoal == null) return;
+
+    try {
+      // Get the athlete document to find the user_id
+      final athleteQuerySnapshot = await FirebaseFirestore.instance
+          .collection('athletes')
+          .where('app_id', isEqualTo: uid)
+          .limit(1)
+          .get();
+
+      if (athleteQuerySnapshot.docs.isEmpty) {
+        print("No athlete document found for uid: $uid");
+        return;
+      }
+
+      final athleteDoc = athleteQuerySnapshot.docs.first;
+      final athleteId = athleteDoc.id;
+      int? userIdNumber = int.tryParse(athleteId);
+
+      if (userIdNumber == null && athleteDoc.data().containsKey('user_id')) {
+        userIdNumber = athleteDoc.data()['user_id'] as int?;
+      }
+
+      if (userIdNumber == null) {
+        final numericPart = RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
+        userIdNumber = numericPart != null ? int.tryParse(numericPart) : null;
+      }
+
+      if (userIdNumber == null) {
+        print("Could not determine user_id for activities");
+        return;
+      }
+
+      // Fetch all activities since goal creation
+      final goalCreationTimestamp = userGoal!['timestamp'] as Timestamp;
+      final allActivitiesSnapshot = await FirebaseFirestore.instance
+          .collection('activities')
+          .where('user_id', isEqualTo: userIdNumber)
+          .where('start_date', isGreaterThan: goalCreationTimestamp)
+          .get();
+
+      // Group activities by week
+      Map<int, List<Map<String, dynamic>>> activitiesByWeek = {};
+
+      for (var doc in allActivitiesSnapshot.docs) {
+        Map<String, dynamic> activityData = doc.data();
+        DateTime activityDate =
+            (activityData['start_date'] as Timestamp).toDate();
+
+        int weekNumber = _calculateWeekNumber(activityDate);
+
+        if (!activitiesByWeek.containsKey(weekNumber)) {
+          activitiesByWeek[weekNumber] = [];
+        }
+        activitiesByWeek[weekNumber]!.add(activityData);
+      }
+
+      // Process each week's activities
+      activitiesByWeek.forEach((weekNumber, activities) {
         // Initialize week data if it doesn't exist
         if (!_weeklyGoalData.containsKey(weekNumber)) {
           String goalId = userGoal!['id'] ?? "";
           _initializeWeekData(uid, goalId, weekNumber);
         }
-        
-        // Update the weight for that week
-        if (_weeklyGoalData.containsKey(weekNumber)) {
-          // If this is the first weight entry for the week, set it as start weight
-          if (_weeklyGoalData[weekNumber]!['weekStartWeight'] == null || 
-              _weeklyGoalData[weekNumber]!['weekStartWeight'] == 0.0) {
-            _weeklyGoalData[weekNumber]!['weekStartWeight'] = weight;
-          }
-          
-          // Always update the end weight to the latest weight for that week
-          _weeklyGoalData[weekNumber]!['weekEndWeight'] = weight;
-          
-          print("Updated weight for week $weekNumber: start=${_weeklyGoalData[weekNumber]!['weekStartWeight']}, end=${_weeklyGoalData[weekNumber]!['weekEndWeight']}");
-        }
-      }
-    }
-  } catch (e) {
-    print("Error fetching weight data by week: $e");
-  }
-}
 
-void _initializeWeekData(String uid, String goalId, int weekNumber) {
-  DateTime weekStart = _goalCreationDate.add(Duration(days: 7 * (weekNumber - 1)));
-  DateTime weekEnd = weekStart.add(Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+        // Calculate totals for this week
+        double totalDuration = 0.0;
+        double totalDistance = 0.0;
+        double totalCalories = 0.0;
+        Set<String> uniqueDays = {};
+        double bestDistance = 0.0;
+        double bestPace = 0.0;
+        DateTime? bestDistanceDate;
 
-  Map<String, dynamic> weekData = {
-    'uid': uid,
-    'goalId': goalId,
-    'weekNumber': weekNumber,
-    'weekStartDate': Timestamp.fromDate(weekStart),
-    'weekEndDate': Timestamp.fromDate(weekEnd),
-    'timestamp': FieldValue.serverTimestamp(),
-    'sessionsCompleted': 0,
-    'totalDuration': 0.0,
-    'totalDistance': 0.0,
-    'uniqueDays': [],
-    'caloriesBurned': 0.0,
-  };
+        for (var activity in activities) {
+          // Duration
+          double duration = safeParseDouble(activity['elapsed_time']) /
+              60.0; // Convert to minutes
+          totalDuration += duration;
 
-  if (userGoal?['goalType'] == 'High Intensity Cycling') {
-    weekData['weekStartWeight'] = 0.0;
-    weekData['weekEndWeight'] = 0.0;
-    weekData['targetWeight'] = targetWeight;
-    weekData['initialWeight'] = userGoal?['initialWeight'] ?? 0.0;
-  } else if (userGoal?['goalType'] == 'Endurance') {
-    weekData['bestDistance'] = 0.0;
-    weekData['bestPace'] = 0.0;
-    weekData['targetDistance'] = userGoal?['targetDistance'] ?? 0.0;
-  } else if (userGoal?['goalType'] == 'Leisure') {
-    weekData['targetDaysPerWeek'] = userGoal?['daysPerWeek'] ?? 3;
-    weekData['targetDuration'] = userGoal?['sessionDuration'] ?? 30.0;
-  }
+          // Distance
+          double distance = safeParseDouble(activity['distance']);
+          totalDistance += distance;
 
-  _weeklyGoalData[weekNumber] = weekData;
-}
+          // Calories
+          double calories = safeParseDouble(activity['calories_burned']);
+          totalCalories += calories;
 
-Future<void> _fetchAndMapActivitiesDataByWeek() async {
-  String? uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null || userGoal == null) return;
+          // Unique days
+          DateTime activityDate =
+              (activity['start_date'] as Timestamp).toDate();
+          String dayKey = DateFormat('yyyy-MM-dd').format(activityDate);
+          uniqueDays.add(dayKey);
 
-  try {
-    // Get the athlete document to find the user_id
-    final athleteQuerySnapshot = await FirebaseFirestore.instance
-        .collection('athletes')
-        .where('app_id', isEqualTo: uid)
-        .limit(1)
-        .get();
-
-    if (athleteQuerySnapshot.docs.isEmpty) {
-      print("No athlete document found for uid: $uid");
-      return;
-    }
-
-    final athleteDoc = athleteQuerySnapshot.docs.first;
-    final athleteId = athleteDoc.id;
-    int? userIdNumber = int.tryParse(athleteId);
-
-    if (userIdNumber == null && athleteDoc.data().containsKey('user_id')) {
-      userIdNumber = athleteDoc.data()['user_id'] as int?;
-    }
-
-    if (userIdNumber == null) {
-      final numericPart = RegExp(r'(\d+)').firstMatch(athleteId)?.group(1);
-      userIdNumber = numericPart != null ? int.tryParse(numericPart) : null;
-    }
-
-    if (userIdNumber == null) {
-      print("Could not determine user_id for activities");
-      return;
-    }
-
-    // Fetch all activities since goal creation
-    final goalCreationTimestamp = userGoal!['timestamp'] as Timestamp;
-    final allActivitiesSnapshot = await FirebaseFirestore.instance
-        .collection('activities')
-        .where('user_id', isEqualTo: userIdNumber)
-        .where('start_date', isGreaterThan: goalCreationTimestamp)
-        .get();
-
-    // Group activities by week
-    Map<int, List<Map<String, dynamic>>> activitiesByWeek = {};
-
-    for (var doc in allActivitiesSnapshot.docs) {
-      Map<String, dynamic> activityData = doc.data();
-      DateTime activityDate = (activityData['start_date'] as Timestamp).toDate();
-      
-      int weekNumber = _calculateWeekNumber(activityDate);
-      
-      if (!activitiesByWeek.containsKey(weekNumber)) {
-        activitiesByWeek[weekNumber] = [];
-      }
-      activitiesByWeek[weekNumber]!.add(activityData);
-    }
-
-    // Process each week's activities
-    activitiesByWeek.forEach((weekNumber, activities) {
-      // Initialize week data if it doesn't exist
-      if (!_weeklyGoalData.containsKey(weekNumber)) {
-        String goalId = userGoal!['id'] ?? "";
-        _initializeWeekData(uid, goalId, weekNumber);
-      }
-
-      // Calculate totals for this week
-      double totalDuration = 0.0;
-      double totalDistance = 0.0;
-      double totalCalories = 0.0;
-      Set<String> uniqueDays = {};
-      double bestDistance = 0.0;
-      double bestPace = 0.0;
-      DateTime? bestDistanceDate;
-
-      for (var activity in activities) {
-        // Duration
-        double duration = safeParseDouble(activity['elapsed_time']) / 60.0; // Convert to minutes
-        totalDuration += duration;
-
-        // Distance
-        double distance = safeParseDouble(activity['distance']);
-        totalDistance += distance;
-
-        // Calories
-        double calories = safeParseDouble(activity['calories_burned']);
-        totalCalories += calories;
-
-        // Unique days
-        DateTime activityDate = (activity['start_date'] as Timestamp).toDate();
-        String dayKey = DateFormat('yyyy-MM-dd').format(activityDate);
-        uniqueDays.add(dayKey);
-
-        // Best distance tracking for Endurance goals
-        if (userGoal?['goalType'] == 'Endurance' && distance > bestDistance) {
-          bestDistance = distance;
-          bestDistanceDate = activityDate;
-          if (duration > 0) {
-            bestPace = duration / distance; // minutes per km
+          // Best distance tracking for Endurance goals
+          if (userGoal?['goalType'] == 'Endurance' && distance > bestDistance) {
+            bestDistance = distance;
+            bestDistanceDate = activityDate;
+            if (duration > 0) {
+              bestPace = duration / distance; // minutes per km
+            }
           }
         }
-      }
 
-      // Update week data
-      _weeklyGoalData[weekNumber]!['sessionsCompleted'] = activities.length;
-      _weeklyGoalData[weekNumber]!['totalDuration'] = totalDuration;
-      _weeklyGoalData[weekNumber]!['totalDistance'] = totalDistance;
-      _weeklyGoalData[weekNumber]!['caloriesBurned'] = totalCalories;
-      _weeklyGoalData[weekNumber]!['uniqueDays'] = uniqueDays.toList();
+        // Update week data
+        _weeklyGoalData[weekNumber]!['sessionsCompleted'] = activities.length;
+        _weeklyGoalData[weekNumber]!['totalDuration'] = totalDuration;
+        _weeklyGoalData[weekNumber]!['totalDistance'] = totalDistance;
+        _weeklyGoalData[weekNumber]!['caloriesBurned'] = totalCalories;
+        _weeklyGoalData[weekNumber]!['uniqueDays'] = uniqueDays.toList();
 
-      if (userGoal?['goalType'] == 'Endurance') {
-        _weeklyGoalData[weekNumber]!['bestDistance'] = bestDistance;
-        _weeklyGoalData[weekNumber]!['bestPace'] = bestPace;
-        if (bestDistanceDate != null) {
-          _weeklyGoalData[weekNumber]!['bestDistanceDate'] = Timestamp.fromDate(bestDistanceDate);
+        if (userGoal?['goalType'] == 'Endurance') {
+          _weeklyGoalData[weekNumber]!['bestDistance'] = bestDistance;
+          _weeklyGoalData[weekNumber]!['bestPace'] = bestPace;
+          if (bestDistanceDate != null) {
+            _weeklyGoalData[weekNumber]!['bestDistanceDate'] =
+                Timestamp.fromDate(bestDistanceDate);
+          }
         }
-      }
 
-      print("Updated activities for week $weekNumber: sessions=${activities.length}, duration=${totalDuration.toStringAsFixed(1)}, calories=${totalCalories.toStringAsFixed(0)}");
-    });
-
-  } catch (e) {
-    print("Error fetching activities data by week: $e");
+        print(
+            "Updated activities for week $weekNumber: sessions=${activities.length}, duration=${totalDuration.toStringAsFixed(1)}, calories=${totalCalories.toStringAsFixed(0)}");
+      });
+    } catch (e) {
+      print("Error fetching activities data by week: $e");
+    }
   }
-}
 
   // This method gets the current week number based on the goal creation date
   int getCurrentWeekNumber() {
@@ -4151,60 +4183,65 @@ Future<void> _fetchAndMapActivitiesDataByWeek() async {
   }
 
 // Method to deactivate the current subgoal
-Future<void> _deactivateCurrentSubgoal() async {
-  try {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+  Future<void> _deactivateCurrentSubgoal() async {
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
 
-    QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
-        .collection('cycling_subgoals')
-        .where('userId', isEqualTo: uid)
-        .where('completedSuccessfully', isEqualTo: false)
-        .get();
+      QuerySnapshot subgoalQuery = await FirebaseFirestore.instance
+          .collection('cycling_subgoals')
+          .where('userId', isEqualTo: uid)
+          .where('completedSuccessfully', isEqualTo: false)
+          .get();
 
-    for (var doc in subgoalQuery.docs) {
-      // Determine if the subgoal was completed successfully based on progress
-      bool wasCompleted = false;
-      
-      // Get the current week data which contains the progress information
-      Map<String, dynamic>? currentWeekData = _weeklyGoalData[_currentWeekNumber];
-      if (currentWeekData != null && currentWeekData['subgoalProgress'] != null) {
-        double progress = currentWeekData['subgoalProgress'];
-        wasCompleted = progress >= 1.0;
+      for (var doc in subgoalQuery.docs) {
+        // Determine if the subgoal was completed successfully based on progress
+        bool wasCompleted = false;
+
+        // Get the current week data which contains the progress information
+        Map<String, dynamic>? currentWeekData =
+            _weeklyGoalData[_currentWeekNumber];
+        if (currentWeekData != null &&
+            currentWeekData['subgoalProgress'] != null) {
+          double progress = currentWeekData['subgoalProgress'];
+          wasCompleted = progress >= 1.0;
+        }
+
+        // Update the subgoal status in Firestore
+        await FirebaseFirestore.instance
+            .collection('cycling_subgoals')
+            .doc(doc.id)
+            .update({
+          'completedSuccessfully':
+              wasCompleted, // Use the actual completion status
+        });
+
+        print(
+            "Updated subgoal: ${doc.id} (Completed successfully: $wasCompleted)");
       }
 
-      // Update the subgoal status in Firestore
-      await FirebaseFirestore.instance
-          .collection('cycling_subgoals')
-          .doc(doc.id)
-          .update({
-        'completedSuccessfully': wasCompleted, // Use the actual completion status
-      });
+      final prefs = await SharedPreferences.getInstance();
 
-      print("Updated subgoal: ${doc.id} (Completed successfully: $wasCompleted)");
-    }
+      // Only set show_subgoal_selection to true if the week has ended
+      if (DateTime.now().isAfter(subgoalEndDate) ||
+          DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
+        await prefs.setBool('show_subgoal_selection', true);
+        print("Set show_subgoal_selection flag to true");
 
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Only set show_subgoal_selection to true if the week has ended
-    if (DateTime.now().isAfter(subgoalEndDate) ||
-        DateTime.now().isAtSameMomentAs(subgoalEndDate)) {
-      await prefs.setBool('show_subgoal_selection', true);
-      print("Set show_subgoal_selection flag to true");
-      
-      // Only set hasActiveSubgoal to false if the week has ended
-      setState(() {
-        hasActiveSubgoal = false;
-      });
-      print("Week has ended, set hasActiveSubgoal to false");
-    } else {
-      // Week hasn't ended yet, keep subgoal visible but mark as completed
-      print("Week still ongoing, keeping subgoal card visible despite completion");
+        // Only set hasActiveSubgoal to false if the week has ended
+        setState(() {
+          hasActiveSubgoal = false;
+        });
+        print("Week has ended, set hasActiveSubgoal to false");
+      } else {
+        // Week hasn't ended yet, keep subgoal visible but mark as completed
+        print(
+            "Week still ongoing, keeping subgoal card visible despite completion");
+      }
+    } catch (e) {
+      print("Error deactivating subgoal: $e");
     }
-  } catch (e) {
-    print("Error deactivating subgoal: $e");
   }
-}
 
   void _showSubgoalCompletionDialog() {
     // Check if current time is before the end of the week
@@ -4582,7 +4619,7 @@ Future<void> _deactivateCurrentSubgoal() async {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withAlpha((0.05 * 255).toInt()),
               blurRadius: 10,
               spreadRadius: 0,
               offset: const Offset(0, 2),
@@ -4597,7 +4634,7 @@ Future<void> _deactivateCurrentSubgoal() async {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: primaryOrange.withOpacity(0.1),
+                  color: primaryOrange.withAlpha((0.1 * 255).toInt()),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -4629,30 +4666,32 @@ Future<void> _deactivateCurrentSubgoal() async {
                 ),
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 20),
               // Add the Update Weight & Body Fat button
-              Container(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _showUpdateWeightDialog,
-                  icon: const Icon(Icons.update, color: Colors.white),
-                  label: const Text(
-                    "Update Weight & Body Fat",
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: Colors.white,
+              if (userGoal!['goalType'] == 'High Intensity Cycling')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _showUpdateWeightDialog,
+                    icon: const Icon(Icons.update, color: Colors.white),
+                    label: const Text(
+                      "Update Weight & Body Fat",
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryOrange,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryOrange,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -5074,89 +5113,95 @@ Future<void> _deactivateCurrentSubgoal() async {
   }
 
   Future<void> _updateUserMetrics() async {
-  try {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
 
-    // Parse the new metric values
-    double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
-    double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
-    double newMetabolicRate = double.tryParse(_updateMetabolicRateController.text) ?? 0;
+      // Parse the new metric values
+      double newWeight = double.tryParse(_updateWeightController.text) ?? 0;
+      double newBodyFat = double.tryParse(_updateBodyFatController.text) ?? 0;
+      double newMetabolicRate =
+          double.tryParse(_updateMetabolicRateController.text) ?? 0;
 
-    // Query the latest userData document for the user
-    final userDataQuery = await FirebaseFirestore.instance
-        .collection('userData')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
+      // Query the latest userData document for the user
+      final userDataQuery = await FirebaseFirestore.instance
+          .collection('userData')
+          .where('uid', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
 
-    // Prepare the new data to be saved
-    Map<String, dynamic> newData = {
-      'uid': uid,
-      'timestamp': FieldValue.serverTimestamp(),
-      'weight': newWeight,
-      'bodyFat': newBodyFat,
-      'basalMetabolicRate': newMetabolicRate,
-    };
+      // Prepare the new data to be saved
+      Map<String, dynamic> newData = {
+        'uid': uid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'weight': newWeight,
+        'bodyFat': newBodyFat,
+        'basalMetabolicRate': newMetabolicRate,
+      };
 
-    // Copy over existing fields from the latest userData document
-    if (userDataQuery.docs.isNotEmpty) {
-      Map<String, dynamic> existingData = userDataQuery.docs.first.data();
-      existingData.forEach((key, value) {
-        if (key != 'uid' && key != 'timestamp' && key != 'weight' && key != 'bodyFat' && key != 'basalMetabolicRate') {
-          newData[key] = value;
-        }
-      });
-    }
-
-    // Save the new userData document
-    await FirebaseFirestore.instance.collection('userData').add(newData);
-
-    // Update current user weight for immediate display
-    setState(() {
-      _currentUserWeight = newWeight;
-    });
-
-    // Refresh all weekly data to include the new weight
-    await _fetchAllWeeklyGoalData();
-
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Progress updated successfully!')));
-
-    // Check and update baseline_complete in the goals collection
-    final goalsSnapshot = await FirebaseFirestore.instance
-        .collection('goals')
-        .where('uid', isEqualTo: uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-
-    if (goalsSnapshot.docs.isNotEmpty) {
-      final goalDoc = goalsSnapshot.docs.first;
-      final goalData = goalDoc.data();
-
-      if (goalData['baseline_complete'] == null || goalData['baseline_complete'] == false) {
-        await FirebaseFirestore.instance
-            .collection('goals')
-            .doc(goalDoc.id)
-            .update({'baseline_complete': true});
-
-        setState(() {
-          _isBaselineComplete = true;
+      // Copy over existing fields from the latest userData document
+      if (userDataQuery.docs.isNotEmpty) {
+        Map<String, dynamic> existingData = userDataQuery.docs.first.data();
+        existingData.forEach((key, value) {
+          if (key != 'uid' &&
+              key != 'timestamp' &&
+              key != 'weight' &&
+              key != 'bodyFat' &&
+              key != 'basalMetabolicRate') {
+            newData[key] = value;
+          }
         });
-
-        print('Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
       }
-    }
 
-  } catch (e) {
-    print('Error updating metrics: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update progress: $e')));
+      // Save the new userData document
+      await FirebaseFirestore.instance.collection('userData').add(newData);
+
+      // Update current user weight for immediate display
+      setState(() {
+        _currentUserWeight = newWeight;
+      });
+
+      // Refresh all weekly data to include the new weight
+      await _fetchAllWeeklyGoalData();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Progress updated successfully!')));
+
+      // Check and update baseline_complete in the goals collection
+      final goalsSnapshot = await FirebaseFirestore.instance
+          .collection('goals')
+          .where('uid', isEqualTo: uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (goalsSnapshot.docs.isNotEmpty) {
+        final goalDoc = goalsSnapshot.docs.first;
+        final goalData = goalDoc.data();
+
+        if (goalData['baseline_complete'] == null ||
+            goalData['baseline_complete'] == false) {
+          await FirebaseFirestore.instance
+              .collection('goals')
+              .doc(goalDoc.id)
+              .update({'baseline_complete': true});
+
+          setState(() {
+            _isBaselineComplete = true;
+          });
+
+          print(
+              'Updated baseline_complete to true for goal document ID: ${goalDoc.id}');
+        }
+      }
+    } catch (e) {
+      print('Error updating metrics: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update progress: $e')));
+    }
   }
-}
 
   Widget _buildProgressCard(String title, double progress, double target,
       String unit, Color color, IconData icon,
@@ -5517,11 +5562,12 @@ Future<void> _deactivateCurrentSubgoal() async {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (context) => const FoodQuestionnairePage()),
-  );
-},
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const FoodQuestionnairePage()),
+                  );
+                },
                 icon: const Icon(Icons.update, color: Colors.white),
                 label: const Text(
                   "Update Food Intake",

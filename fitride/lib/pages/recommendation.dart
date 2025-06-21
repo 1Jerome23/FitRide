@@ -91,9 +91,9 @@ class CalorieData {
       weekEndDate = baselineEndDate.subtract(const Duration(days: 21));
     }
     // Default fallback - use last 7 days
-    else {
-      weekStartDate = now.subtract(Duration(days: 6));
-      weekEndDate = now;
+  else {
+      weekStartDate = now;
+      weekEndDate = now.add(const Duration(days: 6));
     }
 
     print(
