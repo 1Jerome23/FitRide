@@ -3956,8 +3956,8 @@ Widget _buildPSPOMetricItem(String label, String value, IconData icon, Color col
   }
 
   Widget _buildSubgoalSelectionCard() {
-    if (hasActiveSubgoal || goalType != "High Intensity Cycling")
-      return SizedBox.shrink();
+  if (hasActiveSubgoal || !(goalType == "High Intensity Cycling" || goalType == "Endurance"))
+  return SizedBox.shrink();
 
     int targetDaysPerWeek = int.tryParse(daysPerWeek) ?? 0;
 
@@ -6631,7 +6631,7 @@ void _generateWeightManagementRecommendations() {
                       child: _buildPrimaryRecommendationCard(),
                     ),
                     SizedBox(height: 16),
-                    if (goalType == "High Intensity Cycling")
+                    if (goalType == "High Intensity Cycling" || goalType == "Endurance")
                       TweenAnimationBuilder(
                         tween: Tween<double>(begin: 0, end: 1),
                         duration: Duration(milliseconds: 800),
