@@ -1362,6 +1362,10 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
               userGoal!['goalType'] == 'High Intensity Cycling') {
             await _fetchActiveSubgoal();
           }
+          else if (userGoal != null &&
+              userGoal!['goalType'] == 'Endurance') {
+            await _fetchActiveSubgoal();
+          }
 
           // After fetching the goal and before setting state
           await _fetchWeeklyProgressData();
@@ -6010,6 +6014,239 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
         ),
       );
     }
+    else if (goalType == 'Endurance') {
+  return FadeTransition(
+    opacity: _fadeAnimation,
+    child: Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 5, top: 15),
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _showUpdateWeightDialog,
+            icon: const Icon(Icons.update, color: Colors.white),
+            label: const Text(
+              "Update Weight",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryOrange,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+
+        if (hasActiveSubgoal) _buildActiveSubgoalCard(),
+
+        Container(
+          margin: const EdgeInsets.only(top: 10),
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _showWeeklyProgressHistory,
+            icon: const Icon(Icons.history, color: Colors.white),
+            label: const Text(
+              "View Weekly Progress History",
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueGrey[700],
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+
+        // Collapsible Goal Card
+        StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryOrange.withOpacity(0.2),
+                    primaryOrange.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: primaryOrange.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        isMainGoalExpanded = !isMainGoalExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: primaryOrange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Image.asset(
+                                _getIconForGoalType(goalType),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  goalType,
+                                  style: const TextStyle(
+                                    fontFamily: 'Fredoka-SemiBold',
+                                    fontSize: 20,
+                                    color: primaryBlack,
+                                  ),
+                                ),
+                                Text(
+                                  "Started on ${DateFormat('MMM d, yyyy').format(createdAt)}",
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: primaryGray,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            isMainGoalExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            color: primaryOrange,
+                            size: 30,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 300),
+                    crossFadeState: isMainGoalExpanded
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    firstChild: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 6),
+
+                          // Endurance Best Distance Card
+                          if (_bestDistanceDate != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: primaryOrange.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.emoji_events,
+                                    size: 16,
+                                    color: primaryOrange,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "Best Distance: ${DateFormat('MMM d, yyyy').format(_bestDistanceDate!)}",
+                                    style: const TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: primaryBlack,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue.shade700,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    "Endurance cycling focuses on building stamina. Pace yourself and increase your distance over time. Don’t forget to hydrate and fuel properly.",
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    secondChild: const SizedBox(height: 0),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    ),
+  );
+}
+
 
     // For other goal types (Leisure or Endurance)
     return FadeTransition(
