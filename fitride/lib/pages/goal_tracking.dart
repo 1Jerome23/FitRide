@@ -827,7 +827,7 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     // Check for stored dialog flags
     _checkDialogFlags();
 
-    Future.delayed(Duration(milliseconds: 500), () {
+    Future.delayed(Duration(milliseconds: 1000), () {
       _loadUserGoalAndActivities();
     });
 
@@ -5055,59 +5055,118 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
   }
 
   Future<void> checkAndUpdateBaselineComplete(String userId) async {
-  final firestore = FirebaseFirestore.instance;
+    final firestore = FirebaseFirestore.instance;
 
-  try {
-    // Step 1: Get the user's goal document
-    final goalSnapshot = await firestore
-        .collection('goals')
-        .doc(userId)
-        .get();
+    try {
+      // Step 1: Get the user's goal document
+      final goalQuery = await firestore
+          .collection('goals')
+          .where('uid', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
 
-    if (!goalSnapshot.exists) {
-      print('Goal document not found for user $userId');
-      return;
+      if (goalQuery.docs.isEmpty) {
+        print('Goal document not found for user $userId');
+        return;
+      }
+
+      final goalSnapshot = goalQuery.docs.first;
+
+      if (!goalSnapshot.exists) {
+        print('Goal document not found for user $userId');
+        return;
+      }
+
+      final goalData = goalSnapshot.data();
+      if (goalData == null) {
+        print('Goal data is null for user $userId');
+        return;
+      }
+
+      // Check if the goal type is "Endurance"
+      if (goalData['goalType'] == 'Endurance') {
+        int daysPerWeek = 0;
+        if (goalData.containsKey('daysPerWeek')) {
+          var daysValue = goalData['daysPerWeek'];
+          if (daysValue is int) {
+            daysPerWeek = daysValue;
+          } else if (daysValue is double) {
+            daysPerWeek = daysValue.toInt();
+          } else if (daysValue is String) {
+            daysPerWeek = int.tryParse(daysValue) ?? 0;
+          }
+        }
+
+        // Step 2: Define baseline week range (example: last 7 days from goal creation)
+        // Use baseline start and end dates from the goal document if available
+        DateTime weekStart = goalData['baseline_StartDate'] != null
+            ? (goalData['baseline_StartDate'] as Timestamp).toDate()
+            : _goalCreationDate;
+        DateTime weekEnd = goalData['baseline_EndDate'] != null
+            ? (goalData['baseline_EndDate'] as Timestamp).toDate()
+            : weekStart.add(Duration(days: 6));
+
+        // Step 3: Query user activities within baseline week
+        final activitySnapshot = await firestore
+            .collection('activities')
+            .where('uid', isEqualTo: userId)
+            .where('start_date', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+            .where('start_date', isLessThanOrEqualTo: Timestamp.fromDate(weekEnd))
+            .get();
+
+        // Step 4: Count number of activities
+        int activityCount = activitySnapshot.docs.length;
+
+        print('Endurance goal: Activities done: $activityCount / Goal: $daysPerWeek');
+
+        // Step 5: Update baseline_complete if condition met
+        if (activityCount >= daysPerWeek && daysPerWeek > 0) {
+            // Use the already retrieved goal document to update baseline_complete
+            await firestore.collection('goals').doc(goalSnapshot.id).update({
+            'baseline_complete': true,
+            });
+            print('Baseline marked as complete ✅');
+          } else {
+            print('Baseline not yet complete ❌');
+          }
+      } else {
+        // Fallback to previous logic for other goal types if needed
+        int daysPerWeek = goalData['DaysPerWeek'] ?? 0;
+
+        DateTime weekStart = _goalCreationDate;
+        DateTime weekEnd = weekStart.add(Duration(days: 6));
+
+        final activitySnapshot = await firestore
+            .collection('activities')
+            .where('userId', isEqualTo: userId)
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+            .where('date', isLessThanOrEqualTo: Timestamp.fromDate(weekEnd))
+            .get();
+
+        Set<String> activeDays = {};
+
+        for (var doc in activitySnapshot.docs) {
+          DateTime date = (doc['date'] as Timestamp).toDate();
+          String dateString = "${date.year}-${date.month}-${date.day}";
+          activeDays.add(dateString);
+        }
+
+        print('Active days: ${activeDays.length} / Goal: $daysPerWeek');
+
+        if (activeDays.length >= daysPerWeek) {
+          await firestore.collection('goals').doc(userId).update({
+            'baseline_complete': true,
+          });
+          print('Baseline marked as complete ✅');
+        } else {
+          print('Baseline not yet complete ❌');
+        }
+      }
+    } catch (e) {
+      print('Error checking baseline: $e');
     }
-
-    int daysPerWeek = goalSnapshot.data()?['DaysPerWeek'] ?? 0;
-
-    // Step 2: Define baseline week range (example: last 7 days)
-    DateTime weekStart = _goalCreationDate;
-    DateTime weekEnd = weekStart.add(Duration(days: 6));
-
-    // Step 3: Query user activities within baseline week
-    final activitySnapshot = await firestore
-        .collection('activities')
-        .where('userId', isEqualTo: userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(weekEnd))
-        .get();
-
-    // Step 4: Count unique days the user was active
-    Set<String> activeDays = {};
-
-    for (var doc in activitySnapshot.docs) {
-      DateTime date = (doc['date'] as Timestamp).toDate();
-      String dateString = "${date.year}-${date.month}-${date.day}";
-      activeDays.add(dateString);
-    }
-
-    print('Active days: ${activeDays.length} / Goal: $daysPerWeek');
-
-    // Step 5: Update baseline_complete if condition met
-    if (activeDays.length >= daysPerWeek) {
-      await firestore.collection('goals').doc(userId).update({
-        'baseline_complete': true,
-      });
-      print('Baseline marked as complete ✅');
-    } else {
-      print('Baseline not yet complete ❌');
-    }
-
-  } catch (e) {
-    print('Error checking baseline: $e');
   }
-}
 
 // Helper method to build consistent input fields with fully rounded icon backgrounds
   Widget _buildInputField({
@@ -6015,33 +6074,11 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
       );
     }
     else if (goalType == 'Endurance') {
-  return FadeTransition(
+    return FadeTransition(
     opacity: _fadeAnimation,
     child: Column(
       children: [
-        Container(
-          margin: const EdgeInsets.only(bottom: 5, top: 15),
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _showUpdateWeightDialog,
-            icon: const Icon(Icons.update, color: Colors.white),
-            label: const Text(
-              "Update Weight",
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryOrange,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
+      // Removed "Update Weight" button for Endurance goal type
 
         if (hasActiveSubgoal) _buildActiveSubgoalCard(),
 
