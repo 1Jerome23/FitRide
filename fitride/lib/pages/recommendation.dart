@@ -5729,12 +5729,17 @@ Future<void> _fetchUserData() async {
   }
 
   void _generateLeisureRecommendations() {
-    // Define heart rate zones for leisure cycling
-    double maxHeartRate = 220 - age.toDouble();
-    double targetHeartRateUpper =
-        maxHeartRate * 0.7; // 70% of max HR for leisure
-    double targetHeartRateLower =
-        maxHeartRate * 0.5; // 50% of max HR for leisure
+    // Determine max heart rate: use user-provided limit if health condition exists and value is set
+    double maxHeartRate;
+    double heartRateLimitValue = safeParseDouble(heartRateLimit);
+    if (healthCondition == "Cardiovascular or Respiratory" && heartRateLimitValue > 0) {
+      maxHeartRate = heartRateLimitValue;
+    } else {
+      maxHeartRate = 220 - age.toDouble();
+    }
+
+    double targetHeartRateUpper = maxHeartRate * 0.7; // 70% of max HR for leisure
+    double targetHeartRateLower = maxHeartRate * 0.5; // 50% of max HR for leisure
 
     // Get latest activity metrics
     double latestHeartRate = safeParseDouble(averageHeartrate);
@@ -5830,9 +5835,6 @@ Future<void> _fetchUserData() async {
           .add("Monitor breathing with 'talk test' during rides.");
       healthRecommendations
           .add("Check air quality before rides (aim for AQI < 100).");
-    }
-
-    if (healthCondition == "Cardiovascular or Respiratory") {
       healthRecommendations.add(
           "Stay in ${targetHeartRateLower.toInt()}-${targetHeartRateUpper.toInt()} bpm zone.");
       healthRecommendations
@@ -6193,8 +6195,15 @@ void _generateWeightManagementRecommendations() {
     double targetDurationValue = safeParseDouble(targetDuration);
     double currentDurationValue = safeParseDouble(sessionDuration) / 60;
 
-    // Heart rate zones - updated based on the research
-    double maxHeartRate = 220 - age.toDouble();
+    // Use user-provided heart rate limit if health condition exists and value is set
+    double heartRateLimitValue = safeParseDouble(heartRateLimit);
+    double maxHeartRate;
+    if (healthCondition == "Cardiovascular or Respiratory" && heartRateLimitValue > 0) {
+      maxHeartRate = heartRateLimitValue;
+    } else {
+      maxHeartRate = 220 - age.toDouble();
+    }
+
     double enduranceZoneLower = maxHeartRate * 0.65; // 65% of max HR
     double enduranceZoneUpper = maxHeartRate * 0.75; // 75% of max HR
     double thresholdZoneLower = maxHeartRate * 0.76; // 76% of max HR
@@ -6210,63 +6219,63 @@ void _generateWeightManagementRecommendations() {
     //prinze PSPO-recoms start
     //PSPO-based recommendations
     if (activityData.length >= 2) {
-    double weightInKg = safeParseDouble(weight);
-    print("User weight for PSPO recommendation: $weightInKg kg");
-    
-    // Process activities to calculate PSPO
-    List<double> pspoValues = [];
-    print("Starting PSPO calculation for recommendations with ${activityData.length} activities:");
-    
-    for (var activity in activityData) {
-      double distance = safeParseDouble(activity['distance']);
-      double durationSeconds = safeParseDouble(activity['elapsed_time']);
-      double avgSpeed = safeParseDouble(activity['average_speed']);
+      double weightInKg = safeParseDouble(weight);
+      print("User weight for PSPO recommendation: $weightInKg kg");
       
-      print("Activity data - Distance: $distance km, Duration: $durationSeconds s, Speed: $avgSpeed km/h");
+      // Process activities to calculate PSPO
+      List<double> pspoValues = [];
+      print("Starting PSPO calculation for recommendations with ${activityData.length} activities:");
       
-      if (distance > 0 && durationSeconds > 0) {
-        // If average speed is not available, calculate it
-        double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
-        print("Speed used for PSPO: $speedKmh km/h");
+      for (var activity in activityData) {
+        double distance = safeParseDouble(activity['distance']);
+        double durationSeconds = safeParseDouble(activity['elapsed_time']);
+        double avgSpeed = safeParseDouble(activity['average_speed']);
         
-        // Calculate PSPO
-        double pspo = calculatePSPO(speedKmh, weightInKg, durationSeconds);
-        print("Calculated PSPO: $pspo W");
+        print("Activity data - Distance: $distance km, Duration: $durationSeconds s, Speed: $avgSpeed km/h");
         
-        if (pspo > 0) {
-          pspoValues.add(pspo);
-          print("Added PSPO value to recommendations list, total now: ${pspoValues.length}");
+        if (distance > 0 && durationSeconds > 0) {
+          // If average speed is not available, calculate it
+          double speedKmh = avgSpeed > 0 ? avgSpeed : (distance / (durationSeconds / 3600));
+          print("Speed used for PSPO: $speedKmh km/h");
+          
+          // Calculate PSPO
+          double pspo = calculatePSPO(speedKmh, weightInKg, durationSeconds);
+          print("Calculated PSPO: $pspo W");
+          
+          if (pspo > 0) {
+            pspoValues.add(pspo);
+            print("Added PSPO value to recommendations list, total now: ${pspoValues.length}");
+          }
+        }
+      }
+      
+      print("Total valid PSPO values: ${pspoValues.length}");
+      
+      if (pspoValues.length >= 2) {
+        // Calculate recent trend
+        pspoValues.sort(); // Sort from lowest to highest
+        double avgPSPO = pspoValues.reduce((a, b) => a + b) / pspoValues.length;
+        double maxPSPO = pspoValues.last;
+        double pspoPerKg = maxPSPO / weightInKg;
+        
+        print("PSPO stats - Avg: $avgPSPO W, Max: $maxPSPO W, PSPO/kg: $pspoPerKg W/kg");
+        
+        // Recommendations based on PSPO/kg
+        if (pspoPerKg < 2.5) {
+          pspoRecommendations.add(
+            "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
+          );
+        } else if (pspoPerKg < 3.5) {
+          pspoRecommendations.add(
+            "Your moderate PSPO indicates you're ready for tempo training. Add interval sessions with 3-5 minute efforts at ${(maxHeartRate * 0.8).toInt()} bpm."
+          );
+        } else {
+          pspoRecommendations.add(
+            "Your strong PSPO allows for high-intensity training. Include VO2max intervals (2-3 minute efforts at ${(maxHeartRate * 0.9).toInt()} bpm) for advanced gains."
+          );
         }
       }
     }
-    
-    print("Total valid PSPO values: ${pspoValues.length}");
-    
-    if (pspoValues.length >= 2) {
-      // Calculate recent trend
-      pspoValues.sort(); // Sort from lowest to highest
-      double avgPSPO = pspoValues.reduce((a, b) => a + b) / pspoValues.length;
-      double maxPSPO = pspoValues.last;
-      double pspoPerKg = maxPSPO / weightInKg;
-      
-      print("PSPO stats - Avg: $avgPSPO W, Max: $maxPSPO W, PSPO/kg: $pspoPerKg W/kg");
-      
-      // Recommendations based on PSPO/kg
-      if (pspoPerKg < 2.5) {
-        pspoRecommendations.add(
-          "Focus on base endurance training with long Zone 2 rides (${zone2HeartRate.toInt()} bpm) to build your aerobic foundation."
-        );
-      } else if (pspoPerKg < 3.5) {
-        pspoRecommendations.add(
-          "Your moderate PSPO indicates you're ready for tempo training. Add interval sessions with 3-5 minute efforts at ${zone3HeartRate.toInt()} bpm."
-        );
-      } else {
-        pspoRecommendations.add(
-          "Your strong PSPO allows for high-intensity training. Include VO2max intervals (2-3 minute efforts at ${zone4HeartRate.toInt()} bpm) for advanced gains."
-        );
-      }
-    }
-  }
     //prinze PSPO-recoms end
 
     // Tracking progress and providing feedback
@@ -6482,13 +6491,6 @@ void _generateWeightManagementRecommendations() {
       }
 
       // Health condition recommendations - updated based on research
-      if (healthCondition == "Cardiovascular or Respiratory") {
-        // Updated based on air quality research
-        healthRecommendations.add(
-            "With your respiratory condition, build endurance gradually and monitor symptoms during exercise. Controlled aerobic exercise can increase respiratory stamina.");
-        healthRecommendations.add(
-            "Only ride outdoors when air quality is good, as pollution can exacerbate respiratory issues, reduce lung function, and decrease performance. Consider training in lower-pollution environments.");
-      }
 
       if (healthCondition == "Cardiovascular or Respiratory") {
         // Updated based on AHA research and Myles C's advice
@@ -8742,6 +8744,9 @@ void _generateWeightManagementRecommendations() {
   // Calculate a fixed card height that will be safe for all cards
   double cardHeight = math.min(media.width * 0.45, 180);
 
+  // Hide food, weight, and calorie data for Leisure goal
+  bool hideFoodWeightCalories = goalType == 'Leisure';
+
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -8902,9 +8907,10 @@ void _generateWeightManagementRecommendations() {
               ),
             ),
           ),
-          Expanded(
-            child: _buildWeeklyCaloriesBurnedCard(cardHeight),
-          ),
+          if (!hideFoodWeightCalories)
+            Expanded(
+              child: _buildWeeklyCaloriesBurnedCard(cardHeight),
+            ),
         ],
       ),
 
@@ -9054,149 +9060,150 @@ void _generateWeightManagementRecommendations() {
             ),
 
             // Weight Card
-            Expanded(
-              child: Container(
-                height: cardHeight,
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 2,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "Weight",
-                              style: TextStyle(
-                                fontFamily: 'Fredoka-SemiBold',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                overflow: TextOverflow.ellipsis,
+            if (!hideFoodWeightCalories)
+              Expanded(
+                child: Container(
+                  height: cardHeight,
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                "Weight",
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka-SemiBold',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Color(0xffFF3800).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
+                            Container(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Color(0xffFF3800).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.monitor_weight_rounded,
+                                color: Color(0xffFF3800),
+                                size: 18,
+                              ),
                             ),
-                            child: Icon(
-                              Icons.monitor_weight_rounded,
-                              color: Color(0xffFF3800),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
 
-                      // Value display
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) {
-                                  return LinearGradient(
-                                          colors: [
-                                        Color(0xffFF3800),
-                                        Color(0xffE62200)
-                                      ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight)
-                                      .createShader(Rect.fromLTRB(
-                                          0, 0, bounds.width, bounds.height));
-                                },
-                                child: Text(
-                                  "${weight}",
-                                  style: TextStyle(
-                                    fontFamily: 'Fredoka-SemiBold',
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
+                        // Value display
+                        Expanded(
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ShaderMask(
+                                  blendMode: BlendMode.srcIn,
+                                  shaderCallback: (bounds) {
+                                    return LinearGradient(
+                                            colors: [
+                                          Color(0xffFF3800),
+                                          Color(0xffE62200)
+                                        ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight)
+                                        .createShader(Rect.fromLTRB(
+                                            0, 0, bounds.width, bounds.height));
+                                  },
+                                  child: Text(
+                                    "${weight}",
+                                    style: TextStyle(
+                                      fontFamily: 'Fredoka-SemiBold',
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Text(
-                                "kg | ${bodyFat}% fat",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
+                                Text(
+                                  "kg | ${bodyFat}% fat",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
 
-                      // Change indicator
-                      if (previousWeight > 0 && latestWeight > 0)
-                        Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: latestWeight < previousWeight
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                latestWeight < previousWeight
-                                    ? Icons.arrow_downward_rounded
-                                    : Icons.arrow_upward_rounded,
-                                size: 14,
-                                color: latestWeight < previousWeight
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
+                        // Change indicator
+                        if (previousWeight > 0 && latestWeight > 0)
+                          Container(
+                            padding:
+                                EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: latestWeight < previousWeight
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  latestWeight < previousWeight
+                                      ? Icons.arrow_downward_rounded
+                                      : Icons.arrow_upward_rounded,
+                                  size: 14,
                                   color: latestWeight < previousWeight
                                       ? Colors.green
                                       : Colors.red,
-                                  fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                            ],
+                                SizedBox(width: 5),
+                                Text(
+                                  "${(latestWeight - previousWeight).abs().toStringAsFixed(1)} kg",
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: latestWeight < previousWeight
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
 
         SizedBox(height: 15),
 
         // Bottom Card - Caloric Balance
-        if (goalType != 'Endurance') 
+        if (!hideFoodWeightCalories && goalType != 'Endurance') 
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
