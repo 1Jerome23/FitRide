@@ -5589,7 +5589,6 @@ Future<void> _fetchUserData() async {
     switch (goalType) {
       case "Leisure":
         _generateLeisureRecommendations();
-        _generateNutritionRecommendationsFromFoodDiary();
         break;
       case "High Intensity Cycling":
         _generateWeightManagementRecommendations();

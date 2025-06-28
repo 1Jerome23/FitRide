@@ -6079,7 +6079,35 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     child: Column(
       children: [
       // Removed "Update Weight" button for Endurance goal type
-
+Container(
+              margin: const EdgeInsets.only(bottom: 5, top: 15),
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const FoodQuestionnairePage()),
+                  );
+                },
+                icon: const Icon(Icons.update, color: Colors.white),
+                label: const Text(
+                  "Update Food Intake",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
         if (hasActiveSubgoal) _buildActiveSubgoalCard(),
 
         Container(

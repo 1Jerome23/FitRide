@@ -2814,77 +2814,79 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       );
                     },
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 5, bottom: 15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Title section
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.fitness_center_rounded,
-                                size: 22,
-                                color: Colors.blue[600],
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                "Body Metrics",
-                                style: TextStyle(
-                                  fontFamily: 'Fredoka-SemiBold',
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // Show All Metrics button
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _showAllMetrics = !_showAllMetrics;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[500]!.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.blue[500]!.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _showAllMetrics
-                                        ? Icons.keyboard_arrow_up_rounded
-                                        : Icons.keyboard_arrow_down_rounded,
-                                    size: 16,
-                                    color: Colors.blue[600],
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    _showAllMetrics ? "Hide" : "Show History",
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                    child: _userGoal != "Leisure"
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 5, bottom: 15),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Title section
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.fitness_center_rounded,
+                                      size: 22,
                                       color: Colors.blue[600],
                                     ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Body Metrics",
+                                      style: TextStyle(
+                                        fontFamily: 'Fredoka-SemiBold',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                // Show All Metrics button
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _showAllMetrics = !_showAllMetrics;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue[500]!.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.blue[500]!.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _showAllMetrics
+                                              ? Icons.keyboard_arrow_up_rounded
+                                              : Icons.keyboard_arrow_down_rounded,
+                                          size: 16,
+                                          color: Colors.blue[600],
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          _showAllMetrics ? "Hide" : "Show History",
+                                          style: TextStyle(
+                                            fontFamily: 'Inter',
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.blue[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          )
+                        : SizedBox.shrink(),
                   ),
 
                   SizedBox(height: 8),
@@ -2903,7 +2905,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       );
                     },
-                    child: _buildBodyMetricsHistory(),
+                    child: _userGoal != "Leisure"
+                        ? _buildBodyMetricsHistory()
+                        : SizedBox.shrink(),
                   ),
 
                   SizedBox(height: 40),
