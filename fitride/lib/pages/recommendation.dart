@@ -8907,7 +8907,7 @@ void _generateWeightManagementRecommendations() {
               ),
             ),
           ),
-          if (!hideFoodWeightCalories)
+        if (!hideFoodWeightCalories && goalType != 'Endurance')
             Expanded(
               child: _buildWeeklyCaloriesBurnedCard(cardHeight),
             ),
@@ -9060,8 +9060,7 @@ void _generateWeightManagementRecommendations() {
             ),
 
             // Weight Card
-            if (!hideFoodWeightCalories)
-              Expanded(
+            if (!hideFoodWeightCalories && goalType != 'Endurance')              Expanded(
                 child: Container(
                   height: cardHeight,
                   margin: const EdgeInsets.symmetric(horizontal: 5),
