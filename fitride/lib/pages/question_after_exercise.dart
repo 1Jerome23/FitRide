@@ -123,7 +123,28 @@ class _FoodQuestionnairePageState extends State<FoodQuestionnairePage> {
               SizedBox(height: 16),
 
               // Guidelines section (collapsible)
-              if (_showGuidelines) _buildGuidelines(),
+              if (_showGuidelines) ...[
+                _buildGuidelines(),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue[400], size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Note: Food intake calories and nutrition are estimated using an external library (CaloriesNinja API) and may sometimes be inaccurate. For best results, enter detailed and specific food descriptions.",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: Colors.blue[900],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Breakfast Section
               _buildMealSection(

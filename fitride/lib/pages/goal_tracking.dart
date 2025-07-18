@@ -5559,9 +5559,9 @@ class _GoalTrackingPageState extends State<GoalTrackingPage>
     }
 
     // If baseline is complete but there are no activities, show first activity prompt
-    if (!_hasActivityAfterGoal) {
-      return _buildFirstActivityPrompt();
-    }
+    // if (!_hasActivityAfterGoal) {
+    //   return _buildFirstActivityPrompt();
+    // }
 
     final goalType = userGoal!['goalType'] ?? '';
     final createdAt = userGoal!['timestamp'] != null
