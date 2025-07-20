@@ -1455,6 +1455,15 @@ class _QuestionPageState extends State<QuestionPage>
                   ),
                 ],
               ),
+              SizedBox(height: 8),
+              Text(
+                "Tip: If you don't have a body composition scale, you can estimate your Basal Metabolic Rate (BMR) using the Mifflin-St Jeor Equation:\n\nFor men: BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) + 5\nFor women: BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) - 161",
+                style: TextStyle(
+                  fontFamily: "Inter",
+                  color: Colors.grey[700],
+                  fontSize: 13,
+                ),
+              ),
               SizedBox(height: 15),
 
               // Body Fat
@@ -1516,6 +1525,7 @@ class _QuestionPageState extends State<QuestionPage>
                   ),
                 ],
               ),
+              // Removed body fat calculation tip here
             ],
           ),
         ),
@@ -2038,8 +2048,8 @@ class _QuestionPageState extends State<QuestionPage>
                 ),
               ),
             ),
-          ),
-        );
+          )
+          );
       },
     );
   }
